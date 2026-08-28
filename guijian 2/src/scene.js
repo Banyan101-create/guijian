@@ -1,6 +1,21 @@
 
 var scene = new THREE.Scene();
-scene.background = new THREE.Color(0x1b1d22);
+
+// subtle vertical gradient sky for depth (kept close to the original mood)
+(function makeSkyBackground() {
+  var c = document.createElement('canvas');
+  c.width = 2; c.height = 256;
+  var ctx = c.getContext('2d');
+  var g = ctx.createLinearGradient(0, 0, 0, 256);
+  g.addColorStop(0.0, '#2a2f3a');
+  g.addColorStop(0.5, '#1b1d22');
+  g.addColorStop(1.0, '#131418');
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, 2, 256);
+  var tex = new THREE.CanvasTexture(c);
+  tex.encoding = THREE.sRGBEncoding;
+  scene.background = tex;
+})();
 scene.fog = new THREE.Fog(0x1b1d22, 45, 100);
 
 var camera = new THREE.PerspectiveCamera(42, window.innerWidth/window.innerHeight, 0.1, 200);
