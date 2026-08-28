@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>古建生成器 · Chinese Architecture Generator</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="wrap">
+  <div id="panel">
+    <h3>古建生成器</h3>
+
+    <div class="sec">建筑类型 building</div>
+    <div class="row"><label>类型 type</label>
+      <select id="buildingType">
+        <option value="hall">大殿 hall</option>
+        <option value="pagoda">高塔 pagoda</option>
+      </select>
+    </div>
+    <div class="row pg"><label>塔式 style</label>
+      <select id="pagodaStyle">
+        <option value="louge">楼阁式 pavilion</option>
+        <option value="miyan">密檐式 dense-eave</option>
+      </select>
+    </div>
+    <div class="row pg"><label>层数 storeys <span id="stOut"></span></label><input type="range" id="storeys" min="3" max="13" step="2" value="7"></div>
+    <div class="row pg"><label>平面边数 plan sides <span id="sdOut"></span></label><input type="range" id="sides" min="4" max="8" step="2" value="8"></div>
+
+    <div class="sec">模数 module 斗口</div>
+    <div class="row"><label>斗口等级 grade <span id="dkOut"></span></label><input type="range" id="doukou" min="1" max="11" step="1" value="6"></div>
+    <div class="row"><label>做法 class</label>
+      <select id="classType">
+        <option value="da">大式 grand (bracketed)</option>
+        <option value="xiao">小式 minor (no brackets)</option>
+      </select>
+    </div>
+    <div class="row"><label>年代 period</label>
+      <select id="period">
+        <option value="qing">清 Qing 工程做法则例</option>
+        <option value="song">宋 Song 营造法式</option>
+      </select>
+    </div>
+
+    <div class="sec">开间进深 plan</div>
+    <div class="row"><label>面阔间数 bays <span id="bayOut"></span></label><input type="range" id="bays" min="3" max="11" step="2" value="5"></div>
+    <div class="row"><label>檩数 purlins <span id="plOut"></span></label><input type="range" id="purlins" min="5" max="11" step="2" value="9"></div>
+
+    <div class="sec">屋顶 roof</div>
+    <div class="row"><label>式样 type</label>
+      <select id="roofType">
+        <option value="xieshan">歇山顶 hip-and-gable</option>
+        <option value="wudian">庑殿顶 hip roof</option>
+      </select>
+    </div>
+    <div class="row"><label>推山 tuishan <span id="tsOut"></span></label><input type="range" id="tuishan" min="0" max="1" step="1" value="1"></div>
+    <div class="row"><label>瓦垄 tile ribs <span id="tOut"></span></label><input type="range" id="tiles" min="0" max="60" step="2" value="26"></div>
+
+    <div class="sec">做法细则 rules</div>
+    <div class="row"><label>生起 shengqi <span id="sqOut"></span></label><input type="range" id="shengqi" min="0" max="1" step="1" value="1"></div>
+    <div class="row"><label>侧脚 cejiao <span id="cjOut"></span></label><input type="range" id="cejiao" min="0" max="1" step="1" value="1"></div>
+    <div class="row"><label>栏杆 balustrade <span id="rlOut"></span></label><input type="range" id="railing" min="0" max="1" step="1" value="1"></div>
+    <div class="row"><label>彩画 caihua <span id="chOut"></span></label><input type="range" id="caihua" min="0" max="1" step="1" value="1"></div>
+
+    <div class="sec">推算尺寸 derived</div>
+    <div id="derived" style="font-size:11px;line-height:1.65;color:#8f8c84;font-variant-numeric:tabular-nums;"></div>
+
+    <div class="sec">颜色 palette</div>
+    <div class="row"><label>预设 preset</label>
+      <select id="preset">
+        <option value="imperial" selected>皇家 imperial · 黄琉璃</option>
+        <option value="official">官式 official · 绿琉璃</option>
+        <option value="heaven">天坛 heaven · 蓝琉璃</option>
+        <option value="library">文渊 library · 黑琉璃</option>
+        <option value="temple">寺观 temple · 灰瓦</option>
+        <option value="jiangnan">江南 Jiangnan · 粉墙黛瓦</option>
+        <option value="lingnan">岭南 Lingnan · southern</option>
+        <option value="tibetan">藏式 Tibetan · crimson + gold</option>
+      </select>
+    </div>
+    <div class="row"><label>瓦 tile</label><input type="color" id="roofColor" value="#b8912a"></div>
+    <div class="row"><label>脊/檐口 ridge + eave trim</label><input type="color" id="trimColor" value="#d8d2c2"></div>
+    <div class="row"><label>柱 columns</label><input type="color" id="woodColor" value="#8a2a1c"></div>
+    <div class="row"><label>枋/椽 beams + rafters</label><input type="color" id="beamColor" value="#1d4a66"></div>
+    <div class="row"><label>彩画 painted detail</label><input type="color" id="caihuaColor" value="#2f7d8a"></div>
+    <div class="row"><label>斗拱 brackets</label><input type="color" id="dgColor" value="#28647a"></div>
+    <div class="row"><label>墙 wall</label><input type="color" id="wallColor" value="#9e2f20"></div>
+    <div class="row"><label>槅扇 lattice</label><input type="color" id="latticeColor" value="#7a2418"></div>
+    <div class="row"><label>基座 base stone</label><input type="color" id="baseColor" value="#c9c3b2"></div>
+    <div class="row"><label>栏杆 balustrade</label><input type="color" id="railColor" value="#d8d2c2"></div>
+
+    <button id="exportBtn">导出 OBJ export</button>
+    <button id="imgBtn" style="background:#3f6b4a;">保存图片 save JPEG</button>
+    <div style="display:flex;gap:6px;margin-top:8px;">
+      <button id="saveBtn" style="margin-top:0;background:#2a4a66;">保存 save</button>
+      <button id="loadBtn" style="margin-top:0;background:#4a4a52;">读取 load</button>
+    </div>
+  </div>
+  <div id="hint">drag rotate · scroll zoom · right-drag pan</div>
+  <div id="stats"></div>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script src="src/scene.js"></script>
+<script src="src/constants.js"></script>
+<script src="src/roof.js"></script>
+<script src="src/pagoda.js"></script>
+<script src="src/hall.js"></script>
+<script src="src/palette.js"></script>
+<script src="src/app.js"></script>
+</body>
+</html>

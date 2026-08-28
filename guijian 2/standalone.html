@@ -1,0 +1,1853 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>古建生成器 Chinese Architecture Generator</title>
+<style>
+  html, body { margin:0; padding:0; overflow:hidden; background:#0e0e10; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; }
+  #wrap { position:relative; width:100vw; height:100vh; }
+  #panel { position:absolute; top:12px; left:12px; width:252px; background:rgba(16,16,18,0.88);
+    color:#e8e6e1; padding:14px 16px; border-radius:12px; font-size:12.5px; backdrop-filter:blur(10px);
+    max-height:94vh; overflow-y:auto; border:1px solid rgba(255,255,255,0.08); }
+  #panel h3 { margin:0 0 10px; font-size:12px; font-weight:500; color:#d9b779; letter-spacing:0.04em; text-transform:uppercase; }
+  #panel .sec { margin:14px 0 6px; font-size:11px; color:#8a877f; letter-spacing:0.05em; text-transform:uppercase; }
+  .row { margin:7px 0; }
+  .row label { display:flex; justify-content:space-between; margin-bottom:3px; color:#b8b5ad; font-size:12px; }
+  .row label span { color:#d9b779; font-variant-numeric:tabular-nums; }
+  input[type=range] { width:100%; accent-color:#b3542f; }
+  input[type=color] { width:100%; height:22px; border:none; border-radius:4px; background:none; cursor:pointer; }
+  select { width:100%; padding:5px 6px; border-radius:6px; background:#232326; color:#e8e6e1; border:1px solid #3a3a3e; font-size:12px; }
+  button { width:100%; margin-top:12px; padding:9px; background:#b3542f; color:#fff; border:none;
+    border-radius:7px; cursor:pointer; font-size:12.5px; font-weight:500; }
+  button:hover { background:#c9633a; }
+  #hint { position:absolute; bottom:12px; left:14px; color:#6a6862; font-size:11px; }
+  #stats { position:absolute; bottom:12px; right:14px; color:#6a6862; font-size:11px; font-variant-numeric:tabular-nums; }
+</style>
+</head>
+<body>
+<div id="wrap">
+  <div id="panel">
+    <h3>古建生成器</h3>
+
+    <div class="sec">建筑类型 building</div>
+    <div class="row"><label>类型 type</label>
+      <select id="buildingType">
+        <option value="hall">大殿 hall</option>
+        <option value="pagoda">高塔 pagoda</option>
+      </select>
+    </div>
+    <div class="row pg"><label>塔式 style</label>
+      <select id="pagodaStyle">
+        <option value="louge">楼阁式 pavilion</option>
+        <option value="miyan">密檐式 dense-eave</option>
+      </select>
+    </div>
+    <div class="row pg"><label>层数 storeys <span id="stOut"></span></label><input type="range" id="storeys" min="3" max="13" step="2" value="7"></div>
+    <div class="row pg"><label>平面边数 plan sides <span id="sdOut"></span></label><input type="range" id="sides" min="4" max="8" step="2" value="8"></div>
+
+    <div class="sec">模数 module 斗口</div>
+    <div class="row"><label>斗口等级 grade <span id="dkOut"></span></label><input type="range" id="doukou" min="1" max="11" step="1" value="6"></div>
+    <div class="row"><label>做法 class</label>
+      <select id="classType">
+        <option value="da">大式 grand (bracketed)</option>
+        <option value="xiao">小式 minor (no brackets)</option>
+      </select>
+    </div>
+    <div class="row"><label>年代 period</label>
+      <select id="period">
+        <option value="qing">清 Qing 工程做法则例</option>
+        <option value="song">宋 Song 营造法式</option>
+      </select>
+    </div>
+
+    <div class="sec">开间进深 plan</div>
+    <div class="row"><label>面阔间数 bays <span id="bayOut"></span></label><input type="range" id="bays" min="3" max="11" step="2" value="5"></div>
+    <div class="row"><label>檩数 purlins <span id="plOut"></span></label><input type="range" id="purlins" min="5" max="11" step="2" value="9"></div>
+
+    <div class="sec">屋顶 roof</div>
+    <div class="row"><label>式样 type</label>
+      <select id="roofType">
+        <option value="xieshan">歇山顶 hip-and-gable</option>
+        <option value="wudian">庑殿顶 hip roof</option>
+      </select>
+    </div>
+    <div class="row"><label>推山 tuishan <span id="tsOut"></span></label><input type="range" id="tuishan" min="0" max="1" step="1" value="1"></div>
+    <div class="row"><label>瓦垄 tile ribs <span id="tOut"></span></label><input type="range" id="tiles" min="0" max="60" step="2" value="26"></div>
+
+    <div class="sec">做法细则 rules</div>
+    <div class="row"><label>生起 shengqi <span id="sqOut"></span></label><input type="range" id="shengqi" min="0" max="1" step="1" value="1"></div>
+    <div class="row"><label>侧脚 cejiao <span id="cjOut"></span></label><input type="range" id="cejiao" min="0" max="1" step="1" value="1"></div>
+    <div class="row"><label>栏杆 balustrade <span id="rlOut"></span></label><input type="range" id="railing" min="0" max="1" step="1" value="1"></div>
+    <div class="row"><label>彩画 caihua <span id="chOut"></span></label><input type="range" id="caihua" min="0" max="1" step="1" value="1"></div>
+
+    <div class="sec">推算尺寸 derived</div>
+    <div id="derived" style="font-size:11px;line-height:1.65;color:#8f8c84;font-variant-numeric:tabular-nums;"></div>
+
+    <div class="sec">颜色 palette</div>
+    <div class="row"><label>预设 preset</label>
+      <select id="preset">
+        <option value="imperial" selected>皇家 imperial · 黄琉璃</option>
+        <option value="official">官式 official · 绿琉璃</option>
+        <option value="heaven">天坛 heaven · 蓝琉璃</option>
+        <option value="library">文渊 library · 黑琉璃</option>
+        <option value="temple">寺观 temple · 灰瓦</option>
+        <option value="jiangnan">江南 Jiangnan · 粉墙黛瓦</option>
+        <option value="lingnan">岭南 Lingnan · southern</option>
+        <option value="tibetan">藏式 Tibetan · crimson + gold</option>
+      </select>
+    </div>
+    <div class="row"><label>瓦 tile</label><input type="color" id="roofColor" value="#b8912a"></div>
+    <div class="row"><label>脊/檐口 ridge + eave trim</label><input type="color" id="trimColor" value="#d8d2c2"></div>
+    <div class="row"><label>柱 columns</label><input type="color" id="woodColor" value="#8a2a1c"></div>
+    <div class="row"><label>枋/椽 beams + rafters</label><input type="color" id="beamColor" value="#1d4a66"></div>
+    <div class="row"><label>彩画 painted detail</label><input type="color" id="caihuaColor" value="#2f7d8a"></div>
+    <div class="row"><label>斗拱 brackets</label><input type="color" id="dgColor" value="#28647a"></div>
+    <div class="row"><label>墙 wall</label><input type="color" id="wallColor" value="#9e2f20"></div>
+    <div class="row"><label>槅扇 lattice</label><input type="color" id="latticeColor" value="#7a2418"></div>
+    <div class="row"><label>基座 base stone</label><input type="color" id="baseColor" value="#c9c3b2"></div>
+    <div class="row"><label>栏杆 balustrade</label><input type="color" id="railColor" value="#d8d2c2"></div>
+
+    <button id="exportBtn">导出 OBJ export</button>
+    <button id="imgBtn" style="background:#3f6b4a;">保存图片 save JPEG</button>
+    <div style="display:flex;gap:6px;margin-top:8px;">
+      <button id="saveBtn" style="margin-top:0;background:#2a4a66;">保存 save</button>
+      <button id="loadBtn" style="margin-top:0;background:#4a4a52;">读取 load</button>
+    </div>
+  </div>
+  <div id="hint">drag rotate · scroll zoom · right-drag pan</div>
+  <div id="stats"></div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script>
+var scene = new THREE.Scene();
+scene.background = new THREE.Color(0x1b1d22);
+scene.fog = new THREE.Fog(0x1b1d22, 45, 100);
+
+var camera = new THREE.PerspectiveCamera(42, window.innerWidth/window.innerHeight, 0.1, 200);
+camera.position.set(12, 8, 13);
+
+var renderer = new THREE.WebGLRenderer({ antialias:true, preserveDrawingBuffer:true });
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.outputEncoding = THREE.sRGBEncoding;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.08;
+document.getElementById('wrap').appendChild(renderer.domElement);
+
+var controls = new THREE.OrbitControls(camera, renderer.domElement);
+controls.target.set(0, 2.2, 0);
+controls.enableDamping = true;
+controls.dampingFactor = 0.07;
+controls.minDistance = 3.5;
+controls.maxDistance = 60;
+controls.maxPolarAngle = Math.PI * 0.495;
+
+// procedural sky-ish environment for PBR reflections
+function makeEnvMap() {
+  var c = document.createElement('canvas');
+  c.width = 512; c.height = 256;
+  var ctx = c.getContext('2d');
+  var g = ctx.createLinearGradient(0, 0, 0, 256);
+  g.addColorStop(0.0, '#c2c9d0');
+  g.addColorStop(0.45, '#e2e0da');
+  g.addColorStop(0.55, '#8e8a80');
+  g.addColorStop(1.0, '#3b3a36');
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, 512, 256);
+  var tex = new THREE.CanvasTexture(c);
+  tex.mapping = THREE.EquirectangularReflectionMapping;
+  var pmrem = new THREE.PMREMGenerator(renderer);
+  pmrem.compileEquirectangularShader();
+  var env = pmrem.fromEquirectangular(tex).texture;
+  pmrem.dispose(); tex.dispose();
+  return env;
+}
+scene.environment = makeEnvMap();
+
+var hemi = new THREE.HemisphereLight(0xdfe3e6, 0x59493a, 0.55);
+scene.add(hemi);
+var sun = new THREE.DirectionalLight(0xfff4e6, 2.0);
+sun.position.set(9, 14, 7);
+sun.castShadow = true;
+sun.shadow.mapSize.set(2048, 2048);
+sun.shadow.camera.left = -16; sun.shadow.camera.right = 16;
+sun.shadow.camera.top = 16; sun.shadow.camera.bottom = -16;
+sun.shadow.camera.far = 50;
+sun.shadow.bias = -0.0009;
+scene.add(sun);
+var rim = new THREE.DirectionalLight(0xa8b4c4, 0.16);
+rim.position.set(-9, 5, -8);
+scene.add(rim);
+
+var ground = new THREE.Mesh(
+  new THREE.PlaneGeometry(120, 120),
+  new THREE.MeshStandardMaterial({ color:C('#2c2b26'), roughness:0.97, metalness:0 })
+);
+ground.rotation.x = -Math.PI/2;
+ground.receiveShadow = true;
+scene.add(ground);
+
+
+// ============================================================================
+//  PROCEDURAL TEXTURES — drawn greyscale so the material colour tints them,
+//  keeping every colour picker functional while adding real surface detail.
+// ============================================================================
+var TEX = {};
+function makeCanvas(w, h, draw) {
+  var c = document.createElement('canvas');
+  c.width = w; c.height = h;
+  draw(c.getContext('2d'), w, h);
+  var t = new THREE.CanvasTexture(c);
+  t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  t.anisotropy = 4;
+  t.encoding = THREE.sRGBEncoding;
+  return t;
+}
+
+function initTextures() {
+  // 筒瓦 barrel tiles: vertical half-round columns with row shadows
+  TEX.tile = makeCanvas(256, 256, function(ctx, w, h) {
+    var cols = 8, rows = 6;
+    for (var x = 0; x < w; x++) {
+      var ph = (x / (w/cols)) * Math.PI * 2;
+      var shade = 196 + 59 * Math.pow(0.5 + 0.5*Math.cos(ph), 0.6);
+      ctx.fillStyle = 'rgb(' + [shade,shade,shade].join(',') + ')';
+      ctx.fillRect(x, 0, 1, h);
+    }
+    ctx.fillStyle = 'rgba(40,40,40,0.35)';
+    for (var r = 0; r < rows; r++) {
+      ctx.fillRect(0, r*(h/rows), w, 3);
+      // 瓦当 tile-end discs on each row edge
+      for (var c2 = 0; c2 < cols; c2++) {
+        ctx.beginPath();
+        ctx.arc(c2*(w/cols) + (w/cols)/2, r*(h/rows)+2, 4, 0, Math.PI*2);
+        ctx.fillStyle = 'rgba(230,230,230,0.5)';
+        ctx.fill();
+        ctx.fillStyle = 'rgba(40,40,40,0.35)';
+      }
+    }
+  });
+
+  // wood grain: long vertical streaks with knots
+  TEX.wood = makeCanvas(128, 512, function(ctx, w, h) {
+    ctx.fillStyle = 'rgb(238,238,238)';
+    ctx.fillRect(0, 0, w, h);
+    for (var i = 0; i < 60; i++) {
+      var x = Math.random()*w, wd = 1 + Math.random()*2.5;
+      var sh = 198 + Math.random()*46;
+      ctx.strokeStyle = 'rgba(' + [sh,sh,sh].join(',') + ',0.55)';
+      ctx.lineWidth = wd;
+      ctx.beginPath();
+      ctx.moveTo(x, 0);
+      ctx.bezierCurveTo(x + (Math.random()-0.5)*14, h*0.33,
+                        x + (Math.random()-0.5)*14, h*0.66, x, h);
+      ctx.stroke();
+    }
+  });
+
+  // plaster: soft noise
+  TEX.plaster = makeCanvas(256, 256, function(ctx, w, h) {
+    ctx.fillStyle = 'rgb(242,242,242)';
+    ctx.fillRect(0, 0, w, h);
+    for (var i = 0; i < 4200; i++) {
+      var sh = 214 + Math.random()*40;
+      ctx.fillStyle = 'rgba(' + [sh,sh,sh].join(',') + ',0.25)';
+      ctx.fillRect(Math.random()*w, Math.random()*h, 1+Math.random()*2, 1+Math.random()*2);
+    }
+  });
+
+  // stone blocks: courses with mortar lines
+  TEX.stone = makeCanvas(256, 256, function(ctx, w, h) {
+    ctx.fillStyle = 'rgb(240,240,240)';
+    ctx.fillRect(0, 0, w, h);
+    var rows = 4, bw = w/3;
+    for (var r = 0; r < rows; r++) {
+      var off = (r % 2) * bw/2;
+      ctx.strokeStyle = 'rgba(90,90,90,0.6)'; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.moveTo(0, r*(h/rows)); ctx.lineTo(w, r*(h/rows)); ctx.stroke();
+      for (var b = -1; b < 4; b++) {
+        ctx.beginPath();
+        ctx.moveTo(off + b*bw, r*(h/rows)); ctx.lineTo(off + b*bw, (r+1)*(h/rows));
+        ctx.stroke();
+      }
+      for (var i = 0; i < 90; i++) {
+        var sh = 212 + Math.random()*40;
+        ctx.fillStyle = 'rgba(' + [sh,sh,sh].join(',') + ',0.3)';
+        ctx.fillRect(Math.random()*w, r*(h/rows)+2 + Math.random()*(h/rows-4), 2, 2);
+      }
+    }
+  });
+}
+
+// Hex colours are sRGB. With outputEncoding = sRGB the renderer converts
+// linear -> sRGB on output, so feeding sRGB in unconverted brightens everything
+// twice -- deep red renders as salmon. Convert on the way in.
+function C(hex) { return new THREE.Color(hex).convertSRGBToLinear(); }
+
+function texClone(t, rx, ry) {
+  var c = t.clone();
+  c.needsUpdate = true;
+  c.repeat.set(rx, ry);
+  return c;
+}
+
+initTextures();
+
+var buildingGroup = new THREE.Group();
+scene.add(buildingGroup);
+
+// ============================================================================
+//  MODULAR PROPORTION SYSTEM
+//  Every dimension below derives from one module, per 《工程做法则例》(Qing,
+//  1734) and 《营造法式》(Song, 1103). No invented constants.
+// ============================================================================
+
+// 斗口 grades 1..11 : 6.0寸 down to 1.0寸 in 0.5寸 steps (卷二十八)
+var DOUKOU_CUN = [6.0, 5.5, 5.0, 4.5, 4.0, 3.5, 3.0, 2.5, 2.0, 1.5, 1.0];
+
+// 举架 coefficient ladders, eave -> ridge, keyed by purlin count (Qing)
+var JUJIA = {
+  5:  [0.5, 0.7],
+  7:  [0.5, 0.65, 0.8],
+  9:  [0.5, 0.65, 0.75, 0.9],
+  11: [0.5, 0.6, 0.65, 0.75, 0.9]
+};
+
+// Song 举折: total rise as a fraction of span, by building class
+var JUZHE_RISE = { dian: 1/3, ting: 1/4 };
+
+function deriveDimensions(grade, bays, purlins, isDaShi, isSong) {
+  var dk = 1.0;                       // work in doukou units, scale at the end
+  var D = {};
+  D.doukouCun = DOUKOU_CUN[grade - 1];
+
+  // --- vertical: column ---
+  D.colDia    = 6 * dk;               // 檐柱径 = 6 斗口
+  D.colH      = 60 * dk;              // 檐柱高 = 60 斗口 (= 10 diameters)
+  D.colTopDia = D.colDia * (1 - (isDaShi ? 0.007 : 0.01) * 10); // 收分 taper
+  D.cejiao    = { front: 1/100, side: 8/1000 };                 // 侧脚 lean
+
+  // --- plan: bays. 明间 = 77 斗口 (7 攒 x 11), each outward bay -1 攒 ---
+  D.zanDang = 11 * dk;
+  var half = (bays - 1) / 2;
+  D.bayWidths = [];
+  for (var i = -half; i <= half; i++) {
+    var steps = Math.abs(i);
+    var w = 77 * dk - steps * D.zanDang;
+    D.bayWidths.push(Math.max(44 * dk, w));   // floor at 4 攒
+  }
+  D.totalWidth = D.bayWidths.reduce(function(a,b){ return a+b; }, 0);
+
+  // --- plan: depth. 通进深 = 通面阔 x 5/8 (documented 大式 rule), then
+  // subdivided into 步架 keeping the canonical 廊步:其他 = 24:19.2 = 1.25:1 ratio ---
+  D.totalDepth = D.totalWidth * 0.625;
+  D.halfDepth  = D.totalDepth / 2;
+  var halfSteps = (purlins - 1) / 2;
+  var weights = [];
+  for (var k = 0; k < halfSteps; k++) weights.push(k === 0 ? 1.25 : 1.0);
+  var wSum = weights.reduce(function(a,b){ return a+b; }, 0);
+  D.stepRuns = weights.map(function(w){ return (w / wSum) * D.halfDepth; });
+
+  // --- roof curve: real purlin positions from 举架 / 举折 ---
+  D.coeffs = JUJIA[purlins] || JUJIA[9];
+  D.purlins = [{ x: D.halfDepth, y: 0 }];       // eave purlin at the outside
+  var cx = D.halfDepth, cy = 0;
+  for (var j = 0; j < D.stepRuns.length; j++) {
+    cx -= D.stepRuns[j];
+    cy += D.coeffs[j] * D.stepRuns[j];
+    D.purlins.push({ x: Math.max(0, cx), y: cy });
+  }
+  D.pingShui = isDaShi ? 4 * dk : D.colDia - 1;   // 平水 above the melon column
+  D.roofRise = cy + D.pingShui;
+  D.purlins[D.purlins.length - 1].y += D.pingShui;
+
+  if (isSong) {
+    // 举折: fix total rise as a fraction of span, then fold top-down by halves
+    var H = D.totalDepth * JUZHE_RISE.dian;
+    var n = D.purlins.length;
+    for (var q = 0; q < n; q++) {
+      var t = q / (n - 1);                        // 0 = eave, 1 = ridge
+      D.purlins[q].y = H * t;
+    }
+    var fold = H / 10;
+    for (var f = n - 2; f > 0; f--) {
+      D.purlins[f].y -= fold;
+      fold /= 2;
+    }
+    D.roofRise = H;
+  }
+
+  // --- eave: 出檐 = 21 斗口 (檐椽 14 : 飞椽 7 = 2:1) ---
+  D.rafterDia   = 1.5 * dk;                       // 椽径 = 1.5 斗口
+  D.eaveRafter  = 14 * dk;
+  D.flyRafter   = 7 * dk;
+  D.eaveOut     = isDaShi ? (D.eaveRafter + D.flyRafter) : D.colH * 0.3;
+  D.zhengXinHeng = 4.5 * dk;                      // 正心桁径
+  D.tiaoYanHeng  = 3 * dk;                        // 挑檐桁径
+  D.purlinDia    = D.rafterDia * 3;               // 檩径 = 3 椽径
+
+  // --- 冲三翘四: corner rafter projects 3 椽径, rises 4 椽径 ---
+  D.cornerOut  = 3 * D.rafterDia;
+  D.cornerRise = 4 * D.rafterDia;
+
+  // --- 生起: corner columns rise 2寸 per two bays (Song only) ---
+  D.shengqi = isSong ? (bays - 1) * 0.5 * (2 / D.doukouCun) * dk : 0;
+
+  // --- platform 台明 ---
+  D.baseH = isDaShi ? D.colH * 0.2 : 2 * D.colDia;
+
+  // --- bracket set 斗栱 ---
+  D.dgUnit = dk;                                  // bracket sized on the module
+  D.dgH    = isDaShi ? 12 * dk : 0;
+
+  return D;
+}
+
+
+// ---------- legacy normalized profile (kept for the roof surface sampler) ----------
+function solveRoofProfile(halfDepth, roofHeight, steps) {
+  steps = steps || 5;
+  var coeffs = [0.5, 0.62, 0.72, 0.82, 0.92].slice(0, steps);
+  var stepRun = halfDepth / steps;
+  var pts = [{x:0, y:0}];
+  var cx = 0, cy = 0;
+  for (var i = 0; i < steps; i++) {
+    cx += stepRun; cy += coeffs[i] * stepRun;
+    pts.push({x:cx, y:cy});
+  }
+  var maxY = pts[pts.length-1].y, maxX = pts[pts.length-1].x;
+  return pts.map(function(p){
+    return { x: halfDepth - (p.x/maxX)*halfDepth, y: (p.y/maxY)*roofHeight };
+  }).reverse();
+}
+
+function profileH(t, profile, halfDepth) {
+  var tx = Math.min(1, Math.max(0, t)) * halfDepth;
+  for (var i = 0; i < profile.length-1; i++) {
+    var a = profile[i], b = profile[i+1];
+    if (tx >= a.x && tx <= b.x) {
+      var f = (tx - a.x) / (b.x - a.x || 1);
+      return a.y + (b.y - a.y) * f;
+    }
+  }
+  return profile[profile.length-1].y;
+}
+
+function cornerLift(t, xf, zf, upturn) {
+  return upturn * (xf * zf) * Math.max(0, (t - 0.5) / 0.5);
+}
+
+function makeSurface(o) {
+  var geo = new THREE.BufferGeometry();
+  var pos = [], idx = [], uvs = [];
+  var nx = o.segX + 1, nz = o.segZ + 1;
+  var thick = o.thickness || 0;
+
+  for (var j = 0; j <= o.segZ; j++) {
+    var v = j / o.segZ;
+    var z = o.halfDepth - v * 2 * o.halfDepth;
+    var t = Math.min(1, Math.abs(z) / o.halfDepth);
+    var bx = o.boundary(t);
+    for (var i = 0; i <= o.segX; i++) {
+      var u = i / o.segX;
+      var xr = -o.halfWidth + u * 2 * o.halfWidth;
+      var x = Math.max(-bx, Math.min(bx, xr));
+      pos.push(x, o.height(x, z, t, bx), z);
+      uvs.push(u, v);
+    }
+  }
+  var nVert = nx * nz;
+
+  if (thick > 0) {
+    for (var j2 = 0; j2 <= o.segZ; j2++) {
+      for (var i2 = 0; i2 <= o.segX; i2++) {
+        var base = (j2 * nx + i2) * 3;
+        pos.push(pos[base], pos[base+1] - thick, pos[base+2]);
+        uvs.push(i2/o.segX, j2/o.segZ);
+      }
+    }
+  }
+
+  for (var jj = 0; jj < o.segZ; jj++) {
+    for (var ii = 0; ii < o.segX; ii++) {
+      var a = jj*nx+ii, b = a+1, c = a+nx, d = c+1;
+      idx.push(a, c, b, b, c, d);
+      if (thick > 0) {
+        var a2 = a+nVert, b2 = b+nVert, c2 = c+nVert, d2 = d+nVert;
+        idx.push(a2, b2, c2, b2, d2, c2);
+      }
+    }
+  }
+
+  if (thick > 0) {
+    // stitch the four border rims so the shell is closed
+    for (var i3 = 0; i3 < o.segX; i3++) {
+      var f0 = i3, f1 = i3+1;
+      idx.push(f0, f1, f0+nVert, f1, f1+nVert, f0+nVert);
+      var k0 = o.segZ*nx + i3, k1 = k0+1;
+      idx.push(k1, k0, k0+nVert, k1, k0+nVert, k1+nVert);
+    }
+    for (var j3 = 0; j3 < o.segZ; j3++) {
+      var l0 = j3*nx, l1 = l0+nx;
+      idx.push(l1, l0, l0+nVert, l1, l0+nVert, l1+nVert);
+      var r0 = j3*nx + o.segX, r1 = r0+nx;
+      idx.push(r0, r1, r0+nVert, r1, r1+nVert, r0+nVert);
+    }
+  }
+
+  geo.setIndex(idx);
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  geo.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
+  geo.computeVertexNormals();
+  return geo;
+}
+
+// tile corrugation: ribs run down the slope, so ripple varies across the slope
+function tileRib(coord, ribCount, span, amp) {
+  if (ribCount <= 0) return 0;
+  var period = (2 * span) / ribCount;
+  var phase = (coord / period) * Math.PI * 2;
+  var c = 0.5 + 0.5 * Math.cos(phase);
+  // sharpen: rounded pan tiles with a defined valley between each rib
+  return amp * Math.pow(c, 0.4);
+}
+
+function ridgeBeam(len, thick, mat, ornament) {
+  var g = new THREE.Group();
+  var body = new THREE.Mesh(new THREE.BoxGeometry(len, thick*1.5, thick), mat);
+  g.add(body);
+  var cap = new THREE.Mesh(new THREE.BoxGeometry(len, thick*0.5, thick*1.5), mat);
+  cap.position.y = thick*0.9;
+  g.add(cap);
+  if (ornament) {
+    // 鸱吻 owl-tail finial: an S-curved silhouette extruded to give it real form
+    var sh = new THREE.Shape();
+    var u = thick;
+    sh.moveTo(0, 0);
+    sh.lineTo(u*1.5, 0);
+    sh.quadraticCurveTo(u*2.3, u*1.1, u*1.75, u*2.2);
+    sh.quadraticCurveTo(u*1.45, u*3.0, u*0.6, u*3.25);
+    sh.quadraticCurveTo(u*1.15, u*2.35, u*0.85, u*1.75);
+    sh.quadraticCurveTo(u*0.55, u*1.15, 0, u*1.0);
+    sh.lineTo(0, 0);
+    var eg = new THREE.ExtrudeGeometry(sh, { depth: u*0.95, bevelEnabled:true,
+      bevelThickness: u*0.09, bevelSize: u*0.08, bevelSegments: 2, curveSegments: 10 });
+    eg.translate(0, 0, -u*0.475);
+    [-1, 1].forEach(function(sd){
+      var o = new THREE.Mesh(eg, mat);
+      if (sd < 0) o.rotation.y = Math.PI;   // rotate, never mirror: mirroring inverts normals
+      o.position.set(sd * len/2, thick*0.35, 0);
+      o.castShadow = true; o.receiveShadow = true;
+      g.add(o);
+    });
+  }
+  g.traverse(function(m){ if(m.isMesh){ m.castShadow = true; m.receiveShadow = true; } });
+  return g;
+}
+
+// 垂脊/戗脊 hip ridges running down the diagonal hip lines
+function hipRidges(cornerPts, apexY, mat, thick) {
+  var g = new THREE.Group();
+  cornerPts.forEach(function(c){
+    var dir = new THREE.Vector3(c.x - c.ax, c.y - c.ay, c.z - c.az);
+    var len = dir.length();
+    if (len < 0.05) return;
+    var box = new THREE.Mesh(new THREE.BoxGeometry(thick*1.15, thick*1.5, len), mat);
+    var mid = new THREE.Vector3((c.x+c.ax)/2, (c.y+c.ay)/2 + thick*0.5, (c.z+c.az)/2);
+    box.position.copy(mid);
+    box.lookAt(new THREE.Vector3(c.x, c.y + thick*0.5, c.z));
+    box.castShadow = true; box.receiveShadow = true;
+    g.add(box);
+  });
+  return g;
+}
+
+// ---- eave assembly: 椽子 rafters, 飞椽 flying rafters, 瓦当 tile caps, pale trim band ----
+function buildEaveAssembly(hw, hd, heightFn, rafterMat, trimMat, capMat, spacing) {
+  var g = new THREE.Group();
+  var samples = [];
+  var stepsX = Math.max(6, Math.round((hw*2) / spacing));
+  var stepsZ = Math.max(4, Math.round((hd*2) / spacing));
+
+  function push(x, z, nx, nz) {
+    samples.push({ x:x, z:z, nx:nx, nz:nz, y:heightFn(x, z) });
+  }
+  for (var i = 0; i <= stepsX; i++) { var x = -hw + (i/stepsX)*hw*2; push(x, hd, 0, 1); }
+  for (var k = 1; k <= stepsZ; k++) { var z = hd - (k/stepsZ)*hd*2; push(hw, z, 1, 0); }
+  for (var i2 = stepsX; i2 >= 0; i2--) { var x2 = -hw + (i2/stepsX)*hw*2; push(x2, -hd, 0, -1); }
+  for (var k2 = 1; k2 < stepsZ; k2++) { var z2 = -hd + (k2/stepsZ)*hd*2; push(-hw, z2, -1, 0); }
+
+  // pale trim band: a closed prism ring (4 verts per sample) so it is a solid,
+  // not a double-sided sheet. A doubled-winding sheet is non-manifold.
+  var pos = [], idx = [];
+  var bandH = 0.105, bandT = 0.045;
+  var N = samples.length;
+  for (var s0 = 0; s0 < N; s0++) {
+    var p0 = samples[s0];
+    var ox = p0.nx * bandT, oz = p0.nz * bandT;
+    var yT = p0.y + 0.010, yB = yT - bandH;
+    pos.push(p0.x + ox, yT, p0.z + oz);   // outer top
+    pos.push(p0.x + ox, yB, p0.z + oz);   // outer bottom
+    pos.push(p0.x - ox, yB, p0.z - oz);   // inner bottom
+    pos.push(p0.x - ox, yT, p0.z - oz);   // inner top
+  }
+  function quad(a,b,c,d){ idx.push(a,b,c, a,c,d); }
+  for (var s1 = 0; s1 < N; s1++) {
+    var A = s1*4, B = ((s1+1) % N)*4;
+    quad(A+0, A+1, B+1, B+0);   // outer face
+    quad(B+3, B+2, A+2, A+3);   // inner face
+    quad(A+3, A+0, B+0, B+3);   // top
+    quad(A+1, A+2, B+2, B+1);   // bottom
+  }
+  var bandGeo = new THREE.BufferGeometry();
+  bandGeo.setIndex(idx);
+  bandGeo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  bandGeo.computeVertexNormals();
+  var band = new THREE.Mesh(bandGeo, trimMat);
+  band.castShadow = true; band.receiveShadow = true;
+  g.add(band);
+
+  // rafters + flying rafters, instanced
+  var rl = 0.30, rr = 0.042;
+  var rafterGeo = new THREE.CylinderGeometry(rr, rr, rl, 8);
+  rafterGeo.rotateX(Math.PI/2);
+  var flyGeo = new THREE.BoxGeometry(rr*1.5, rr*1.5, rl*0.62);
+  var capGeo = new THREE.CylinderGeometry(rr*1.15, rr*1.15, 0.03, 12);
+  capGeo.rotateX(Math.PI/2);
+
+  var n = samples.length;
+  var rafters = new THREE.InstancedMesh(rafterGeo, rafterMat, n);
+  var flyers  = new THREE.InstancedMesh(flyGeo, rafterMat, n);
+  var caps    = new THREE.InstancedMesh(capGeo, capMat, n);
+  var m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), e = new THREE.Euler();
+  var up = new THREE.Vector3(0,1,0);
+
+  for (var s2 = 0; s2 < n; s2++) {
+    var p = samples[s2];
+    var ang = Math.atan2(p.nx, p.nz);
+    e.set(0.26, ang, 0, 'YXZ');
+    q.setFromEuler(e);
+    var sc = new THREE.Vector3(1,1,1);
+
+    m4.compose(new THREE.Vector3(p.x - p.nx*rl*0.62, p.y - 0.038, p.z - p.nz*rl*0.62), q, sc);
+    rafters.setMatrixAt(s2, m4);
+
+    e.set(0.10, ang, 0, 'YXZ'); q.setFromEuler(e);
+    m4.compose(new THREE.Vector3(p.x - p.nx*rl*0.22, p.y - 0.014, p.z - p.nz*rl*0.22), q, sc);
+    flyers.setMatrixAt(s2, m4);
+
+    e.set(0, ang, 0, 'YXZ'); q.setFromEuler(e);
+    m4.compose(new THREE.Vector3(p.x - p.nx*0.015, p.y - 0.006, p.z - p.nz*0.015), q, sc);
+    caps.setMatrixAt(s2, m4);
+  }
+  [rafters, flyers, caps].forEach(function(im){
+    im.instanceMatrix.needsUpdate = true;
+    im.castShadow = true; im.receiveShadow = true;
+    g.add(im);
+  });
+  return g;
+}
+
+function buildRoof(P) {
+  var group = new THREE.Group();
+  var halfWidth = P.halfWidth, halfDepth = P.halfDepth;
+  var profile = solveRoofProfile(halfDepth, P.roofHeight, 5);
+  var mat = P.tileMat, wallMat = P.gableMat, trimMat = P.trimMat;
+  var ribs = P.ribs, ribAmp = 0.075;
+  var segX = ribs > 0 ? Math.max(60, ribs * 3) : 32;
+
+  if (P.roofType === 'wudian') {
+    // 推山 (tuishan): each step above the eave step is reduced by 1/10 of its
+    // own run, recursively -- this lengthens 正脊 beyond the naive 45-degree hip.
+    var naiveRidge = Math.max(0.35, halfWidth - halfDepth);
+    var ridgeHalfLen = naiveRidge;
+    if (P.tuishan) {
+      var steps = 4, run = halfDepth / steps, gained = 0, cur = run;
+      for (var ts = 1; ts < steps; ts++) { cur = cur * 0.9; gained += (run - cur); }
+      ridgeHalfLen = Math.min(halfWidth * 0.92, naiveRidge + gained);
+    }
+    var boundary = function(t){ return halfWidth; };
+    var geo = makeSurface({
+      segX: segX, segZ: 40, halfWidth: halfWidth, halfDepth: halfDepth,
+      thickness: P.shellThick,
+      boundary: boundary,
+      height: function(x, z, t, bx) {
+        var dz = Math.abs(z) / halfDepth;
+        var dx = Math.max(0, Math.abs(x) - ridgeHalfLen) / Math.max(halfWidth - ridgeHalfLen, 1e-6);
+        var hipDom = dx > dz;
+        var tEff = Math.min(1, Math.max(dz, dx));
+        var y = profileH(tEff, profile, halfDepth);
+        y += cornerLift(tEff, Math.abs(x)/halfWidth, dz, P.upturn);
+        y += tileRib(hipDom ? z : x, ribs, hipDom ? halfDepth : halfWidth, ribAmp);
+        return y;
+      }
+    });
+    var m = new THREE.Mesh(geo, mat);
+    m.castShadow = true; m.receiveShadow = true;
+    group.add(m);
+    var rb = ridgeBeam(ridgeHalfLen*2 + 0.2, 0.11, trimMat, true);
+    var apexY = profileH(0, profile, halfDepth);
+    rb.position.set(0, apexY + 0.09, 0);
+    group.add(rb);
+    var eaveY0 = profileH(1, profile, halfDepth);
+    var cps = [];
+    [[1,1],[1,-1],[-1,1],[-1,-1]].forEach(function(s){
+      cps.push({ ax: s[0]*ridgeHalfLen, ay: apexY, az: 0,
+                 x: s[0]*halfWidth, y: eaveY0 + P.upturn, z: s[1]*halfDepth });
+    });
+    group.add(hipRidges(cps, apexY, trimMat, 0.1));
+    group.add(buildEaveAssembly(halfWidth, halfDepth, function(x,z){
+      var dz = Math.abs(z)/halfDepth;
+      var dx = Math.max(0, Math.abs(x)-ridgeHalfLen)/Math.max(halfWidth-ridgeHalfLen,1e-6);
+      var tE = Math.min(1, Math.max(dz,dx));
+      return profileH(tE, profile, halfDepth) + cornerLift(tE, Math.abs(x)/halfWidth, dz, P.upturn) - P.shellThick;
+    }, P.rafterMat, P.eaveTrimMat, P.capMat, 0.30));
+    return group;
+  }
+
+  // ---- 歇山顶 xieshan ----
+  // derive the gable break from the 收山 gable plane rather than a magic fraction
+  var tBreak = P.purlinDia
+    ? Math.min(0.78, Math.max(0.35, 1 - (halfDepth * 0.55 + P.purlinDia) / halfDepth))
+    : 1 - P.gableFrac;
+  // 收山 (shoushan): Qing recedes the gable plane one 檩径 from the side
+  // purlin centreline, rather than an arbitrary fraction of the width.
+  var gableHW = P.purlinDia
+    ? Math.max(halfWidth * 0.22, halfWidth - halfDepth * 0.55 - P.purlinDia)
+    : halfWidth * (0.30 + 0.25 * P.gableFrac);
+  var skirtTopY = profileH(tBreak, profile, halfDepth);
+  var gableWallH = 0.0;
+  var ridgeY = profileH(0, profile, halfDepth);
+
+  var lowerBoundary = function(t) { return halfWidth; };
+  var lowerGeo = makeSurface({
+    segX: segX, segZ: 44, halfWidth: halfWidth, halfDepth: halfDepth,
+    thickness: P.shellThick,
+    boundary: lowerBoundary,
+    height: function(x, z, t, bx) {
+      var gz = tBreak * halfDepth;
+      var dx = Math.max(0, Math.abs(x) - gableHW) / Math.max(halfWidth - gableHW, 1e-6);
+      var dz = Math.max(0, Math.abs(z) - gz) / Math.max(halfDepth - gz, 1e-6);
+      if (dx <= 0 && dz <= 0) return skirtTopY;
+      var hipDom = dx > dz;
+      var f = Math.min(1, Math.max(dx, dz));
+      var tEff = tBreak + f * (1 - tBreak);
+      var y = profileH(tEff, profile, halfDepth);
+      y += cornerLift(tEff, Math.abs(x)/halfWidth, Math.abs(z)/halfDepth, P.upturn);
+      y += tileRib(hipDom ? z : x, ribs, hipDom ? halfDepth : halfWidth, ribAmp);
+      return y;
+    }
+  });
+  var lower = new THREE.Mesh(lowerGeo, mat);
+  lower.castShadow = true; lower.receiveShadow = true;
+  group.add(lower);
+
+  var upHD = tBreak * halfDepth * 1.10;
+  var upHW = gableHW * 1.10;
+  var upBase = skirtTopY - 0.05;
+  var upperGeo = makeSurface({
+    segX: Math.max(40, Math.round(ribs*1.6)), segZ: 30, halfWidth: upHW, halfDepth: upHD,
+    thickness: P.shellThick,
+    boundary: function(){ return upHW; },
+    height: function(x, z, t, bx) {
+      var tt = Math.min(1, Math.abs(z) / upHD);
+      var span = ridgeY - skirtTopY;
+      var y = upBase + span * (1 - Math.pow(tt, 1.35));
+      y += cornerLift(tt, bx > 0 ? Math.abs(x)/bx : 0, tt, P.upturn * 0.5);
+      y += tileRib(x, Math.round(ribs*0.55), upHW, ribAmp);
+      return y;
+    }
+  });
+  var upper = new THREE.Mesh(upperGeo, mat);
+  upper.castShadow = true; upper.receiveShadow = true;
+  group.add(upper);
+
+  // 山花 gable end walls
+  [1, -1].forEach(function(side){
+    var shape = new THREE.Shape();
+    shape.moveTo(-upHD, 0);
+    shape.lineTo(upHD, 0);
+    shape.lineTo(0, (ridgeY - skirtTopY) + gableWallH);
+    shape.lineTo(-upHD, 0);
+    var gGeo = new THREE.ExtrudeGeometry(shape, { depth: 0.07, bevelEnabled: false });
+    gGeo.translate(0, 0, -0.035);
+    var gm = new THREE.Mesh(gGeo, wallMat);
+    gm.rotation.y = side * Math.PI/2;
+    gm.position.set(side * gableHW * 0.985, skirtTopY - 0.012, 0);
+    gm.castShadow = true; gm.receiveShadow = true;
+    group.add(gm);
+  });
+
+  // main ridge 正脊
+  var rb2 = ridgeBeam(upHW*2 + 0.15, 0.1, trimMat, true);
+  rb2.position.set(0, upBase + (ridgeY - skirtTopY) + 0.08, 0);
+  group.add(rb2);
+
+  // 戗脊 hip ridges on the lower skirt: gable corner -> eave corner
+  var eaveY1 = profileH(1, profile, halfDepth);
+  var scps = [];
+  [[1,1],[1,-1],[-1,1],[-1,-1]].forEach(function(s){
+    scps.push({ ax: s[0]*gableHW, ay: skirtTopY, az: s[1]*upHD,
+                x: s[0]*halfWidth, y: eaveY1 + P.upturn, z: s[1]*halfDepth });
+  });
+  group.add(hipRidges(scps, skirtTopY, trimMat, 0.09));
+
+  // 垂脊 on the upper gabled roof, ridge end down to its own eave corners
+  var upRidgeY = upBase + (ridgeY - skirtTopY);
+  var ucps = [];
+  [[1,1],[1,-1],[-1,1],[-1,-1]].forEach(function(s){
+    ucps.push({ ax: s[0]*upHW, ay: upRidgeY, az: 0,
+                x: s[0]*upHW, y: upBase + P.upturn*0.5, z: s[1]*upHD });
+  });
+  group.add(hipRidges(ucps, upRidgeY, trimMat, 0.075));
+
+  group.add(buildEaveAssembly(halfWidth, halfDepth, function(x,z){
+    var gz = tBreak * halfDepth;
+    var dx = Math.max(0, Math.abs(x)-gableHW)/Math.max(halfWidth-gableHW,1e-6);
+    var dz = Math.max(0, Math.abs(z)-gz)/Math.max(halfDepth-gz,1e-6);
+    var f = Math.min(1, Math.max(dx,dz));
+    var tE = tBreak + f*(1-tBreak);
+    return profileH(tE, profile, halfDepth)
+         + cornerLift(tE, Math.abs(x)/halfWidth, Math.abs(z)/halfDepth, P.upturn) - P.shellThick;
+  }, P.rafterMat, P.eaveTrimMat, P.capMat, 0.30));
+
+  group.add(buildEaveAssembly(upHW, upHD, function(x,z){
+    var tt = Math.min(1, Math.abs(z)/upHD);
+    var span = ridgeY - skirtTopY;
+    return upBase + span*(1-Math.pow(tt,1.35))
+         + cornerLift(tt, Math.abs(x)/upHW, tt, P.upturn*0.5) - P.shellThick;
+  }, P.rafterMat, P.eaveTrimMat, P.capMat, 0.32));
+
+  return group;
+}
+
+
+// ============================================================================
+//  PAGODA (塔) — polygonal 攒尖顶 tier roofs + storey stacking
+//  Taper per storey from 应县木塔 measured 面阔: 968/927/883/842/798 cm
+//  -> ratios 0.958 / 0.953 / 0.954 / 0.948, mean ~= 0.953
+// ============================================================================
+var PAGODA_TAPER = 0.953;
+
+function polyRadius(R, n, theta) {
+  var sector = (Math.PI * 2) / n;
+  var a = ((theta % sector) + sector) % sector - sector / 2;
+  return R * Math.cos(Math.PI / n) / Math.cos(a);
+}
+
+function cornerProximity(n, theta) {
+  var sector = (Math.PI * 2) / n;
+  var a = ((theta % sector) + sector) % sector;
+  var d = Math.min(a, sector - a) / (sector / 2);
+  return 1 - d;
+}
+
+function profileFrac(u, profile) {
+  var last = profile[profile.length-1];
+  var span = profile[0].y - last.y || 1;
+  var tx = u * (last.x - profile[0].x) + profile[0].x;
+  for (var i = 0; i < profile.length-1; i++) {
+    var a = profile[i], b = profile[i+1];
+    if (tx >= a.x && tx <= b.x) {
+      var f = (tx - a.x) / (b.x - a.x || 1);
+      var y = a.y + (b.y - a.y) * f;
+      return (profile[0].y - y) / span;
+    }
+  }
+  return 1;
+}
+
+function buildPolygonRoof(R, n, rise, upturn, ribs, profile, mat, thickness) {
+  var ribK = n * Math.max(3, Math.round((ribs||12) / 5));
+  var segA = Math.max(n * 12, ribK * 3), segR = 14;
+  var pos = [], idx = [], uvs = [];
+  var nA = segA + 1;
+
+  function hAt(u, theta) {
+    var y = rise * (1 - profileFrac(u, profile));
+    var cp = cornerProximity(n, theta);
+    y += upturn * Math.pow(cp, 2.2) * Math.max(0, (u - 0.5) / 0.5);
+    if (ribs > 0) {
+      // tile rows radiate from the apex: one rib every few degrees, amplitude
+      // scaled to the roof so it reads at any size
+      var K = n * Math.max(3, Math.round(ribs / 5));
+      var ribPhase = theta * K;
+      y += R * 0.030 * Math.pow(0.5 + 0.5 * Math.cos(ribPhase), 0.45) * Math.min(1, u * 2.2);
+    }
+    return y;
+  }
+
+  for (var j = 0; j <= segR; j++) {
+    var u = j / segR;
+    for (var i = 0; i <= segA; i++) {
+      var th = (i / segA) * Math.PI * 2;
+      var rr = polyRadius(R, n, th) * u;
+      pos.push(Math.cos(th) * rr, hAt(u, th), Math.sin(th) * rr);
+      uvs.push(i / segA, u);
+    }
+  }
+  var nVert = nA * (segR + 1);
+  if (thickness > 0) {
+    for (var j2 = 0; j2 <= segR; j2++)
+      for (var i2 = 0; i2 <= segA; i2++) {
+        var b = (j2 * nA + i2) * 3;
+        pos.push(pos[b], pos[b+1] - thickness, pos[b+2]);
+        uvs.push(i2 / segA, j2 / segR);
+      }
+  }
+  for (var jj = 0; jj < segR; jj++)
+    for (var ii = 0; ii < segA; ii++) {
+      var a2 = jj*nA+ii, b2 = a2+1, c2 = a2+nA, d2 = c2+1;
+      idx.push(a2, c2, b2, b2, c2, d2);
+      if (thickness > 0) idx.push(a2+nVert, b2+nVert, c2+nVert, b2+nVert, d2+nVert, c2+nVert);
+    }
+  if (thickness > 0) {
+    for (var e = 0; e < segA; e++) {
+      var o0 = segR*nA + e, o1 = o0 + 1;
+      idx.push(o0, o1, o0+nVert, o1, o1+nVert, o0+nVert);
+    }
+  }
+  var geo = new THREE.BufferGeometry();
+  geo.setIndex(idx);
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  geo.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
+  geo.computeVertexNormals();
+  var m = new THREE.Mesh(geo, mat);
+  m.castShadow = true; m.receiveShadow = true;
+  return m;
+}
+
+function buildPagodaStorey(R, n, height, colDia, colMat, wallMat, railMat, withBalcony) {
+  var g = new THREE.Group();
+  var colGeo = new THREE.CylinderGeometry(colDia*0.46, colDia*0.5, height, 12);
+  for (var k = 0; k < n; k++) {
+    var th = (k / n) * Math.PI * 2;
+    var x = Math.cos(th) * R, z = Math.sin(th) * R;
+    var c = new THREE.Mesh(colGeo, colMat);
+    c.position.set(x, height/2, z);
+    c.castShadow = true; c.receiveShadow = true;
+    g.add(c);
+    var th2 = ((k+1) / n) * Math.PI * 2;
+    var x2 = Math.cos(th2) * R, z2 = Math.sin(th2) * R;
+    var mx = (x+x2)/2, mz = (z+z2)/2;
+    var len = Math.sqrt((x2-x)*(x2-x) + (z2-z)*(z2-z)) * 0.9;
+    var panel = new THREE.Mesh(new THREE.BoxGeometry(len, height*0.995, colDia*0.35), wallMat);
+    panel.position.set(mx, height*0.4975, mz);
+    panel.lookAt(new THREE.Vector3(mx*2, height*0.4975, mz*2));
+    panel.castShadow = true; panel.receiveShadow = true;
+    g.add(panel);
+
+    // 槅扇 lattice window on each face, so storeys are not blank slabs
+    var fr = colDia * 0.16;
+    var winW = len * 0.62, winH = height * 0.52, winY = height * 0.56;
+    var lat = new THREE.Group();
+    var outward = new THREE.Vector3(mx*2, winY, mz*2);
+    [[0, winH/2],[0, -winH/2]].forEach(function(o){
+      var hb = new THREE.Mesh(new THREE.BoxGeometry(winW, fr, fr*1.4), railMat);
+      hb.position.set(0, o[1], 0); lat.add(hb);
+    });
+    [[-winW/2],[winW/2]].forEach(function(o){
+      var vb = new THREE.Mesh(new THREE.BoxGeometry(fr, winH, fr*1.4), railMat);
+      vb.position.set(o[0], 0, 0); lat.add(vb);
+    });
+    for (var gx = 1; gx < 4; gx++) {
+      var vm = new THREE.Mesh(new THREE.BoxGeometry(fr*0.5, winH*0.94, fr), railMat);
+      vm.position.set(-winW/2 + (winW/4)*gx, 0, fr*0.2); lat.add(vm);
+    }
+    for (var gy = 1; gy < 5; gy++) {
+      var hm = new THREE.Mesh(new THREE.BoxGeometry(winW*0.94, fr*0.5, fr), railMat);
+      hm.position.set(0, -winH/2 + (winH/5)*gy, fr*0.2); lat.add(hm);
+    }
+    lat.position.set(mx*1.005, winY, mz*1.005);
+    lat.lookAt(outward);
+    lat.traverse(function(m){ if(m.isMesh){ m.castShadow = true; m.receiveShadow = true; } });
+    g.add(lat);
+    // 額枋 head beam closing the top of each bay against the roof above
+    var beam = new THREE.Mesh(new THREE.BoxGeometry(len*1.04, colDia*0.75, colDia*0.55), colMat);
+    beam.position.set(mx, height - colDia*0.42, mz);
+    beam.lookAt(new THREE.Vector3(mx*2, height - colDia*0.42, mz*2));
+    beam.castShadow = true; beam.receiveShadow = true;
+    g.add(beam);
+    // 腰檐 sill band at the foot of each storey
+    var sill = new THREE.Mesh(new THREE.BoxGeometry(len*1.04, colDia*0.5, colDia*0.6), colMat);
+    sill.position.set(mx, colDia*0.3, mz);
+    sill.lookAt(new THREE.Vector3(mx*2, colDia*0.3, mz*2));
+    sill.castShadow = true; sill.receiveShadow = true;
+    g.add(sill);
+  }
+  if (withBalcony) {
+    var rr = R * 1.06, postH = height * 0.155;
+    var postGeo = new THREE.BoxGeometry(colDia*0.72, postH, colDia*0.72);
+    var steps = n * 2;
+    for (var q = 0; q < steps; q++) {
+      var th3 = (q / steps) * Math.PI * 2;
+      var pr = polyRadius(rr, n, th3);
+      var pst = new THREE.Mesh(postGeo, railMat);
+      pst.position.set(Math.cos(th3)*pr, postH/2, Math.sin(th3)*pr);
+      pst.rotation.y = -th3;
+      pst.castShadow = true;
+      g.add(pst);
+    }
+    // handrail + mid rail, plus a solid skirt board along the balcony edge
+    [[postH*0.98, colDia*0.55], [postH*0.52, colDia*0.34], [postH*0.10, colDia*0.9]].forEach(function(cfg){
+      for (var e2 = 0; e2 < n; e2++) {
+        var a1 = (e2/n)*Math.PI*2, a2b = ((e2+1)/n)*Math.PI*2;
+        var p1 = new THREE.Vector3(Math.cos(a1)*rr, cfg[0], Math.sin(a1)*rr);
+        var p2 = new THREE.Vector3(Math.cos(a2b)*rr, cfg[0], Math.sin(a2b)*rr);
+        var seg = new THREE.Mesh(
+          new THREE.BoxGeometry(p1.distanceTo(p2)*1.02, cfg[1], colDia*0.42), railMat);
+        seg.position.copy(p1).add(p2).multiplyScalar(0.5);
+        seg.lookAt(p2); seg.rotateY(Math.PI/2);
+        seg.castShadow = true; seg.receiveShadow = true;
+        g.add(seg);
+      }
+    });
+  }
+  return g;
+}
+
+function buildFinial(R, height, mat, goldMat) {
+  var g = new THREE.Group();
+  var mast = new THREE.Mesh(new THREE.CylinderGeometry(R*0.06, R*0.08, height, 12), mat);
+  mast.position.y = height/2;
+  g.add(mast);
+  var rings = 7;
+  for (var i = 0; i < rings; i++) {
+    var f = i / rings;
+    var rad = R * 0.30 * (1 - f * 0.62);
+    var d = new THREE.Mesh(new THREE.TorusGeometry(Math.max(0.01, rad), Math.max(0.005, R*0.035), 8, 20), goldMat);
+    d.rotation.x = Math.PI/2;
+    d.position.y = height * (0.22 + f * 0.55);
+    g.add(d);
+  }
+  var bead = new THREE.Mesh(new THREE.SphereGeometry(Math.max(0.01, R*0.10), 16, 12), goldMat);
+  bead.position.y = height * 0.94;
+  g.add(bead);
+  g.traverse(function(m){ if(m.isMesh){ m.castShadow = true; m.receiveShadow = true; } });
+  return g;
+}
+
+function buildPagoda(D, scale, opts, mats) {
+  var g = new THREE.Group();
+  var n = opts.sides, storeys = opts.storeys;
+  var dense = opts.style === 'miyan';
+  // 密檐式 towers are markedly more slender than 楼阁式, with one tall base
+  // storey then thin stacked eaves (嵩岳寺塔 ~40 m on a ~10 m base = 4:1).
+  var R0 = (D.totalWidth * scale) / 2 * (dense ? 0.30 : 1.0);
+  var storeyH = D.colH * scale * (dense ? 0.55 : 1.0);
+  var profile = solveRoofProfile(Math.max(0.001, D.halfDepth * scale), 1.0, 5);
+  var eaveOut = D.eaveOut * scale * (dense ? 0.5 : 1.0);
+  var thick = Math.max(0.03, D.purlinDia * scale * 0.5);
+
+  var y = 0, R = R0;
+  for (var i = 0; i < storeys; i++) {
+    var isFirst = (i === 0);
+    var h = dense ? (isFirst ? storeyH * 5.0 : storeyH * 0.34) : storeyH;
+
+    var body = buildPagodaStorey(R, n, h, D.colDia * scale,
+      mats.wood, mats.wall, mats.dg, !dense && !isFirst);
+    body.position.y = y;
+    g.add(body);
+
+    if (opts.dougong) {
+      var unit = D.colDia * scale * 0.22;
+      for (var k = 0; k < n * 3; k++) {
+        var th = (k / (n*3)) * Math.PI * 2;
+        var pr = polyRadius(R, n, th);
+        var blk = new THREE.Mesh(new THREE.BoxGeometry(unit*1.6, unit*1.5, unit*1.6), mats.dg);
+        blk.position.set(Math.cos(th)*pr, y + h + unit*0.7, Math.sin(th)*pr);
+        blk.rotation.y = -th;
+        blk.castShadow = true;
+        g.add(blk);
+      }
+    }
+
+    var tierRise = (dense ? 0.42 : 0.78) * storeyH;
+    var roofY = y + h + (opts.dougong ? D.colDia*scale*0.4 : 0) - thick*0.5;
+    var roof = buildPolygonRoof(R + eaveOut, n, tierRise,
+      D.cornerRise * scale, opts.ribs, profile, mats.tile, thick);
+    roof.position.y = roofY;
+    g.add(roof);
+
+    // pale eave band around each tier edge
+    var er = R + eaveOut;
+    for (var eb = 0; eb < n; eb++) {
+      var b1 = (eb/n)*Math.PI*2, b2 = ((eb+1)/n)*Math.PI*2;
+      var q1 = new THREE.Vector3(Math.cos(b1)*er, 0, Math.sin(b1)*er);
+      var q2 = new THREE.Vector3(Math.cos(b2)*er, 0, Math.sin(b2)*er);
+      var band = new THREE.Mesh(
+        new THREE.BoxGeometry(q1.distanceTo(q2)*1.02, thick*1.9, thick*1.5), mats.trim);
+      band.position.copy(q1).add(q2).multiplyScalar(0.5);
+      band.position.y = roofY - thick*0.6;
+      band.lookAt(new THREE.Vector3(q2.x, roofY - thick*0.6, q2.z));
+      band.rotateY(Math.PI/2);
+      band.castShadow = true; band.receiveShadow = true;
+      g.add(band);
+    }
+
+    y += h + tierRise * (dense ? 0.70 : 0.62);
+    R *= dense ? 0.982 : PAGODA_TAPER;   // dense-eave towers taper far more slowly
+  }
+
+  var capRise = storeyH * 1.05;
+  var cap = buildPolygonRoof(R + eaveOut*0.7, n, capRise,
+    D.cornerRise * scale * 0.8, opts.ribs, profile, mats.tile, thick);
+  cap.position.y = y;
+  g.add(cap);
+
+  var fin = buildFinial(R, storeyH * 1.25, mats.trim, mats.gold);
+  fin.position.y = y + capRise;
+  g.add(fin);
+
+  g.userData.totalHeight = y + capRise + storeyH * 1.25;
+  return g;
+}
+
+function buildBase(hw, hd, h, tiers, mat, trimMat) {
+  var g = new THREE.Group();
+  for (var i = 0; i < tiers; i++) {
+    var shrink = i * 0.22;
+    var w = (hw + 0.65) - shrink, d = (hd + 0.65) - shrink;
+    var th = h / tiers;
+    var m = new THREE.Mesh(new THREE.BoxGeometry(w*2, th*0.82, d*2), mat);
+    m.position.y = i*th + th*0.41;
+    m.castShadow = true; m.receiveShadow = true;
+    g.add(m);
+    // moulding cap for each tier (须弥座 profile hint)
+    var cap = new THREE.Mesh(new THREE.BoxGeometry(w*2 + 0.12, th*0.18, d*2 + 0.12), trimMat);
+    cap.position.y = i*th + th*0.91;
+    cap.castShadow = true; cap.receiveShadow = true;
+    g.add(cap);
+  }
+  return g;
+}
+
+function buildColumns(D, scale, baseH, mat, beamMat, plinthMat, useShengqi, useCejiao) {
+  var g = new THREE.Group();
+  var colH = D.colH * scale, r = (D.colDia * scale) / 2;
+  var topR = (D.colTopDia * scale) / 2;                       // 收分 entasis
+  var hw = (D.totalWidth * scale) / 2, hd = (D.totalDepth * scale) / 2;
+
+  // column x positions from the real bay widths, not even division
+  var xs = [-hw], acc = -hw;
+  for (var i = 0; i < D.bayWidths.length; i++) { acc += D.bayWidths[i] * scale; xs.push(acc); }
+
+  // depth positions from the 步架 step runs
+  var zs = [-hd], zacc = -hd;
+  for (var k = D.stepRuns.length - 1; k >= 0; k--) { zacc += D.stepRuns[k] * scale; zs.push(zacc); }
+  for (var k2 = 0; k2 < D.stepRuns.length; k2++) { zacc += D.stepRuns[k2] * scale; zs.push(zacc); }
+
+  var mid = (xs.length - 1) / 2;
+  xs.forEach(function(x, xi) {
+    zs.forEach(function(z, zi) {
+      var edge = (xi === 0 || xi === xs.length-1 || zi === 0 || zi === zs.length-1);
+      if (!edge) return;
+
+      // 生起: columns rise progressively toward the corners
+      var rise = useShengqi ? D.shengqi * scale * (Math.abs(xi - mid) / Math.max(mid,1)) : 0;
+      var h = colH + rise;
+
+      var geo = new THREE.CylinderGeometry(topR, r, h, 14);
+      var m = new THREE.Mesh(geo, mat);
+      m.position.set(x, baseH + h/2, z);
+
+      // 侧脚: columns lean inward, 1/100 front-back and 8/1000 side
+      if (useCejiao) {
+        m.rotation.z =  (x > 0 ? -1 : 1) * D.cejiao.side  * (Math.abs(x) > 1e-6 ? 1 : 0);
+        m.rotation.x =  (z > 0 ?  1 : -1) * D.cejiao.front * (Math.abs(z) > 1e-6 ? 1 : 0);
+      }
+      m.castShadow = true; m.receiveShadow = true;
+      g.add(m);
+
+      var pl = new THREE.Mesh(new THREE.CylinderGeometry(r*1.75, r*1.95, r*1.1, 16), plinthMat);
+      pl.position.set(x, baseH + r*0.55, z);
+      pl.castShadow = true; pl.receiveShadow = true;
+      g.add(pl);
+    });
+  });
+
+  // 额枋 head tie-beams, sized on the module (10:8 section)
+  var bh = D.colDia * scale * 0.8, bt = bh * 0.8;
+  var yTop = baseH + colH - bh*0.7;
+  [zs[0], zs[zs.length-1]].forEach(function(z){
+    var b = new THREE.Mesh(new THREE.BoxGeometry(hw*2, bh, bt), beamMat);
+    b.position.set(0, yTop, z); b.castShadow = true; g.add(b);
+  });
+  [xs[0], xs[xs.length-1]].forEach(function(x){
+    var b = new THREE.Mesh(new THREE.BoxGeometry(bt, bh, hd*2), beamMat);
+    b.position.set(x, yTop, 0); b.castShadow = true; g.add(b);
+  });
+  g.userData.xs = xs; g.userData.zs = zs;
+  return g;
+}
+
+// 斗拱 dougong bracket band under the eave
+function buildDougong(hw, hd, y, mat) {
+  var g = new THREE.Group();
+  var unit = 0.13;
+  var blockGeo = new THREE.BoxGeometry(unit*1.5, unit*0.55, unit*1.5);
+  var armGeo = new THREE.BoxGeometry(unit*3.4, unit*0.42, unit*0.6);
+  var armGeoZ = new THREE.BoxGeometry(unit*0.6, unit*0.42, unit*3.4);
+  var spacing = unit * 5.2;
+
+  function bracketAt(x, z, rotY) {
+    var b = new THREE.Group();
+    var d0 = new THREE.Mesh(blockGeo, mat);
+    b.add(d0);
+    for (var lvl = 1; lvl <= 2; lvl++) {
+      var arm = new THREE.Mesh(rotY ? armGeoZ : armGeo, mat);
+      arm.position.y = lvl * unit * 0.62;
+      arm.scale.setScalar(1 + lvl*0.16);
+      b.add(arm);
+      var blk = new THREE.Mesh(blockGeo, mat);
+      blk.position.y = lvl * unit * 0.62 + unit*0.3;
+      blk.scale.setScalar(0.85);
+      b.add(blk);
+    }
+    b.position.set(x, y, z);
+    b.traverse(function(m){ if(m.isMesh){ m.castShadow = true; } });
+    return b;
+  }
+
+  g.userData.height = 2 * unit * 0.62 + unit * 0.3 + unit * 0.275;
+  var nx = Math.max(3, Math.floor((hw*2) / spacing));
+  var nz = Math.max(2, Math.floor((hd*2) / spacing));
+  for (var i = 0; i <= nx; i++) {
+    var x = -hw + (i/nx) * hw*2;
+    g.add(bracketAt(x, hd, false));
+    g.add(bracketAt(x, -hd, false));
+  }
+  for (var k = 1; k < nz; k++) {
+    var z = -hd + (k/nz) * hd*2;
+    g.add(bracketAt(hw, z, true));
+    g.add(bracketAt(-hw, z, true));
+  }
+  return g;
+}
+
+function buildWalls(hw, hd, baseH, colH, mat, colR) {
+  var g = new THREE.Group();
+  // sit flush against the column centreline so no gap opens between wall and column
+  var wh = colH * 0.82, t = 0.09, inset = (colR || 0.08) * 0.5;
+  var back = new THREE.Mesh(new THREE.BoxGeometry((hw-inset)*2, wh, t), mat);
+  back.position.set(0, baseH + wh/2, -(hd-inset));
+  g.add(back);
+  [-1, 1].forEach(function(s){
+    var side = new THREE.Mesh(new THREE.BoxGeometry(t, wh, (hd-inset)*2), mat);
+    side.position.set(s*(hw-inset), baseH + wh/2, 0);
+    g.add(side);
+  });
+  g.traverse(function(m){ if(m.isMesh){ m.castShadow = true; m.receiveShadow = true; } });
+  return g;
+}
+
+// 槅扇 lattice door/window screens across the front bays
+function buildLattice(hw, hd, baseH, colH, bays, frameMat, paperMat, colR) {
+  var g = new THREE.Group();
+  var inset = (colR || 0.08) * 0.5;
+  var z = hd - inset;
+  var wh = colH * 0.78;
+  var y0 = baseH;
+  var span = (hw - inset) * 2;
+  var bayW = span / (bays - 1);
+  var panelW = bayW * 0.86;
+  var fr = 0.035;
+
+  var centre = Math.floor((bays - 1) / 2);
+  for (var b = 0; b < bays - 1; b++) {
+    var cx = -(hw - inset) + bayW * (b + 0.5);
+    var isDoor = (b === centre) || (bays >= 7 && Math.abs(b - centre) === 1);
+    // paper/screen backing
+    var back = new THREE.Mesh(new THREE.BoxGeometry(panelW, wh, 0.02), paperMat);
+    back.position.set(cx, y0 + wh/2, z);
+    g.add(back);
+    // outer frame
+    [[0, wh/2],[0, -wh/2]].forEach(function(o){
+      var h = new THREE.Mesh(new THREE.BoxGeometry(panelW, fr*1.6, fr*2.2), frameMat);
+      h.position.set(cx + o[0], y0 + wh/2 + o[1], z);
+      g.add(h);
+    });
+    [[-panelW/2, 0],[panelW/2, 0]].forEach(function(o){
+      var vb = new THREE.Mesh(new THREE.BoxGeometry(fr*1.6, wh, fr*2.2), frameMat);
+      vb.position.set(cx + o[0], y0 + wh/2, z);
+      g.add(vb);
+    });
+    // doors run their lattice much lower than windows
+    var gridTop = y0 + wh*0.97, gridBot = y0 + (isDoor ? wh*0.20 : wh*0.34);
+    var cols = 5, rows = 7;
+    for (var c = 1; c < cols; c++) {
+      var vx = cx - panelW/2 + (panelW/cols)*c;
+      var vm = new THREE.Mesh(new THREE.BoxGeometry(fr*0.75, gridTop-gridBot, fr*1.5), frameMat);
+      vm.position.set(vx, (gridTop+gridBot)/2, z + 0.006);
+      g.add(vm);
+    }
+    for (var rr = 1; rr < rows; rr++) {
+      var hy = gridBot + ((gridTop-gridBot)/rows)*rr;
+      var hm = new THREE.Mesh(new THREE.BoxGeometry(panelW, fr*0.75, fr*1.5), frameMat);
+      hm.position.set(cx, hy, z + 0.006);
+      g.add(hm);
+    }
+    if (isDoor) {
+      // central meeting stile between the door leaves
+      var stile = new THREE.Mesh(new THREE.BoxGeometry(fr*2.0, wh, fr*2.6), frameMat);
+      stile.position.set(cx, y0 + wh/2, z + 0.008);
+      g.add(stile);
+      var kick = new THREE.Mesh(new THREE.BoxGeometry(panelW*0.94, wh*0.15, fr*2.4), frameMat);
+      kick.position.set(cx, y0 + wh*0.085, z + 0.004);
+      g.add(kick);
+    } else {
+      var apron = new THREE.Mesh(new THREE.BoxGeometry(panelW*0.94, wh*0.28, fr*2.4), frameMat);
+      apron.position.set(cx, y0 + wh*0.17, z + 0.004);
+      g.add(apron);
+    }
+  }
+  g.traverse(function(m){ if(m.isMesh){ m.castShadow = true; m.receiveShadow = true; } });
+  return g;
+}
+
+// 踏跺 front steps
+function buildSteps(hw, baseH, tiers, mat, cheekMat) {
+  var g = new THREE.Group();
+  var n = Math.max(3, Math.round(baseH / 0.15));
+  var w = Math.min(hw * 0.55, 1.9);
+  var depthEach = 0.24;
+  var runTotal = depthEach * n;
+  for (var i = 0; i < n; i++) {
+    var h = baseH * ((i+1)/n);
+    var st = new THREE.Mesh(new THREE.BoxGeometry(w*2, h, depthEach), mat);
+    st.position.set(0, h/2, depthEach * (n - i - 0.5));
+    st.castShadow = true; st.receiveShadow = true;
+    g.add(st);
+  }
+  // 垂带 sloping side cheeks flanking the flight
+  var shape = new THREE.Shape();
+  shape.moveTo(0, 0);
+  shape.lineTo(runTotal, 0);
+  shape.lineTo(runTotal, baseH * 0.30);
+  shape.lineTo(0, baseH * 1.04);
+  shape.lineTo(0, 0);
+  var eg = new THREE.ExtrudeGeometry(shape, { depth: 0.16, bevelEnabled:false });
+  [-1, 1].forEach(function(sd){
+    var ch = new THREE.Mesh(eg, cheekMat);
+    ch.rotation.y = Math.PI/2;
+    // extrude runs along +Z then rotates to -X, so shift by the extrude depth
+    ch.position.set(sd * (w + 0.08) + 0.08, 0, 0);
+    ch.castShadow = true; ch.receiveShadow = true;
+    g.add(ch);
+  });
+  return g;
+}
+
+var PRESETS = {
+  // 黄琉璃 imperial yellow — emperor only. Vermilion walls, gilt-blue caihua.
+  imperial: { roof:'#d4a017', trim:'#efe9d8', wood:'#8f1d13', beam:'#123f5c', caihua:'#1a6b7a',
+              dg:'#15586e', wall:'#a82a17', lattice:'#7a1810', base:'#d8d2be', rail:'#e8e2ce' },
+  // 绿琉璃 green — princes, high officials, temples
+  official: { roof:'#1f6b3d', trim:'#e4dfcc', wood:'#7a2d16', beam:'#164a68', caihua:'#c9971f',
+              dg:'#1d5f6b', wall:'#93361c', lattice:'#5e2110', base:'#cfc9b4', rail:'#e0dac6' },
+  // 蓝琉璃 azure — Temple of Heaven, altars to the sky
+  heaven:   { roof:'#1d4f8c', trim:'#eae6d6', wood:'#8f1d13', beam:'#123f5c', caihua:'#d4a017',
+              dg:'#15586e', wall:'#a82a17', lattice:'#7a1810', base:'#d8d2be', rail:'#e8e2ce' },
+  // 黑琉璃 black — libraries (water element, wards off fire) and military halls
+  library:  { roof:'#23262b', trim:'#dcd7c6', wood:'#3f2418', beam:'#1c4152', caihua:'#2f7d6b',
+              dg:'#265a63', wall:'#6b4a2c', lattice:'#3a2114', base:'#c4bfaa', rail:'#d6d1bd' },
+  // 灰瓦 vernacular grey clay — commoners; timber left dark and unpainted
+  temple:   { roof:'#3a4048', trim:'#ded8c4', wood:'#5e2a17', beam:'#7a6526', caihua:'#1d5a70',
+              dg:'#6b5720', wall:'#9c7440', lattice:'#4a2612', base:'#c9c3ac', rail:'#dcd6c2' },
+  // 江南 Jiangnan — 粉墙黛瓦, white walls and ink-dark tiles
+  jiangnan: { roof:'#1e2126', trim:'#f4f0e2', wood:'#2a1c14', beam:'#33241a', caihua:'#4a3628',
+              dg:'#33241a', wall:'#ece7d6', lattice:'#2a1c14', base:'#bdb7a2', rail:'#f0ece0' },
+  // 岭南 Lingnan — southern; ochre walls, green tile, red-gold trim
+  lingnan:  { roof:'#2d6b52', trim:'#f0e6cc', wood:'#8a3418', beam:'#a8781c', caihua:'#b03018',
+              dg:'#8a6318', wall:'#d4a95c', lattice:'#6b2410', base:'#cfc6ac', rail:'#e6dcc0' },
+  // 藏式 Tibetan-influenced — crimson, deep gold, white
+  tibetan:  { roof:'#b8891f', trim:'#f2efe4', wood:'#6b1410', beam:'#8a1a14', caihua:'#c9a02a',
+              dg:'#7a1812', wall:'#8f1810', lattice:'#5a100c', base:'#e8e4d6', rail:'#f2efe4' }
+};
+
+function buildBalustrade(hw, hd, y, mat) {
+  var g = new THREE.Group();
+  var postH = 0.30, postW = 0.085;
+  var railH = 0.075;
+  var spacing = 0.62;
+  var edges = [
+    { fx:1, fz:0, len:hd, cx:hw,  cz:0 },
+    { fx:-1,fz:0, len:hd, cx:-hw, cz:0 },
+    { fx:0, fz:-1,len:hw, cx:0,   cz:-hd }
+  ];
+  var postGeo = new THREE.BoxGeometry(postW, postH, postW);
+  var capGeo  = new THREE.BoxGeometry(postW*1.5, postW*0.7, postW*1.5);
+
+  edges.forEach(function(e){
+    var n = Math.max(2, Math.round((e.len*2)/spacing));
+    for (var i = 0; i <= n; i++) {
+      var f = -1 + (i/n)*2;
+      var px = e.fx !== 0 ? e.cx : f*hw;
+      var pz = e.fz !== 0 ? e.cz : f*hd;
+      var post = new THREE.Mesh(postGeo, mat);
+      post.position.set(px, y + postH/2, pz);
+      g.add(post);
+      var cap = new THREE.Mesh(capGeo, mat);
+      cap.position.set(px, y + postH + postW*0.3, pz);
+      g.add(cap);
+    }
+    // top and mid rails
+    var isX = e.fx !== 0;
+    [postH*0.92, postH*0.45].forEach(function(ry, k){
+      var rg = new THREE.BoxGeometry(
+        isX ? postW*0.85 : hw*2, k===0 ? railH : railH*0.7, isX ? hd*2 : postW*0.85);
+      var rail = new THREE.Mesh(rg, mat);
+      rail.position.set(isX ? e.cx : 0, y + ry, isX ? 0 : e.cz);
+      g.add(rail);
+    });
+  });
+  g.traverse(function(m){ if(m.isMesh){ m.castShadow = true; m.receiveShadow = true; } });
+  return g;
+}
+
+// 彩画 painted decoration band across the head tie-beams
+function buildCaihua(hw, hd, y, beamH, baseMat, accentMat, goldMat, colR) {
+  var g = new THREE.Group();
+  var inset = (colR || 0.08) * 0.5;
+  function band(len, isX, cx, cz) {
+    var segs = Math.max(5, Math.round(len/0.55));
+    for (var i = 0; i < segs; i++) {
+      var f = -1 + ((i+0.5)/segs)*2;
+      var segLen = (len*2/segs) * 0.82;
+      var isAccent = (i % 2 === 0);
+      var mat = isAccent ? accentMat : baseMat;
+      var w = isX ? 0.075 : segLen;
+      var d = isX ? segLen : 0.075;
+      var m = new THREE.Mesh(new THREE.BoxGeometry(w, beamH*0.55, d), mat);
+      m.position.set(isX ? cx : f*len, y, isX ? f*len : cz);
+      g.add(m);
+      // gold medallion at the centre of each accent segment
+      if (isAccent) {
+        var gm = new THREE.Mesh(new THREE.BoxGeometry(
+          isX ? 0.085 : segLen*0.3, beamH*0.26, isX ? segLen*0.3 : 0.085), goldMat);
+        gm.position.set(isX ? cx : f*len, y, isX ? f*len : cz);
+        g.add(gm);
+      }
+    }
+  }
+  band(hd-inset, true,  hw-inset, 0);
+  band(hd-inset, true, -(hw-inset), 0);
+  band(hw-inset, false, 0,  hd-inset);
+  band(hw-inset, false, 0, -(hd-inset));
+  g.traverse(function(m){ if(m.isMesh){ m.castShadow = true; } });
+  return g;
+}
+
+
+function val(id){ return parseFloat(document.getElementById(id).value); }
+
+function rebuild() {
+  while (buildingGroup.children.length) buildingGroup.remove(buildingGroup.children[0]);
+
+  var grade   = parseInt(document.getElementById('doukou').value);
+  var bays    = parseInt(document.getElementById('bays').value);
+  var purlins = parseInt(document.getElementById('purlins').value);
+  var isDaShi = document.getElementById('classType').value === 'da';
+  var isSong  = document.getElementById('period').value === 'song';
+  var roofType = document.getElementById('roofType').value;
+  var ribs    = val('tiles');
+  var useTuishan  = val('tuishan') > 0.5;
+  var useShengqi  = val('shengqi') > 0.5 && isSong;
+  var useCejiao   = val('cejiao') > 0.5;
+
+  var D = deriveDimensions(grade, bays, purlins, isDaShi, isSong);
+
+  // scale doukou units into a comfortable scene size
+  var scale = 9.0 / D.totalWidth;
+
+  var hw = (D.totalWidth * scale) / 2;
+  var hd = (D.totalDepth * scale) / 2;
+  var colH = D.colH * scale;
+  var baseH = D.baseH * scale;
+  var roofRise = D.roofRise * scale;
+  var eaveOut = D.eaveOut * scale;
+  var upturn = D.cornerRise * scale;
+
+  document.getElementById('dkOut').textContent = grade + '等 (' + D.doukouCun + '寸)';
+  document.getElementById('bayOut').textContent = bays;
+  document.getElementById('plOut').textContent = purlins;
+  document.getElementById('tOut').textContent = ribs;
+  document.getElementById('tsOut').textContent = useTuishan ? 'on' : 'off';
+  document.getElementById('sqOut').textContent = isSong ? (useShengqi?'on':'off') : 'Qing: n/a';
+  document.getElementById('cjOut').textContent = useCejiao ? 'on' : 'off';
+  document.getElementById('rlOut').textContent = val('railing') > 0.5 ? 'on' : 'off';
+  document.getElementById('chOut').textContent = val('caihua') > 0.5 ? 'on' : 'off';
+
+  var cm = D.doukouCun * 3.2;
+  document.getElementById('derived').innerHTML =
+    '通面阔 ' + (D.totalWidth*cm/100).toFixed(1) + ' m &nbsp; 通进深 ' + (D.totalDepth*cm/100).toFixed(1) + ' m<br>' +
+    '柱高 ' + (D.colH*cm/100).toFixed(2) + ' m &nbsp; 柱径 ' + (D.colDia*cm).toFixed(0) + ' cm<br>' +
+    '明间 ' + (D.bayWidths[(bays-1)/2]*cm/100).toFixed(2) + ' m &nbsp; 出檐 ' + (D.eaveOut*cm/100).toFixed(2) + ' m<br>' +
+    '举架 ' + D.coeffs.map(function(c){return c.toFixed(2);}).join(' → ') + '<br>' +
+    '深:阔 ' + (D.totalDepth/D.totalWidth).toFixed(2) + ' &nbsp; 举高:进深 ' + (D.roofRise/D.totalDepth).toFixed(2);
+
+  function col(id){ return document.getElementById(id).value; }
+  var cRoof=col('roofColor'), cTrim=col('trimColor'), cWood=col('woodColor'),
+      cBeam=col('beamColor'), cCaihua=col('caihuaColor'), cDg=col('dgColor'),
+      cWall=col('wallColor'), cLattice=col('latticeColor'), cBase=col('baseColor'),
+      cRail=col('railColor');
+
+  var tileMat   = new THREE.MeshStandardMaterial({ color:C(cRoof), roughness:0.42, metalness:0.12, envMapIntensity:0.28, side:THREE.DoubleSide,
+    map: texClone(TEX.tile, 6, 3) });
+  var trimMat   = new THREE.MeshStandardMaterial({ color:C(cTrim), roughness:0.75, metalness:0.02, envMapIntensity:0.3 });
+  var woodMat   = new THREE.MeshStandardMaterial({ color:C(cWood), roughness:0.7,  metalness:0.03, map: texClone(TEX.wood, 1, 1) });
+  var beamMat   = new THREE.MeshStandardMaterial({ color:C(cBeam), roughness:0.66, metalness:0.04, map: texClone(TEX.wood, 2, 0.5) });
+  var caihuaMat = new THREE.MeshStandardMaterial({ color:C(cCaihua), roughness:0.55, metalness:0.06 });
+  var goldMat   = new THREE.MeshStandardMaterial({ color:C('#c9a94a'), roughness:0.32, metalness:0.65 });
+  var dgMat     = new THREE.MeshStandardMaterial({ color:C(cDg), roughness:0.6, metalness:0.06 });
+  var wallMat   = new THREE.MeshStandardMaterial({ color:C(cWall), roughness:0.9, metalness:0.0, map: texClone(TEX.plaster, 2, 1) });
+  var latticeMat= new THREE.MeshStandardMaterial({ color:C(cLattice), roughness:0.68, metalness:0.03 });
+  var baseMat   = new THREE.MeshStandardMaterial({ color:C(cBase), roughness:0.95, metalness:0.0, envMapIntensity:0.25, map: texClone(TEX.stone, 4, 1) });
+  var railMat   = new THREE.MeshStandardMaterial({ color:C(cRail), roughness:0.85, metalness:0.0, envMapIntensity:0.25 });
+  var paperMat  = new THREE.MeshStandardMaterial({ color:C('#e8dfc6'), roughness:0.95, metalness:0.0 });
+  var eaveTrimMat = new THREE.MeshStandardMaterial({ color:C(cTrim), roughness:0.8, metalness:0.02, envMapIntensity:0.3, side:THREE.DoubleSide });
+  var rafterMat = new THREE.MeshStandardMaterial({ color:C(cBeam), roughness:0.68, metalness:0.03 });
+  var capMat    = new THREE.MeshStandardMaterial({ color:C(cTrim), roughness:0.6, metalness:0.03, envMapIntensity:0.3 });
+  var floorMat  = new THREE.MeshStandardMaterial({ color:C('#3a2f26'), roughness:0.9, metalness:0.02 });
+
+  var isPagoda = document.getElementById('buildingType').value === 'pagoda';
+  var storeys = parseInt(document.getElementById('storeys').value);
+  var sides   = parseInt(document.getElementById('sides').value);
+  var pStyle  = document.getElementById('pagodaStyle').value;
+  document.getElementById('stOut').textContent = storeys;
+  document.getElementById('sdOut').textContent = sides + '边';
+  var pgRows = document.querySelectorAll('.pg');
+  for (var pi = 0; pi < pgRows.length; pi++)
+    pgRows[pi].style.display = isPagoda ? 'block' : 'none';
+
+  if (isPagoda) {
+    var pagodaR = hw * 0.62;
+    buildingGroup.add(buildBase(pagodaR, pagodaR, baseH, 2, baseMat, trimMat));
+    var pg = buildPagoda(D, scale * 0.62, {
+      sides: sides, storeys: storeys, style: pStyle,
+      ribs: ribs, dougong: isDaShi
+    }, {
+      tile: tileMat, wood: woodMat, wall: wallMat, rail: railMat,
+      dg: dgMat, trim: trimMat, gold: goldMat
+    });
+    pg.position.y = baseH;
+    buildingGroup.add(pg);
+
+    controls.target.set(0, (pg.userData.totalHeight || 10) * 0.42, 0);
+    var ptris = 0;
+    buildingGroup.traverse(function(o){
+      if (o.isMesh && o.geometry.index) ptris += o.geometry.index.count/3;
+      else if (o.isMesh) ptris += o.geometry.attributes.position.count/3;
+    });
+    document.getElementById('stats').textContent =
+      Math.round(ptris).toLocaleString() + ' tris · ' + storeys + '层 ' + sides + '边';
+    return;
+  }
+
+  buildingGroup.add(buildBase(hw, hd, baseH, 2, baseMat, trimMat));
+
+  var floor = new THREE.Mesh(new THREE.BoxGeometry(hw*2, 0.05, hd*2), floorMat);
+  floor.position.y = baseH + 0.025; floor.receiveShadow = true;
+  buildingGroup.add(floor);
+
+  var colR = D.colDia * scale / 2;
+  buildingGroup.add(buildWalls(hw, hd, baseH, colH, wallMat, colR));
+  buildingGroup.add(buildColumns(D, scale, baseH, woodMat, beamMat, baseMat, useShengqi, useCejiao));
+  buildingGroup.add(buildLattice(hw, hd, baseH, colH, bays, latticeMat, paperMat, colR));
+
+  if (val('railing') > 0.5) buildingGroup.add(buildBalustrade(hw + 0.5, hd + 0.5, baseH, railMat));
+  if (val('caihua') > 0.5) {
+    var beamH = D.colDia * scale * 0.8;
+    buildingGroup.add(buildCaihua(hw, hd, baseH + colH - beamH*0.7, beamH, beamMat, caihuaMat, goldMat, colR));
+  }
+
+  var steps = buildSteps(hw, baseH, 2, baseMat, railMat);
+  steps.position.z = hd + 0.65;
+  buildingGroup.add(steps);
+
+  var eaveY = baseH + colH;
+  if (isDaShi) {
+    var dg = buildDougong(hw - 0.2, hd - 0.2, eaveY + 0.02, dgMat);
+    buildingGroup.add(dg);
+    eaveY += 0.02 + (dg.userData.height || 0.2);
+  }
+
+  var roof = buildRoof({
+    halfWidth: hw + eaveOut, halfDepth: hd + eaveOut,
+    roofHeight: roofRise, upturn: upturn,
+    roofType: roofType, gableFrac: 0.45, ribs: ribs,
+    shellThick: Math.max(0.05, D.purlinDia * scale * 0.5),
+    tuishan: useTuishan, purlinDia: D.purlinDia * scale,
+    rafterMat: rafterMat, eaveTrimMat: eaveTrimMat, capMat: capMat,
+    tileMat: tileMat, gableMat: wallMat, trimMat: trimMat
+  });
+  roof.position.y = eaveY;
+  buildingGroup.add(roof);
+
+  controls.target.set(0, (baseH + colH + roofRise) * 0.45, 0);
+
+  var tris = 0;
+  buildingGroup.traverse(function(o){
+    if (o.isMesh && o.geometry.index) tris += o.geometry.index.count/3;
+    else if (o.isMesh) tris += o.geometry.attributes.position.count/3;
+  });
+  var meshes = 0;
+  buildingGroup.traverse(function(o){ if (o.isMesh) meshes++; });
+  document.getElementById('stats').textContent =
+    Math.round(tris).toLocaleString() + ' tris · ' + meshes + ' meshes';
+}
+
+function applyPreset() {
+  var p = PRESETS[document.getElementById('preset').value];
+  if (!p) return;
+  var map = { roofColor:'roof', trimColor:'trim', woodColor:'wood', beamColor:'beam',
+              caihuaColor:'caihua', dgColor:'dg', wallColor:'wall', latticeColor:'lattice',
+              baseColor:'base', railColor:'rail' };
+  Object.keys(map).forEach(function(id){ document.getElementById(id).value = p[map[id]]; });
+}
+document.getElementById('preset').addEventListener('change', function(){
+  applyPreset();
+  rebuild();
+});
+
+['buildingType','pagodaStyle','storeys','sides',
+ 'doukou','classType','period','bays','purlins','roofType','tuishan','tiles','shengqi','cejiao',
+ 'railing','caihua','roofColor','trimColor','woodColor','beamColor','caihuaColor',
+ 'dgColor','wallColor','latticeColor','baseColor','railColor'].forEach(function(id){
+  document.getElementById(id).addEventListener('input', rebuild);
+});
+
+function exportOBJ(group) {
+  var lines = ['# Chinese architecture generator'];
+  var off = 1;
+  group.updateMatrixWorld(true);
+
+  function writeGeo(geo, matrix, name) {
+    var pos = geo.attributes.position, idx = geo.index;
+    lines.push('o ' + name);
+    var v = new THREE.Vector3();
+    for (var i = 0; i < pos.count; i++) {
+      v.fromBufferAttribute(pos, i).applyMatrix4(matrix);
+      lines.push('v ' + v.x.toFixed(5) + ' ' + v.y.toFixed(5) + ' ' + v.z.toFixed(5));
+    }
+    if (idx) {
+      for (var k = 0; k < idx.count; k += 3)
+        lines.push('f ' + (idx.getX(k)+off) + ' ' + (idx.getX(k+1)+off) + ' ' + (idx.getX(k+2)+off));
+    } else {
+      for (var k2 = 0; k2 < pos.count; k2 += 3)
+        lines.push('f ' + (k2+off) + ' ' + (k2+1+off) + ' ' + (k2+2+off));
+    }
+    off += pos.count;
+  }
+
+  var partNo = 0;
+  group.traverse(function(o){
+    if (!o.isMesh) return;
+    partNo++;
+    if (o.isInstancedMesh) {
+      // flatten every instance into real geometry, else the export loses them all
+      var inst = new THREE.Matrix4(), world = new THREE.Matrix4();
+      for (var n = 0; n < o.count; n++) {
+        o.getMatrixAt(n, inst);
+        world.multiplyMatrices(o.matrixWorld, inst);
+        writeGeo(o.geometry, world, 'part' + partNo + '_i' + n);
+      }
+    } else {
+      writeGeo(o.geometry, o.matrixWorld, 'part' + partNo);
+    }
+  });
+
+  var w = weldOBJ(lines, 5);
+  var pct = (100 * (1 - w.after / Math.max(w.before,1))).toFixed(1);
+  console.log('OBJ export: ' + w.before + ' -> ' + w.after + ' verts welded ('
+              + pct + '% reduction), ' + w.faces + ' triangles, '
+              + (w.holes || 0) + ' holes filled');
+  var blob = new Blob([w.lines.join('\n')], {type:'text/plain'});
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement('a');
+  a.href = url; a.download = 'guijian_model.obj'; a.click();
+  URL.revokeObjectURL(url);
+}
+
+// Weld coincident vertices across the whole export. Without this the file carries
+// one unshared vertex per triangle corner -- huge files and non-manifold shells
+// that slicers refuse. This is the single biggest print-readiness win.
+function nz(v, tol) { return (+((+v).toFixed(tol))).toFixed(tol); }
+
+function weldOBJ(lines, tol) {
+  tol = tol || 5;
+  var faces = [], header = [];
+  var out = [], seen = 0, remap = [];
+  // Weld PER PART, not globally. Welding across parts fuses vertices where two
+  // separate solids happen to touch, producing edges shared by 4 faces (non-
+  // manifold). Kept separate, each part stays a closed solid and slicers union
+  // them at slice time -- which is the correct representation for printing.
+  var map = {};
+  for (var i = 0; i < lines.length; i++) {
+    var L = lines[i];
+    if (L.charCodeAt(0) === 111 && L.charCodeAt(1) === 32) {        // "o " new part
+      map = {};
+      continue;
+    }
+    if (L.charCodeAt(0) === 118 && L.charCodeAt(1) === 32) {        // "v "
+      var pr = L.split(' ');
+      // double-round so -0.00000 and 0.00000 produce the same key. Without this,
+      // seam vertices (sin(2*PI) = -2.4e-16) never weld and leave a seam hole.
+      var key = nz(pr[1], tol) + '_' + nz(pr[2], tol) + '_' + nz(pr[3], tol);
+      seen++;
+      if (map[key] === undefined) {
+        map[key] = out.length + 1;
+        out.push('v ' + pr[1] + ' ' + pr[2] + ' ' + pr[3]);
+      }
+      remap[seen] = map[key];
+    } else if (L.charCodeAt(0) === 102 && L.charCodeAt(1) === 32) { // "f "
+      var fp = L.split(' ');
+      var a = remap[+fp[1]], b = remap[+fp[2]], c = remap[+fp[3]];
+      if (a !== b && b !== c && a !== c) faces.push('f ' + a + ' ' + b + ' ' + c);
+    } else if (L.charCodeAt(0) === 35) {
+      header.push(L);
+    }
+  }
+  var filled = fillHoles(out, faces);
+  return { lines: header.concat(filled.verts, filled.faces),
+           before: seen, after: filled.verts.length,
+           faces: filled.faces.length, holes: filled.holes };
+}
+
+// Three.js primitives (cylinders, spheres, tori) are not watertight: their cap
+// and pole fans leave unshared edges. Find every boundary loop and fan-fill it
+// so the exported solid is closed and slicers need no repair.
+function fillHoles(vertLines, faceLines) {
+  // Identify boundaries by UNDIRECTED edge count. Using directed edges gives
+  // false positives wherever winding is inconsistent, and patching those
+  // already-closed regions creates non-manifold geometry.
+  var count = new Map(), adj = new Map();
+  function key(a,b){ return a < b ? a+'_'+b : b+'_'+a; }
+  for (var i = 0; i < faceLines.length; i++) {
+    var p = faceLines[i].split(' ');
+    var t = [+p[1], +p[2], +p[3]];
+    for (var k = 0; k < 3; k++) {
+      var kk = key(t[k], t[(k+1)%3]);
+      count.set(kk, (count.get(kk) || 0) + 1);
+    }
+  }
+  var bEdges = [];
+  count.forEach(function(c, kk){ if (c === 1) bEdges.push(kk); });
+  if (!bEdges.length) return { verts: vertLines, faces: faceLines, holes: 0 };
+
+  bEdges.forEach(function(kk){
+    var pr = kk.split('_').map(Number);
+    if (!adj.has(pr[0])) adj.set(pr[0], []);
+    if (!adj.has(pr[1])) adj.set(pr[1], []);
+    adj.get(pr[0]).push(pr[1]);
+    adj.get(pr[1]).push(pr[0]);
+  });
+
+  var coords = vertLines.map(function(l){
+    var q = l.split(' '); return [+q[1], +q[2], +q[3]];
+  });
+  var verts = vertLines.slice(), faces = faceLines.slice();
+  var visited = new Set(), holes = 0;
+
+  adj.forEach(function(_, startV){
+    if (visited.has(startV)) return;
+    // walk the boundary loop
+    var loop = [startV], prev = -1, cur = startV, guard = 0;
+    visited.add(startV);
+    while (guard++ < 200000) {
+      var nbrs = adj.get(cur) || [];
+      var nxt = -1;
+      for (var m = 0; m < nbrs.length; m++) {
+        if (nbrs[m] !== prev && !visited.has(nbrs[m])) { nxt = nbrs[m]; break; }
+        if (nbrs[m] !== prev && nbrs[m] === startV && loop.length > 2) { nxt = -2; break; }
+      }
+      if (nxt === -2 || nxt === -1) break;
+      loop.push(nxt); visited.add(nxt);
+      prev = cur; cur = nxt;
+    }
+    if (loop.length < 3) return;
+    holes++;
+    var cx=0, cy=0, cz=0;
+    for (var q2 = 0; q2 < loop.length; q2++) {
+      var c2 = coords[loop[q2]-1];
+      if (!c2) return;
+      cx += c2[0]; cy += c2[1]; cz += c2[2];
+    }
+    var n = loop.length;
+    verts.push('v ' + (cx/n).toFixed(5) + ' ' + (cy/n).toFixed(5) + ' ' + (cz/n).toFixed(5));
+    var ci = verts.length;
+    for (var m2 = 0; m2 < n; m2++) {
+      faces.push('f ' + loop[(m2+1) % n] + ' ' + loop[m2] + ' ' + ci);
+    }
+  });
+  return { verts: verts, faces: faces, holes: holes };
+}
+
+document.getElementById('exportBtn').addEventListener('click', function(){ exportOBJ(buildingGroup); });
+
+// ---- 保存图片 JPEG capture ----
+document.getElementById('imgBtn').addEventListener('click', function(){
+  renderer.render(scene, camera);
+  var url = renderer.domElement.toDataURL('image/jpeg', 0.92);
+  var a = document.createElement('a');
+  a.href = url; a.download = 'guijian_' + Date.now() + '.jpg'; a.click();
+});
+
+// ---- design save / load (localStorage, like the reference tool) ----
+var CONTROL_IDS = ['buildingType','pagodaStyle','storeys','sides','doukou','classType','period',
+  'bays','purlins','roofType','tuishan','tiles','shengqi','cejiao','railing','caihua','preset',
+  'roofColor','trimColor','woodColor','beamColor','caihuaColor','dgColor','wallColor',
+  'latticeColor','baseColor','railColor'];
+
+function snapshotDesign() {
+  var d = {};
+  CONTROL_IDS.forEach(function(id){ d[id] = document.getElementById(id).value; });
+  return d;
+}
+function applyDesign(d) {
+  CONTROL_IDS.forEach(function(id){
+    if (d[id] !== undefined) document.getElementById(id).value = d[id];
+  });
+  rebuild();
+}
+function getSaves() {
+  try { return JSON.parse(localStorage.getItem('guijian_saves') || '{}'); }
+  catch(e) { return {}; }
+}
+document.getElementById('saveBtn').addEventListener('click', function(){
+  var name = prompt('设计名称 design name:');
+  if (!name) return;
+  var saves = getSaves();
+  saves[name] = snapshotDesign();
+  try { localStorage.setItem('guijian_saves', JSON.stringify(saves)); alert('已保存 saved: ' + name); }
+  catch(e) { alert('保存失败 save failed'); }
+});
+document.getElementById('loadBtn').addEventListener('click', function(){
+  var saves = getSaves();
+  var names = Object.keys(saves);
+  if (!names.length) { alert('没有存档 no saved designs'); return; }
+  var pick = prompt('读取哪个? load which?\n' + names.join('\n'));
+  if (pick && saves[pick]) applyDesign(saves[pick]);
+});
+
+
+window.addEventListener('resize', function(){
+  camera.aspect = window.innerWidth/window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+});
+
+applyPreset();
+rebuild();
+(function animate(){
+  requestAnimationFrame(animate);
+  controls.update();
+  renderer.render(scene, camera);
+})();
+</script>
+</body>
+</html>
