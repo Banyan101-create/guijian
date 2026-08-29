@@ -1,8 +1,12 @@
-function buildBase(hw, hd, h, tiers, mat, trimMat) {
+// margin is the apron the 台明 projects beyond the columns; it has to scale
+// with the building or a slender 密檐 tower ends up on a plinth four times its
+// own width.
+function buildBase(hw, hd, h, tiers, mat, trimMat, margin) {
   var g = new THREE.Group();
+  var m = (margin === undefined) ? 0.65 : margin;
   for (var i = 0; i < tiers; i++) {
-    var shrink = i * 0.22;
-    var w = (hw + 0.65) - shrink, d = (hd + 0.65) - shrink;
+    var shrink = i * m * 0.34;
+    var w = (hw + m) - shrink, d = (hd + m) - shrink;
     var th = h / tiers;
     var m = new THREE.Mesh(new THREE.BoxGeometry(w*2, th*0.82, d*2), mat);
     m.position.y = i*th + th*0.41;

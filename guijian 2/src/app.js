@@ -106,13 +106,16 @@ function rebuild() {
     pgRows[pi].style.display = isPagoda ? 'block' : 'none';
 
   if (isPagoda) {
-    var pagodaR = hw * 0.62;
-    buildingGroup.add(buildBase(pagodaR, pagodaR, baseH, 2, baseMat, trimMat));
+    // must match the R0 buildPagoda derives, 密檐 slenderness factor included
+    var pagodaR = hw * 0.62 * (pStyle === 'miyan' ? 0.30 : 1.0);
+    buildingGroup.add(buildBase(pagodaR, pagodaR, baseH, 2, baseMat, trimMat,
+      pagodaR * 0.22));
     var pg = buildPagoda(D, scale * 0.62, {
       sides: sides, storeys: storeys, style: pStyle,
       ribs: ribs, dougong: isDaShi
     }, {
       tile: tileMat, wood: woodMat, wall: wallMat, rail: railMat,
+      lattice: latticeMat, paper: paperMat,
       dg: dgMat, trim: trimMat, gold: goldMat
     });
     pg.position.y = baseH;

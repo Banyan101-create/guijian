@@ -87,14 +87,62 @@ function buildPolygonRoof(R, n, rise, upturn, ribs, profile, mat, thickness) {
   geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
   geo.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
   geo.computeVertexNormals();
-  var m = new THREE.Mesh(geo, mat);
+  // same rule as the rectangular roof: paint one texture barrel per modelled
+  // rib, or the two counts beat against each other into moire
+  var barrelW = (2 * Math.PI * R) / ribK;
+  var courses = Math.max(3, Math.round(
+    Math.sqrt(R*R + rise*rise) / (barrelW * 2.2)));
+  var m = new THREE.Mesh(geo, tileMatFor(mat, ribK, courses));
   m.castShadow = true; m.receiveShadow = true;
   return m;
 }
 
-function buildPagodaStorey(R, n, height, colDia, colMat, wallMat, railMat, withBalcony) {
+// One bay's 槅扇, built flat in local XY with +Z facing out, then oriented by
+// the caller. Same construction as the hall's: paper behind, leaf stiles, and
+// a muntin grid whose cells stay square whatever the bay works out to.
+function pagodaScreen(w, h, latMat, paperMat) {
+  var g = new THREE.Group();
+  var fr = Math.min(w, h) * 0.05;
+  var leaves = Math.max(2, 2 * Math.round(w / (h * 0.42) / 2));
+  var leafW = w / leaves;
+  var cols = Math.max(2, Math.round(leafW / (h * 0.17)));
+  var cell = leafW / cols;
+  var rows = Math.max(2, Math.round(h / cell));
+
+  g.add(new THREE.Mesh(new THREE.BoxGeometry(w, h, fr*0.7), paperMat));
+
+  for (var L = 0; L < leaves; L++) {
+    var lx = -w/2 + leafW * (L + 0.5);
+    for (var c = 1; c < cols; c++) {
+      var vm = new THREE.Mesh(new THREE.BoxGeometry(fr*0.55, h, fr*1.5), latMat);
+      vm.position.set(lx - leafW/2 + cell*c, 0, fr*0.55);
+      g.add(vm);
+    }
+  }
+  for (var r = 1; r < rows; r++) {
+    var hm = new THREE.Mesh(new THREE.BoxGeometry(w, fr*0.55, fr*1.5), latMat);
+    hm.position.set(0, -h/2 + (h/rows)*r, fr*0.55);
+    g.add(hm);
+  }
+  // 边梃 on every leaf edge, 抹头 top and bottom
+  for (var s = 0; s <= leaves; s++) {
+    var st = new THREE.Mesh(new THREE.BoxGeometry(fr*1.1, h, fr*2.0), latMat);
+    st.position.set(-w/2 + leafW*s, 0, fr*0.7);
+    g.add(st);
+  }
+  [-h/2, h/2].forEach(function(ry){
+    var rl = new THREE.Mesh(new THREE.BoxGeometry(w, fr*1.2, fr*1.9), latMat);
+    rl.position.set(0, ry, fr*0.7);
+    g.add(rl);
+  });
+  g.traverse(function(m){ if(m.isMesh){ m.castShadow = true; m.receiveShadow = true; } });
+  return g;
+}
+
+function buildPagodaStorey(R, n, height, colDia, colMat, wallMat, latMat, paperMat, railMat, withBalcony) {
   var g = new THREE.Group();
   var colGeo = new THREE.CylinderGeometry(colDia*0.46, colDia*0.5, height, 12);
+  var wallT = colDia * 0.35;
   for (var k = 0; k < n; k++) {
     var th = (k / n) * Math.PI * 2;
     var x = Math.cos(th) * R, z = Math.sin(th) * R;
@@ -105,38 +153,32 @@ function buildPagodaStorey(R, n, height, colDia, colMat, wallMat, railMat, withB
     var th2 = ((k+1) / n) * Math.PI * 2;
     var x2 = Math.cos(th2) * R, z2 = Math.sin(th2) * R;
     var mx = (x+x2)/2, mz = (z+z2)/2;
-    var len = Math.sqrt((x2-x)*(x2-x) + (z2-z)*(z2-z)) * 0.9;
-    var panel = new THREE.Mesh(new THREE.BoxGeometry(len, height*0.995, colDia*0.35), wallMat);
+    // the wall spans the whole chord, column centre to column centre. Shrink it
+    // (it used to be 0.9) and a slot opens at every corner that you can see the
+    // roof behind through -- the columns are far too thin to cover the shortfall.
+    var len = Math.sqrt((x2-x)*(x2-x) + (z2-z)*(z2-z));
+    var panel = new THREE.Mesh(new THREE.BoxGeometry(len, height*0.995, wallT), wallMat);
     panel.position.set(mx, height*0.4975, mz);
     panel.lookAt(new THREE.Vector3(mx*2, height*0.4975, mz*2));
     panel.castShadow = true; panel.receiveShadow = true;
     g.add(panel);
 
-    // 槅扇 lattice window on each face, so storeys are not blank slabs
-    var fr = colDia * 0.16;
-    var winW = len * 0.62, winH = height * 0.52, winY = height * 0.56;
-    var lat = new THREE.Group();
-    var outward = new THREE.Vector3(mx*2, winY, mz*2);
-    [[0, winH/2],[0, -winH/2]].forEach(function(o){
-      var hb = new THREE.Mesh(new THREE.BoxGeometry(winW, fr, fr*1.4), railMat);
-      hb.position.set(0, o[1], 0); lat.add(hb);
-    });
-    [[-winW/2],[winW/2]].forEach(function(o){
-      var vb = new THREE.Mesh(new THREE.BoxGeometry(fr, winH, fr*1.4), railMat);
-      vb.position.set(o[0], 0, 0); lat.add(vb);
-    });
-    for (var gx = 1; gx < 4; gx++) {
-      var vm = new THREE.Mesh(new THREE.BoxGeometry(fr*0.5, winH*0.94, fr), railMat);
-      vm.position.set(-winW/2 + (winW/4)*gx, 0, fr*0.2); lat.add(vm);
+    // 槅扇 across the clear span between the two column faces. It has to be
+    // pushed out by half the wall thickness along the face normal -- scaling the
+    // midpoint by a flat 1.005 left it buried, which is why the old lattice read
+    // as lines painted on a slab.
+    var clear = len - colDia;
+    var winH = height * 0.46, winY = height * 0.56;
+    // 密檐 storeys above the first are only an eave deep; they carry blind walls,
+    // not screens, and a screen that short reads as noise rather than joinery
+    if (clear > colDia * 0.5 && winH > colDia * 1.2) {
+      var mlen = Math.sqrt(mx*mx + mz*mz) || 1;
+      var out = wallT * 0.5;
+      var scr = pagodaScreen(clear, winH, latMat, paperMat);
+      scr.position.set(mx + (mx/mlen)*out, winY, mz + (mz/mlen)*out);
+      scr.lookAt(new THREE.Vector3(mx*2, winY, mz*2));
+      g.add(scr);
     }
-    for (var gy = 1; gy < 5; gy++) {
-      var hm = new THREE.Mesh(new THREE.BoxGeometry(winW*0.94, fr*0.5, fr), railMat);
-      hm.position.set(0, -winH/2 + (winH/5)*gy, fr*0.2); lat.add(hm);
-    }
-    lat.position.set(mx*1.005, winY, mz*1.005);
-    lat.lookAt(outward);
-    lat.traverse(function(m){ if(m.isMesh){ m.castShadow = true; m.receiveShadow = true; } });
-    g.add(lat);
     // 額枋 head beam closing the top of each bay against the roof above
     var beam = new THREE.Mesh(new THREE.BoxGeometry(len*1.04, colDia*0.75, colDia*0.55), colMat);
     beam.position.set(mx, height - colDia*0.42, mz);
@@ -220,7 +262,8 @@ function buildPagoda(D, scale, opts, mats) {
     var h = dense ? (isFirst ? storeyH * 5.0 : storeyH * 0.34) : storeyH;
 
     var body = buildPagodaStorey(R, n, h, D.colDia * scale,
-      mats.wood, mats.wall, mats.dg, !dense && !isFirst);
+      mats.wood, mats.wall, mats.lattice, mats.paper, mats.rail,
+      !dense && !isFirst);
     body.position.y = y;
     g.add(body);
 
