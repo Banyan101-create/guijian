@@ -242,6 +242,24 @@ function buildEaveAssembly(hw, hd, heightFn, rafterMat, trimMat, capMat, spacing
   return g;
 }
 
+// The shell's own corrugation is the source of truth for tile spacing. The
+// texture carries 8 barrels x 6 courses, so repeating it ribCount/8 across the
+// surface lands every painted barrel exactly on a modelled rib -- and the two
+// crests coincide, because both peak at the centre of the span. Leave the two
+// counts unrelated (the old fixed 6 x 3) and they beat against each other into
+// moire, which is what a tiled roof must never do.
+function tileMatFor(mat, ribCount, courses) {
+  if (!mat.map || ribCount <= 0) return mat;
+  var m = mat.clone();
+  m.map = mat.map.clone(); m.map.needsUpdate = true;
+  m.map.repeat.set(ribCount / 8, courses / 6);
+  if (mat.normalMap) {
+    m.normalMap = mat.normalMap.clone(); m.normalMap.needsUpdate = true;
+    m.normalMap.repeat.copy(m.map.repeat);
+  }
+  return m;
+}
+
 function buildRoof(P) {
   var group = new THREE.Group();
   var halfWidth = P.halfWidth, halfDepth = P.halfDepth;
@@ -249,6 +267,15 @@ function buildRoof(P) {
   var mat = P.tileMat, wallMat = P.gableMat, trimMat = P.trimMat;
   var ribs = P.ribs, ribAmp = 0.075;
   var segX = ribs > 0 ? Math.max(60, ribs * 3) : 32;
+
+  // a 筒瓦 is roughly 2.2 times longer than it is wide, so derive the course
+  // count from the barrel width the rib count implies
+  function coursesFor(ribCount, spanHalfW, slopeRun) {
+    if (ribCount <= 0) return 6;
+    return Math.max(4, Math.round(slopeRun / ((2 * spanHalfW / ribCount) * 2.2)));
+  }
+  // v runs across both slopes, so the run is the full depth, not the half
+  var fullRun = 2 * Math.sqrt(halfDepth*halfDepth + P.roofHeight*P.roofHeight);
 
   if (P.roofType === 'wudian') {
     // 推山 (tuishan): each step above the eave step is reduced by 1/10 of its
@@ -276,7 +303,7 @@ function buildRoof(P) {
         return y;
       }
     });
-    var m = new THREE.Mesh(geo, mat);
+    var m = new THREE.Mesh(geo, tileMatFor(mat, ribs, coursesFor(ribs, halfWidth, fullRun)));
     m.castShadow = true; m.receiveShadow = true;
     group.add(m);
     var rb = ridgeBeam(ridgeHalfLen*2 + 0.2, 0.11, trimMat, true);
@@ -332,7 +359,7 @@ function buildRoof(P) {
       return y;
     }
   });
-  var lower = new THREE.Mesh(lowerGeo, mat);
+  var lower = new THREE.Mesh(lowerGeo, tileMatFor(mat, ribs, coursesFor(ribs, halfWidth, fullRun)));
   lower.castShadow = true; lower.receiveShadow = true;
   group.add(lower);
 
@@ -352,7 +379,10 @@ function buildRoof(P) {
       return y;
     }
   });
-  var upper = new THREE.Mesh(upperGeo, mat);
+  // the upper roof is modelled with 0.55 of the rib count over a shorter span
+  var upRibs = Math.round(ribs * 0.55);
+  var upper = new THREE.Mesh(upperGeo,
+    tileMatFor(mat, upRibs, coursesFor(upRibs, upHW, 2 * (ridgeY - skirtTopY + upHD))));
   upper.castShadow = true; upper.receiveShadow = true;
   group.add(upper);
 

@@ -13,8 +13,18 @@ function buildBase(hw, hd, h, tiers, mat, trimMat) {
     cap.position.y = i*th + th*0.91;
     cap.castShadow = true; cap.receiveShadow = true;
     g.add(cap);
+    // the last tier wins: this is the surface the columns and balustrade sit on
+    g.userData.topHW = w; g.userData.topHD = d;
   }
   return g;
+}
+
+// Column centrelines from the real 斗口 bay widths. Everything that has to line
+// up with a bay -- columns, 槅扇, 斗栱 -- must read its positions from here.
+function bayAxes(D, scale) {
+  var xs = [-(D.totalWidth * scale) / 2], acc = xs[0];
+  for (var i = 0; i < D.bayWidths.length; i++) { acc += D.bayWidths[i] * scale; xs.push(acc); }
+  return xs;
 }
 
 function buildColumns(D, scale, baseH, mat, beamMat, plinthMat, useShengqi, useCejiao) {
@@ -23,9 +33,7 @@ function buildColumns(D, scale, baseH, mat, beamMat, plinthMat, useShengqi, useC
   var topR = (D.colTopDia * scale) / 2;                       // 收分 entasis
   var hw = (D.totalWidth * scale) / 2, hd = (D.totalDepth * scale) / 2;
 
-  // column x positions from the real bay widths, not even division
-  var xs = [-hw], acc = -hw;
-  for (var i = 0; i < D.bayWidths.length; i++) { acc += D.bayWidths[i] * scale; xs.push(acc); }
+  var xs = bayAxes(D, scale);
 
   // depth positions from the 步架 step runs
   var zs = [-hd], zacc = -hd;
@@ -76,54 +84,88 @@ function buildColumns(D, scale, baseH, mat, beamMat, plinthMat, useShengqi, useC
   return g;
 }
 
-// 斗拱 dougong bracket band under the eave
-function buildDougong(hw, hd, y, mat) {
+// 斗栱 bracket band under the eave. Every dimension is cut from 斗口 (dk), which
+// is what makes the arms clear each other: the longest is 9.4 斗口 inside a 攒当
+// of 11. Sizing them off an arbitrary unit is what turns the band into mush.
+function buildDougong(hw, hd, y, mat, dk) {
   var g = new THREE.Group();
-  var unit = 0.13;
-  var blockGeo = new THREE.BoxGeometry(unit*1.5, unit*0.55, unit*1.5);
-  var armGeo = new THREE.BoxGeometry(unit*3.4, unit*0.42, unit*0.6);
-  var armGeoZ = new THREE.BoxGeometry(unit*0.6, unit*0.42, unit*3.4);
-  var spacing = unit * 5.2;
+  var u = dk || 0.026;
+  var spacing = 11 * u;                                   // 攒当
+  var tiers = 3, tierH = 3.6 * u;                         // 12 斗口 total, per 大式
+  var seatGeo = new THREE.BoxGeometry(3.2*u, 2*u, 3.2*u); // 坐斗
+  var capGeo  = new THREE.BoxGeometry(1.8*u, 1.0*u, 1.8*u); // 升
+  var armX = [], armZ = [], armLen = [];
+  for (var t = 0; t < tiers; t++) {
+    armLen.push((6.2 + t * 1.6) * u);                     // 瓜栱 → 万栱 → 厢栱
+    armX.push(new THREE.BoxGeometry(armLen[t], 1.4*u, 1.25*u));
+    armZ.push(new THREE.BoxGeometry(1.25*u, 1.4*u, armLen[t]));
+  }
 
   function bracketAt(x, z, rotY) {
     var b = new THREE.Group();
-    var d0 = new THREE.Mesh(blockGeo, mat);
-    b.add(d0);
-    for (var lvl = 1; lvl <= 2; lvl++) {
-      var arm = new THREE.Mesh(rotY ? armGeoZ : armGeo, mat);
-      arm.position.y = lvl * unit * 0.62;
-      arm.scale.setScalar(1 + lvl*0.16);
+    var seat = new THREE.Mesh(seatGeo, mat);
+    seat.position.y = u;
+    b.add(seat);
+    for (var t = 0; t < tiers; t++) {
+      var yt = 2*u + t * tierH;
+      var arm = new THREE.Mesh(rotY ? armZ[t] : armX[t], mat);
+      arm.position.y = yt + 0.7*u;
       b.add(arm);
-      var blk = new THREE.Mesh(blockGeo, mat);
-      blk.position.y = lvl * unit * 0.62 + unit*0.3;
-      blk.scale.setScalar(0.85);
-      b.add(blk);
+      var reach = armLen[t] / 2 - 0.9*u;
+      [-reach, 0, reach].forEach(function(o){
+        var c = new THREE.Mesh(capGeo, mat);
+        c.position.set(rotY ? 0 : o, yt + 1.9*u, rotY ? o : 0);
+        b.add(c);
+      });
     }
     b.position.set(x, y, z);
     b.traverse(function(m){ if(m.isMesh){ m.castShadow = true; } });
     return b;
   }
 
-  g.userData.height = 2 * unit * 0.62 + unit * 0.3 + unit * 0.275;
-  var nx = Math.max(3, Math.floor((hw*2) / spacing));
-  var nz = Math.max(2, Math.floor((hd*2) / spacing));
+  g.userData.height = 2*u + (tiers - 1) * tierH + 2.4*u;
+
+  // 垫栱板: the boards closing the space between bracket sets. Leave them out
+  // and the band is a row of holes you can see the sky through.
+  var bandH = g.userData.height;
+  var boardX = new THREE.BoxGeometry(hw*2, bandH, 1.2*u);
+  var boardZ = new THREE.BoxGeometry(1.2*u, bandH, hd*2);
+  [hd, -hd].forEach(function(bz){
+    var m = new THREE.Mesh(boardX, mat);
+    m.position.set(0, y + bandH/2, bz);
+    m.castShadow = true; m.receiveShadow = true;
+    g.add(m);
+  });
+  [hw, -hw].forEach(function(bx){
+    var m = new THREE.Mesh(boardZ, mat);
+    m.position.set(bx, y + bandH/2, 0);
+    m.castShadow = true; m.receiveShadow = true;
+    g.add(m);
+  });
+
+  // one bracket per 攒当, so the 柱头科 land on the column centrelines
+  var nx = Math.max(2, Math.round((hw*2) / spacing));
+  var nz = Math.max(2, Math.round((hd*2) / spacing));
   for (var i = 0; i <= nx; i++) {
-    var x = -hw + (i/nx) * hw*2;
-    g.add(bracketAt(x, hd, false));
-    g.add(bracketAt(x, -hd, false));
+    var bx = -hw + (i/nx) * hw*2;
+    g.add(bracketAt(bx, hd, false));
+    g.add(bracketAt(bx, -hd, false));
   }
   for (var k = 1; k < nz; k++) {
-    var z = -hd + (k/nz) * hd*2;
-    g.add(bracketAt(hw, z, true));
-    g.add(bracketAt(-hw, z, true));
+    var bz = -hd + (k/nz) * hd*2;
+    g.add(bracketAt(hw, bz, true));
+    g.add(bracketAt(-hw, bz, true));
   }
   return g;
 }
 
 function buildWalls(hw, hd, baseH, colH, mat, colR) {
   var g = new THREE.Group();
-  // sit flush against the column centreline so no gap opens between wall and column
-  var wh = colH * 0.82, t = 0.09, inset = (colR || 0.08) * 0.5;
+  // sit flush against the column centreline so no gap opens between wall and column,
+  // and run right up to the underside of the 额枋 (which buildColumns puts at
+  // colH - 1.2 * beam height, beam height being 0.8 * column diameter)
+  var r = colR || 0.08;
+  var wh = colH - r * 1.92, t = 0.09, inset = r * 0.5;
   var back = new THREE.Mesh(new THREE.BoxGeometry((hw-inset)*2, wh, t), mat);
   back.position.set(0, baseH + wh/2, -(hd-inset));
   g.add(back);
@@ -136,75 +178,106 @@ function buildWalls(hw, hd, baseH, colH, mat, colR) {
   return g;
 }
 
-// 槅扇 lattice door/window screens across the front bays
-function buildLattice(hw, hd, baseH, colH, bays, frameMat, paperMat, colR) {
+// 槅扇 door/window screens: one set per structural bay, filling the clear opening
+// between that bay's two columns. Bay widths are unequal (77 斗口 at the 明间,
+// -11 per bay outward), so the layout has to come off bayAxes, never off an even
+// division of the facade.
+function buildLattice(D, scale, hd, baseH, colH, frameMat, paperMat, colR) {
   var g = new THREE.Group();
-  var inset = (colR || 0.08) * 0.5;
-  var z = hd - inset;
-  var wh = colH * 0.78;
+  var xs = bayAxes(D, scale);
+  var bays = xs.length - 1;
+  var r = colR || 0.08;
+  var z = hd - r * 0.5;                       // set behind the column centreline
   var y0 = baseH;
-  var span = (hw - inset) * 2;
-  var bayW = span / (bays - 1);
-  var panelW = bayW * 0.86;
+  var top = y0 + colH - r * 1.92;             // underside of the 额枋
   var fr = 0.035;
+  var leafTarget = colH * 0.22;               // nominal 槅扇 leaf width
+  var cellTarget = colH * 0.075;              // nominal lattice cell, kept constant
+  var centre = (bays - 1) / 2;
 
-  var centre = Math.floor((bays - 1) / 2);
-  for (var b = 0; b < bays - 1; b++) {
-    var cx = -(hw - inset) + bayW * (b + 0.5);
-    var isDoor = (b === centre) || (bays >= 7 && Math.abs(b - centre) === 1);
-    // paper/screen backing
-    var back = new THREE.Mesh(new THREE.BoxGeometry(panelW, wh, 0.02), paperMat);
-    back.position.set(cx, y0 + wh/2, z);
-    g.add(back);
-    // outer frame
-    [[0, wh/2],[0, -wh/2]].forEach(function(o){
-      var h = new THREE.Mesh(new THREE.BoxGeometry(panelW, fr*1.6, fr*2.2), frameMat);
-      h.position.set(cx + o[0], y0 + wh/2 + o[1], z);
-      g.add(h);
+  for (var b = 0; b < bays; b++) {
+    // clear opening: column face to column face
+    var x0 = xs[b] + r, x1 = xs[b + 1] - r, cx = (x0 + x1) / 2;
+    var clear = x1 - x0;
+    if (clear < fr * 6) continue;
+
+    // even leaf count so the meeting stile lands on the bay centreline
+    var leaves = Math.max(2, 2 * Math.round(clear / leafTarget / 2));
+    var leafW = clear / leaves;
+
+    // 明间 (and its neighbours on a wide hall) are doors; the rest are 槛窗
+    var isDoor = Math.abs(b - centre) <= (bays >= 7 ? 1 : 0);
+    var bot = y0 + (top - y0) * (isDoor ? 0.0 : 0.34);
+    var paneH = top - bot;
+
+    // 槛墙 low wall carrying the window bays
+    if (!isDoor) {
+      var sill = new THREE.Mesh(new THREE.BoxGeometry(clear, bot - y0, fr * 2.6), frameMat);
+      sill.position.set(cx, (y0 + bot) / 2, z);
+      sill.receiveShadow = true;
+      g.add(sill);
+    }
+
+    // 裙板 skirt fills the bottom third of a door leaf; a window is glazed throughout
+    var gridBot = bot + paneH * (isDoor ? 0.36 : 0.10);
+    var gridTop = top - paneH * 0.10;
+    var cols = Math.max(2, Math.round(leafW / cellTarget));
+    var cell = leafW / cols;
+    var rows = Math.max(2, Math.round((gridTop - gridBot) / cell));
+
+    for (var L = 0; L < leaves; L++) {
+      var lx = x0 + leafW * (L + 0.5);
+
+      var back = new THREE.Mesh(new THREE.BoxGeometry(leafW, paneH, 0.02), paperMat);
+      back.position.set(lx, (bot + top) / 2, z);
+      g.add(back);
+
+      if (isDoor) {
+        var skirt = new THREE.Mesh(
+          new THREE.BoxGeometry(leafW, gridBot - bot, fr * 2.4), frameMat);
+        skirt.position.set(lx, (bot + gridBot) / 2, z + 0.004);
+        g.add(skirt);
+      }
+
+      // muntins sized off cellTarget so the cells stay square and the same size
+      // in every bay, however wide that bay's leaves came out
+      for (var c = 1; c < cols; c++) {
+        var vm = new THREE.Mesh(
+          new THREE.BoxGeometry(fr * 0.75, gridTop - gridBot, fr * 1.5), frameMat);
+        vm.position.set(lx - leafW / 2 + cell * c, (gridTop + gridBot) / 2, z + 0.006);
+        g.add(vm);
+      }
+      for (var rr = 1; rr < rows; rr++) {
+        var hm = new THREE.Mesh(new THREE.BoxGeometry(leafW, fr * 0.75, fr * 1.5), frameMat);
+        hm.position.set(lx, gridBot + ((gridTop - gridBot) / rows) * rr, z + 0.006);
+        g.add(hm);
+      }
+    }
+
+    // 边梃 stile on every leaf edge, the middle one doubled as the meeting stile
+    for (var s = 0; s <= leaves; s++) {
+      var st = new THREE.Mesh(
+        new THREE.BoxGeometry(fr * (s === leaves / 2 ? 2.0 : 1.6), paneH, fr * 2.4), frameMat);
+      st.position.set(x0 + leafW * s, (bot + top) / 2, z + 0.008);
+      g.add(st);
+    }
+    // 抹头 rails run the full opening
+    [bot, gridBot, gridTop, top].forEach(function(ry){
+      var rl = new THREE.Mesh(new THREE.BoxGeometry(clear, fr * 1.6, fr * 2.2), frameMat);
+      rl.position.set(cx, ry, z + 0.007);
+      g.add(rl);
     });
-    [[-panelW/2, 0],[panelW/2, 0]].forEach(function(o){
-      var vb = new THREE.Mesh(new THREE.BoxGeometry(fr*1.6, wh, fr*2.2), frameMat);
-      vb.position.set(cx + o[0], y0 + wh/2, z);
-      g.add(vb);
-    });
-    // doors run their lattice much lower than windows
-    var gridTop = y0 + wh*0.97, gridBot = y0 + (isDoor ? wh*0.20 : wh*0.34);
-    var cols = 5, rows = 7;
-    for (var c = 1; c < cols; c++) {
-      var vx = cx - panelW/2 + (panelW/cols)*c;
-      var vm = new THREE.Mesh(new THREE.BoxGeometry(fr*0.75, gridTop-gridBot, fr*1.5), frameMat);
-      vm.position.set(vx, (gridTop+gridBot)/2, z + 0.006);
-      g.add(vm);
-    }
-    for (var rr = 1; rr < rows; rr++) {
-      var hy = gridBot + ((gridTop-gridBot)/rows)*rr;
-      var hm = new THREE.Mesh(new THREE.BoxGeometry(panelW, fr*0.75, fr*1.5), frameMat);
-      hm.position.set(cx, hy, z + 0.006);
-      g.add(hm);
-    }
-    if (isDoor) {
-      // central meeting stile between the door leaves
-      var stile = new THREE.Mesh(new THREE.BoxGeometry(fr*2.0, wh, fr*2.6), frameMat);
-      stile.position.set(cx, y0 + wh/2, z + 0.008);
-      g.add(stile);
-      var kick = new THREE.Mesh(new THREE.BoxGeometry(panelW*0.94, wh*0.15, fr*2.4), frameMat);
-      kick.position.set(cx, y0 + wh*0.085, z + 0.004);
-      g.add(kick);
-    } else {
-      var apron = new THREE.Mesh(new THREE.BoxGeometry(panelW*0.94, wh*0.28, fr*2.4), frameMat);
-      apron.position.set(cx, y0 + wh*0.17, z + 0.004);
-      g.add(apron);
-    }
   }
+
   g.traverse(function(m){ if(m.isMesh){ m.castShadow = true; m.receiveShadow = true; } });
   return g;
 }
 
 // 踏跺 front steps
-function buildSteps(hw, baseH, tiers, mat, cheekMat) {
+function buildSteps(halfW, baseH, tiers, mat, cheekMat) {
   var g = new THREE.Group();
   var n = Math.max(3, Math.round(baseH / 0.15));
-  var w = Math.min(hw * 0.55, 1.9);
+  var w = halfW;
   var depthEach = 0.24;
   var runTotal = depthEach * n;
   for (var i = 0; i < n; i++) {
@@ -224,8 +297,10 @@ function buildSteps(hw, baseH, tiers, mat, cheekMat) {
   var eg = new THREE.ExtrudeGeometry(shape, { depth: 0.16, bevelEnabled:false });
   [-1, 1].forEach(function(sd){
     var ch = new THREE.Mesh(eg, cheekMat);
-    ch.rotation.y = Math.PI/2;
-    // extrude runs along +Z then rotates to -X, so shift by the extrude depth
+    // extrude runs along local +X; -90 deg about Y sends it to world +Z, out in
+    // front with the flight. +90 sends it to -Z, i.e. buried in the platform.
+    ch.rotation.y = -Math.PI/2;
+    // the 0.16 of extrude depth lands on -X of the origin, so shift it back
     ch.position.set(sd * (w + 0.08) + 0.08, 0, 0);
     ch.castShadow = true; ch.receiveShadow = true;
     g.add(ch);

@@ -62,6 +62,11 @@ src/
 
 Load order matters: `scene → constants → roof → pagoda → hall → palette → app`.
 
+Bay widths are **unequal** (77 斗口 at the 明间, −11 per bay outward), so
+anything that has to line up with a bay — columns, 槅扇, 斗栱 — must take its
+positions from `bayAxes(D, scale)`. Dividing the facade evenly is the one thing
+that will silently put panels across columns.
+
 ---
 
 ## Validation
@@ -103,6 +108,24 @@ Three subtleties worth knowing before editing this code:
 3. **Find boundaries with undirected edge counts.** Directed-edge detection gives
    false positives wherever winding is inconsistent, and patching those
    already-closed regions is what creates non-manifold geometry.
+
+**Texel density:** `worldScaleUVs()` (scene.js) rewrites box and cylinder UVs in
+world units after every rebuild, because `BoxGeometry` hands each face 0..1 UVs
+whatever its real size — leave it out and a 9-unit platform tier and a
+0.24-unit step tread show the same four bricks. Because of it, `map.repeat`
+means **tiles per world unit**, not tiles per face; the numbers in `app.js` are
+therefore real-world texture sizes. The roof shell carries its own UVs and is
+skipped.
+
+**Normal maps:** every albedo canvas is drawn as a height field as well as a
+colour, and `normalFromHeight()` Sobels it into a tiling normal map. Those must
+stay **linear** — an sRGB normal map is silently wrong, not obviously wrong.
+
+**Tile spacing follows the ribs.** The roof shell models `ribs` corrugations;
+the tile texture carries 8 barrels per tile. `tileMatFor()` (roof.js) clones the
+material per surface with `repeat.x = ribCount / 8` so painted barrels land on
+modelled ribs. Set the two independently and they beat into moiré. The 歇山
+upper roof has its own rib count (0.55x) and so needs its own clone.
 
 **Colour space:** hex values are sRGB but Three r128 feeds them in as linear
 while `outputEncoding = sRGBEncoding` converts linear -> sRGB on output. Passing

@@ -49,23 +49,51 @@ function rebuild() {
       cWall=col('wallColor'), cLattice=col('latticeColor'), cBase=col('baseColor'),
       cRail=col('railColor');
 
-  var tileMat   = new THREE.MeshStandardMaterial({ color:C(cRoof), roughness:0.42, metalness:0.12, envMapIntensity:0.28, side:THREE.DoubleSide,
-    map: texClone(TEX.tile, 6, 3) });
-  var trimMat   = new THREE.MeshStandardMaterial({ color:C(cTrim), roughness:0.75, metalness:0.02, envMapIntensity:0.3 });
-  var woodMat   = new THREE.MeshStandardMaterial({ color:C(cWood), roughness:0.7,  metalness:0.03, map: texClone(TEX.wood, 1, 1) });
-  var beamMat   = new THREE.MeshStandardMaterial({ color:C(cBeam), roughness:0.66, metalness:0.04, map: texClone(TEX.wood, 2, 0.5) });
+  // After worldScaleUVs() below, map.repeat reads as tiles per world unit --
+  // so these numbers set a real-world texture size, not a per-face count.
+  // The roof shell keeps its own UVs, so tileMat stays on the old 6 x 3.
+  function skin(mat, tex, nrm, rx, ry, nScale) {
+    mat.map = texClone(tex, rx, ry);
+    mat.normalMap = texClone(nrm, rx, ry);
+    mat.normalScale = new THREE.Vector2(nScale, nScale);
+    return mat;
+  }
+  var tileMat   = skin(new THREE.MeshStandardMaterial({ color:C(cRoof), roughness:0.42, metalness:0.12, envMapIntensity:0.28, side:THREE.DoubleSide }),
+                       TEX.tile, TEX.tileN, 6, 3, 1.0);
+  // ridges and mouldings are 灰塑 lime render, not plastic: give them a tooth
+  var trimMat   = skin(new THREE.MeshStandardMaterial({ color:C(cTrim), roughness:0.75, metalness:0.02, envMapIntensity:0.3 }),
+                       TEX.plaster, TEX.plasterN, 3, 3, 0.5);
+  var woodMat   = skin(new THREE.MeshStandardMaterial({ color:C(cWood), roughness:0.7,  metalness:0.03 }),
+                       TEX.wood, TEX.woodN, 0.7, 0.7, 0.55);
+  var beamMat   = skin(new THREE.MeshStandardMaterial({ color:C(cBeam), roughness:0.66, metalness:0.04 }),
+                       TEX.wood, TEX.woodN, 1.1, 1.1, 0.55);
   var caihuaMat = new THREE.MeshStandardMaterial({ color:C(cCaihua), roughness:0.55, metalness:0.06 });
   var goldMat   = new THREE.MeshStandardMaterial({ color:C('#c9a94a'), roughness:0.32, metalness:0.65 });
-  var dgMat     = new THREE.MeshStandardMaterial({ color:C(cDg), roughness:0.6, metalness:0.06 });
-  var wallMat   = new THREE.MeshStandardMaterial({ color:C(cWall), roughness:0.9, metalness:0.0, map: texClone(TEX.plaster, 2, 1) });
-  var latticeMat= new THREE.MeshStandardMaterial({ color:C(cLattice), roughness:0.68, metalness:0.03 });
-  var baseMat   = new THREE.MeshStandardMaterial({ color:C(cBase), roughness:0.95, metalness:0.0, envMapIntensity:0.25, map: texClone(TEX.stone, 4, 1) });
-  var railMat   = new THREE.MeshStandardMaterial({ color:C(cRail), roughness:0.85, metalness:0.0, envMapIntensity:0.25 });
+  var dgMat     = skin(new THREE.MeshStandardMaterial({ color:C(cDg), roughness:0.6, metalness:0.06 }),
+                       TEX.wood, TEX.woodN, 3, 3, 0.4);
+  var wallMat   = skin(new THREE.MeshStandardMaterial({ color:C(cWall), roughness:0.9, metalness:0.0 }),
+                       TEX.plaster, TEX.plasterN, 2.5, 2.5, 0.7);
+  var latticeMat= skin(new THREE.MeshStandardMaterial({ color:C(cLattice), roughness:0.68, metalness:0.03 }),
+                       TEX.wood, TEX.woodN, 2.2, 2.2, 0.4);
+  // 1.35 tiles per unit over a 9-unit facade puts the courses at roughly the
+  // 1 m x 0.5 m of real 条石
+  var baseMat   = skin(new THREE.MeshStandardMaterial({ color:C(cBase), roughness:0.95, metalness:0.0, envMapIntensity:0.25 }),
+                       TEX.stone, TEX.stoneN, 1.35, 1.35, 1.1);
+  // 柱础 and 栏杆 are carved from single blocks, not coursed: smooth stone, no joints
+  var plinthMat = skin(new THREE.MeshStandardMaterial({ color:C(cBase), roughness:0.88, metalness:0.0, envMapIntensity:0.25 }),
+                       TEX.plaster, TEX.plasterN, 3.5, 3.5, 0.6);
+  var railMat   = skin(new THREE.MeshStandardMaterial({ color:C(cRail), roughness:0.85, metalness:0.0, envMapIntensity:0.25 }),
+                       TEX.plaster, TEX.plasterN, 3.5, 3.5, 0.6);
   var paperMat  = new THREE.MeshStandardMaterial({ color:C('#e8dfc6'), roughness:0.95, metalness:0.0 });
-  var eaveTrimMat = new THREE.MeshStandardMaterial({ color:C(cTrim), roughness:0.8, metalness:0.02, envMapIntensity:0.3, side:THREE.DoubleSide });
-  var rafterMat = new THREE.MeshStandardMaterial({ color:C(cBeam), roughness:0.68, metalness:0.03 });
-  var capMat    = new THREE.MeshStandardMaterial({ color:C(cTrim), roughness:0.6, metalness:0.03, envMapIntensity:0.3 });
-  var floorMat  = new THREE.MeshStandardMaterial({ color:C('#3a2f26'), roughness:0.9, metalness:0.02 });
+  var eaveTrimMat = skin(new THREE.MeshStandardMaterial({ color:C(cTrim), roughness:0.8, metalness:0.02, envMapIntensity:0.3, side:THREE.DoubleSide }),
+                         TEX.plaster, TEX.plasterN, 3, 3, 0.5);
+  var rafterMat = skin(new THREE.MeshStandardMaterial({ color:C(cBeam), roughness:0.68, metalness:0.03 }),
+                       TEX.wood, TEX.woodN, 1.6, 1.6, 0.5);
+  var capMat    = skin(new THREE.MeshStandardMaterial({ color:C(cTrim), roughness:0.6, metalness:0.03, envMapIntensity:0.3 }),
+                       TEX.plaster, TEX.plasterN, 3, 3, 0.5);
+  // 金砖墁地: the interior floor is laid in large square bricks
+  var floorMat  = skin(new THREE.MeshStandardMaterial({ color:C('#3a2f26'), roughness:0.9, metalness:0.02 }),
+                       TEX.stone, TEX.stoneN, 2.2, 2.2, 0.6);
 
   var isPagoda = document.getElementById('buildingType').value === 'pagoda';
   var storeys = parseInt(document.getElementById('storeys').value);
@@ -89,6 +117,7 @@ function rebuild() {
     });
     pg.position.y = baseH;
     buildingGroup.add(pg);
+    worldScaleUVs(buildingGroup);
 
     controls.target.set(0, (pg.userData.totalHeight || 10) * 0.42, 0);
     var ptris = 0;
@@ -101,7 +130,8 @@ function rebuild() {
     return;
   }
 
-  buildingGroup.add(buildBase(hw, hd, baseH, 2, baseMat, trimMat));
+  var base = buildBase(hw, hd, baseH, 2, baseMat, trimMat);
+  buildingGroup.add(base);
 
   var floor = new THREE.Mesh(new THREE.BoxGeometry(hw*2, 0.05, hd*2), floorMat);
   floor.position.y = baseH + 0.025; floor.receiveShadow = true;
@@ -109,22 +139,25 @@ function rebuild() {
 
   var colR = D.colDia * scale / 2;
   buildingGroup.add(buildWalls(hw, hd, baseH, colH, wallMat, colR));
-  buildingGroup.add(buildColumns(D, scale, baseH, woodMat, beamMat, baseMat, useShengqi, useCejiao));
-  buildingGroup.add(buildLattice(hw, hd, baseH, colH, bays, latticeMat, paperMat, colR));
+  buildingGroup.add(buildColumns(D, scale, baseH, woodMat, beamMat, plinthMat, useShengqi, useCejiao));
+  buildingGroup.add(buildLattice(D, scale, hd, baseH, colH, latticeMat, paperMat, colR));
 
-  if (val('railing') > 0.5) buildingGroup.add(buildBalustrade(hw + 0.5, hd + 0.5, baseH, railMat));
+  // ride the top tier of the 台明, not thin air outboard of it
+  if (val('railing') > 0.5)
+    buildingGroup.add(buildBalustrade(base.userData.topHW - 0.07, base.userData.topHD - 0.07, baseH, railMat));
   if (val('caihua') > 0.5) {
     var beamH = D.colDia * scale * 0.8;
     buildingGroup.add(buildCaihua(hw, hd, baseH + colH - beamH*0.7, beamH, beamMat, caihuaMat, goldMat, colR));
   }
 
-  var steps = buildSteps(hw, baseH, 2, baseMat, railMat);
-  steps.position.z = hd + 0.65;
+  // 踏跺 as wide as the 明间, its top tread flush with the platform edge
+  var steps = buildSteps((D.bayWidths[(bays-1)/2] * scale) / 2, baseH, 2, baseMat, railMat);
+  steps.position.z = base.userData.topHD;
   buildingGroup.add(steps);
 
   var eaveY = baseH + colH;
   if (isDaShi) {
-    var dg = buildDougong(hw - 0.2, hd - 0.2, eaveY + 0.02, dgMat);
+    var dg = buildDougong(hw, hd, eaveY + 0.02, dgMat, scale);
     buildingGroup.add(dg);
     eaveY += 0.02 + (dg.userData.height || 0.2);
   }
@@ -140,6 +173,10 @@ function rebuild() {
   });
   roof.position.y = eaveY;
   buildingGroup.add(roof);
+
+  // once every part exists: the roof shell carries its own UVs and is skipped,
+  // the rafters and everything below get world-unit texel density
+  worldScaleUVs(buildingGroup);
 
   controls.target.set(0, (baseH + colH + roofRise) * 0.45, 0);
 
