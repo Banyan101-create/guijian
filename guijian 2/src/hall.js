@@ -3,10 +3,12 @@
 // own width.
 function buildBase(hw, hd, h, tiers, mat, trimMat, margin) {
   var g = new THREE.Group();
-  var m = (margin === undefined) ? 0.65 : margin;
+  // NB: not `m` -- the tier mesh below already claims that name, and `var` is
+  // function-scoped, so the second tier would multiply by a Mesh and go NaN.
+  var mg = (margin === undefined) ? 0.65 : margin;
   for (var i = 0; i < tiers; i++) {
-    var shrink = i * m * 0.34;
-    var w = (hw + m) - shrink, d = (hd + m) - shrink;
+    var shrink = i * mg * 0.34;
+    var w = (hw + mg) - shrink, d = (hd + mg) - shrink;
     var th = h / tiers;
     var m = new THREE.Mesh(new THREE.BoxGeometry(w*2, th*0.82, d*2), mat);
     m.position.y = i*th + th*0.41;
@@ -54,7 +56,7 @@ function buildColumns(D, scale, baseH, mat, beamMat, plinthMat, useShengqi, useC
       var rise = useShengqi ? D.shengqi * scale * (Math.abs(xi - mid) / Math.max(mid,1)) : 0;
       var h = colH + rise;
 
-      var geo = new THREE.CylinderGeometry(topR, r, h, 14);
+      var geo = new THREE.CylinderGeometry(topR, r, h, 24);
       var m = new THREE.Mesh(geo, mat);
       m.position.set(x, baseH + h/2, z);
 
@@ -66,8 +68,13 @@ function buildColumns(D, scale, baseH, mat, beamMat, plinthMat, useShengqi, useC
       m.castShadow = true; m.receiveShadow = true;
       g.add(m);
 
-      var pl = new THREE.Mesh(new THREE.CylinderGeometry(r*1.75, r*1.95, r*1.1, 16), plinthMat);
-      pl.position.set(x, baseH + r*0.55, z);
+      // 柱础: a square 础石 slab carrying the 鼓镜 drum, not a bare cone
+      var ps = new THREE.Mesh(new THREE.BoxGeometry(r*4.0, r*0.55, r*4.0), plinthMat);
+      ps.position.set(x, baseH + r*0.275, z);
+      ps.castShadow = true; ps.receiveShadow = true;
+      g.add(ps);
+      var pl = new THREE.Mesh(new THREE.CylinderGeometry(r*1.75, r*1.95, r*1.1, 24), plinthMat);
+      pl.position.set(x, baseH + r*1.10, z);
       pl.castShadow = true; pl.receiveShadow = true;
       g.add(pl);
     });
@@ -84,6 +91,49 @@ function buildColumns(D, scale, baseH, mat, beamMat, plinthMat, useShengqi, useC
     var b = new THREE.Mesh(new THREE.BoxGeometry(bt, bh, hd*2), beamMat);
     b.position.set(x, yTop, 0); b.castShadow = true; g.add(b);
   });
+
+  // 雀替: the scrolled bracket stiffening each 额枋 where it lands on a column.
+  // Every Qing hall carries them, and without them the beam meets the column as
+  // a bare butt joint -- the single detail whose absence reads as "plain box".
+  var qH = bh * 1.25, qT = bt * 0.6, yQ = yTop - bh * 0.5;
+  function quetiGeo(len) {
+    var s = new THREE.Shape();
+    s.moveTo(0, 0);
+    s.lineTo(len, 0);
+    s.lineTo(len, -qH * 0.20);
+    s.quadraticCurveTo(len * 0.52, -qH * 0.26, len * 0.34, -qH * 0.66);
+    s.quadraticCurveTo(len * 0.18, -qH, 0, -qH);
+    s.lineTo(0, 0);
+    var eg = new THREE.ExtrudeGeometry(s, { depth: qT, bevelEnabled: false });
+    eg.translate(0, 0, -qT / 2);
+    return eg;
+  }
+  // local +X is the direction the bracket reaches into the bay; -90 deg about Y
+  // sends it to +Z, +90 to -Z, 180 to -X
+  function addQueti(len, px, pz, dir, alongZ) {
+    if (len <= 1e-4) return;
+    var m = new THREE.Mesh(quetiGeo(len), beamMat);
+    m.position.set(px, yQ, pz);
+    if (alongZ) m.rotation.y = (dir > 0) ? -Math.PI/2 : Math.PI/2;
+    else if (dir < 0) m.rotation.y = Math.PI;
+    m.castShadow = true; m.receiveShadow = true;
+    g.add(m);
+  }
+  [zs[0], zs[zs.length-1]].forEach(function(z){
+    for (var qi = 0; qi < xs.length - 1; qi++) {
+      var L = Math.min((xs[qi+1] - xs[qi]) * 0.20, qH * 1.7);
+      addQueti(L, xs[qi],   z,  1, false);
+      addQueti(L, xs[qi+1], z, -1, false);
+    }
+  });
+  [xs[0], xs[xs.length-1]].forEach(function(x){
+    for (var qj = 0; qj < zs.length - 1; qj++) {
+      var L2 = Math.min((zs[qj+1] - zs[qj]) * 0.20, qH * 1.7);
+      addQueti(L2, x, zs[qj],    1, true);
+      addQueti(L2, x, zs[qj+1], -1, true);
+    }
+  });
+
   g.userData.xs = xs; g.userData.zs = zs;
   return g;
 }
@@ -163,7 +213,7 @@ function buildDougong(hw, hd, y, mat, dk) {
   return g;
 }
 
-function buildWalls(hw, hd, baseH, colH, mat, colR) {
+function buildWalls(hw, hd, baseH, colH, mat, colR, lowMat) {
   var g = new THREE.Group();
   // sit flush against the column centreline so no gap opens between wall and column,
   // and run right up to the underside of the 额枋 (which buildColumns puts at
@@ -178,6 +228,20 @@ function buildWalls(hw, hd, baseH, colH, mat, colR) {
     side.position.set(s*(hw-inset), baseH + wh/2, 0);
     g.add(side);
   });
+
+  // 下碱: the masonry course the plaster wall stands on, set slightly proud.
+  // A hall wall that runs plaster straight down to the platform reads as a slab.
+  if (lowMat) {
+    var dj = wh * 0.22, dt = t * 1.7;
+    var bl = new THREE.Mesh(new THREE.BoxGeometry((hw-inset)*2, dj, dt), lowMat);
+    bl.position.set(0, baseH + dj/2, -(hd-inset));
+    g.add(bl);
+    [-1, 1].forEach(function(s){
+      var sl = new THREE.Mesh(new THREE.BoxGeometry(dt, dj, (hd-inset)*2), lowMat);
+      sl.position.set(s*(hw-inset), baseH + dj/2, 0);
+      g.add(sl);
+    });
+  }
   g.traverse(function(m){ if(m.isMesh){ m.castShadow = true; m.receiveShadow = true; } });
   return g;
 }

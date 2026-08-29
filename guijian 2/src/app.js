@@ -79,6 +79,10 @@ function rebuild() {
   // 1 m x 0.5 m of real 条石
   var baseMat   = skin(new THREE.MeshStandardMaterial({ color:C(cBase), roughness:0.95, metalness:0.0, envMapIntensity:0.25 }),
                        TEX.stone, TEX.stoneN, 1.35, 1.35, 1.1);
+  // 阶条石: the platform top is a paved surface, not a blank slab. Big slabs, so
+  // a lower tile density than the wall courses.
+  var capStoneMat = skin(new THREE.MeshStandardMaterial({ color:C(cTrim), roughness:0.92, metalness:0.0, envMapIntensity:0.25 }),
+                         TEX.stone, TEX.stoneN, 0.85, 0.85, 1.0);
   // 柱础 and 栏杆 are carved from single blocks, not coursed: smooth stone, no joints
   var plinthMat = skin(new THREE.MeshStandardMaterial({ color:C(cBase), roughness:0.88, metalness:0.0, envMapIntensity:0.25 }),
                        TEX.plaster, TEX.plasterN, 3.5, 3.5, 0.6);
@@ -108,7 +112,7 @@ function rebuild() {
   if (isPagoda) {
     // must match the R0 buildPagoda derives, 密檐 slenderness factor included
     var pagodaR = hw * 0.62 * (pStyle === 'miyan' ? 0.30 : 1.0);
-    buildingGroup.add(buildBase(pagodaR, pagodaR, baseH, 2, baseMat, trimMat,
+    buildingGroup.add(buildBase(pagodaR, pagodaR, baseH, 2, baseMat, capStoneMat,
       pagodaR * 0.22));
     var pg = buildPagoda(D, scale * 0.62, {
       sides: sides, storeys: storeys, style: pStyle,
@@ -133,7 +137,7 @@ function rebuild() {
     return;
   }
 
-  var base = buildBase(hw, hd, baseH, 2, baseMat, trimMat);
+  var base = buildBase(hw, hd, baseH, 2, baseMat, capStoneMat);
   buildingGroup.add(base);
 
   var floor = new THREE.Mesh(new THREE.BoxGeometry(hw*2, 0.05, hd*2), floorMat);
@@ -141,7 +145,7 @@ function rebuild() {
   buildingGroup.add(floor);
 
   var colR = D.colDia * scale / 2;
-  buildingGroup.add(buildWalls(hw, hd, baseH, colH, wallMat, colR));
+  buildingGroup.add(buildWalls(hw, hd, baseH, colH, wallMat, colR, baseMat));
   buildingGroup.add(buildColumns(D, scale, baseH, woodMat, beamMat, plinthMat, useShengqi, useCejiao));
   buildingGroup.add(buildLattice(D, scale, hd, baseH, colH, latticeMat, paperMat, colR));
 
