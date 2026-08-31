@@ -1,17 +1,34 @@
-// ---------- legacy normalized profile (kept for the roof surface sampler) ----------
+// ============================================================================
+//  屋顶坡面 ROOF SECTION
+//  The 坡面 curve editor drives this. The profile is a quadratic Bezier from
+//  eave to ridge over the unit square; `cx`/`cy` are its control point, and the
+//  three multipliers scale the dimensions constants.js derived.
+//
+//  The defaults reproduce the Qing 举架 coefficient ladder
+//  [0.5, 0.62, 0.72, 0.82, 0.92] to within half a percent, so an untouched
+//  curve builds exactly the roof this generator built before the editor
+//  existed. Everything else in the file reads the profile through profileH(),
+//  which needs x strictly ascending -- hence the clamps: x(t) stays monotonic
+//  only while cx is inside (0, 1), and y likewise for cy.
+// ============================================================================
+var ROOF_CURVE = { cx: 0.5118, cy: 0.3276, rise: 1, eave: 1, lift: 1 };
+
 function solveRoofProfile(halfDepth, roofHeight, steps) {
-  steps = steps || 5;
-  var coeffs = [0.5, 0.62, 0.72, 0.82, 0.92].slice(0, steps);
-  var stepRun = halfDepth / steps;
-  var pts = [{x:0, y:0}];
-  var cx = 0, cy = 0;
-  for (var i = 0; i < steps; i++) {
-    cx += stepRun; cy += coeffs[i] * stepRun;
-    pts.push({x:cx, y:cy});
+  var cx = Math.min(0.95, Math.max(0.05, ROOF_CURVE.cx));
+  var cy = Math.min(0.95, Math.max(0.00, ROOF_CURVE.cy));
+  // sample finer than the old five-step ladder: the curve is now continuous and
+  // can be bent hard, and profileH() only interpolates linearly between samples
+  var n = Math.max(steps || 5, 12);
+  var pts = [];
+  for (var i = 0; i <= n; i++) {
+    var t = i / n, mt = 1 - t;
+    pts.push({ x: 2 * mt * t * cx + t * t,
+               y: 2 * mt * t * cy + t * t });
   }
-  var maxY = pts[pts.length-1].y, maxX = pts[pts.length-1].x;
-  return pts.map(function(p){
-    return { x: halfDepth - (p.x/maxX)*halfDepth, y: (p.y/maxY)*roofHeight };
+  // same contract as before: ordered ridge -> eave, x ascending 0 -> halfDepth,
+  // y descending roofHeight -> 0
+  return pts.map(function (p) {
+    return { x: halfDepth - p.x * halfDepth, y: p.y * roofHeight };
   }).reverse();
 }
 

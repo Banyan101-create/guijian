@@ -253,7 +253,7 @@ function buildPagoda(D, scale, opts, mats) {
   var R0 = (D.totalWidth * scale) / 2 * (dense ? 0.30 : 1.0);
   var storeyH = D.colH * scale * (dense ? 0.55 : 1.0);
   var profile = solveRoofProfile(Math.max(0.001, D.halfDepth * scale), 1.0, 5);
-  var eaveOut = D.eaveOut * scale * (dense ? 0.5 : 1.0);
+  var eaveOut = D.eaveOut * scale * ROOF_CURVE.eave * (dense ? 0.5 : 1.0);
   var thick = Math.max(0.03, D.purlinDia * scale * 0.5);
 
   var y = 0, R = R0;
@@ -283,7 +283,7 @@ function buildPagoda(D, scale, opts, mats) {
     var tierRise = (dense ? 0.42 : 0.78) * storeyH;
     var roofY = y + h + (opts.dougong ? D.colDia*scale*0.4 : 0) - thick*0.5;
     var roof = buildPolygonRoof(R + eaveOut, n, tierRise,
-      D.cornerRise * scale, opts.ribs, profile, mats.tile, thick);
+      D.cornerRise * scale * ROOF_CURVE.lift, opts.ribs, profile, mats.tile, thick);
     roof.position.y = roofY;
     g.add(roof);
 
@@ -309,7 +309,7 @@ function buildPagoda(D, scale, opts, mats) {
 
   var capRise = storeyH * 1.05;
   var cap = buildPolygonRoof(R + eaveOut*0.7, n, capRise,
-    D.cornerRise * scale * 0.8, opts.ribs, profile, mats.tile, thick);
+    D.cornerRise * scale * ROOF_CURVE.lift * 0.8, opts.ribs, profile, mats.tile, thick);
   cap.position.y = y;
   g.add(cap);
 

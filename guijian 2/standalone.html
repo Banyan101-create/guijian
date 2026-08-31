@@ -2,127 +2,1517 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>古建生成器 Chinese Architecture Generator</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0a0a0c">
+<meta name="description" content="Parametric generator for Chinese timber-frame architecture — 斗口 module, 举架 roof curve, 斗拱 brackets, in the browser.">
+<title>古建生成器 · Chinese Architecture Generator</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Serif+SC:wght@500;600;700&display=swap" rel="stylesheet">
 <style>
-  html, body { margin:0; padding:0; overflow:hidden; background:#0e0e10; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; }
-  #wrap { position:relative; width:100vw; height:100vh; }
-  #panel { position:absolute; top:12px; left:12px; width:252px; background:rgba(16,16,18,0.88);
-    color:#e8e6e1; padding:14px 16px; border-radius:12px; font-size:12.5px; backdrop-filter:blur(10px);
-    max-height:94vh; overflow-y:auto; border:1px solid rgba(255,255,255,0.08); }
-  #panel h3 { margin:0 0 10px; font-size:12px; font-weight:500; color:#d9b779; letter-spacing:0.04em; text-transform:uppercase; }
-  #panel .sec { margin:14px 0 6px; font-size:11px; color:#8a877f; letter-spacing:0.05em; text-transform:uppercase; }
-  .row { margin:7px 0; }
-  .row label { display:flex; justify-content:space-between; margin-bottom:3px; color:#b8b5ad; font-size:12px; }
-  .row label span { color:#d9b779; font-variant-numeric:tabular-nums; }
-  input[type=range] { width:100%; accent-color:#b3542f; }
-  input[type=color] { width:100%; height:22px; border:none; border-radius:4px; background:none; cursor:pointer; }
-  select { width:100%; padding:5px 6px; border-radius:6px; background:#232326; color:#e8e6e1; border:1px solid #3a3a3e; font-size:12px; }
-  button { width:100%; margin-top:12px; padding:9px; background:#b3542f; color:#fff; border:none;
-    border-radius:7px; cursor:pointer; font-size:12.5px; font-weight:500; }
-  button:hover { background:#c9633a; }
-  #hint { position:absolute; bottom:12px; left:14px; color:#6a6862; font-size:11px; }
-  #stats { position:absolute; bottom:12px; right:14px; color:#6a6862; font-size:11px; font-variant-numeric:tabular-nums; }
+/* ============================================================================
+   古建生成器 · UI theme
+   Warm-ink dark glass with gold + cinnabar accents, tuned to sit over the
+   3D scene without competing with it. Every native control is hidden and
+   re-drawn by src/ui.js; the hidden input stays the source of truth.
+   ============================================================================ */
+
+:root {
+  --ink:         #08080a;
+  --panel-bg:    rgba(19, 19, 22, 0.84);
+  --raise:       rgba(255, 255, 255, 0.035);
+  --raise-hi:    rgba(255, 255, 255, 0.065);
+  --line:        rgba(255, 255, 255, 0.075);
+  --line-hi:     rgba(255, 255, 255, 0.14);
+
+  --text:        #ece9e2;
+  --text-dim:    #aca89e;
+  --text-mute:   #726f68;
+
+  --gold:        #dcb877;
+  --gold-dim:    #a98d55;
+  --gold-glow:   rgba(220, 184, 119, 0.16);
+  --cinnabar:    #bf4a2b;
+  --cinnabar-hi: #d4593a;
+
+  --r-lg: 16px;
+  --r:    10px;
+  --r-sm: 7px;
+
+  --ease: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0; padding: 0;
+  height: 100%;
+  overflow: hidden;
+  background: var(--ink);
+  color: var(--text);
+  font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-size: 13px;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* ambient wash + vignette so the page edges read as lit space, not a cutout */
+body::before,
+body::after {
+  content: ""; position: fixed; inset: 0;
+  pointer-events: none; z-index: 0;
+}
+body::before {
+  background:
+    radial-gradient(115% 85% at 84% 4%,  rgba(220, 184, 119, 0.10), transparent 55%),
+    radial-gradient(125% 95% at 6% 100%, rgba(191, 74, 43, 0.13),  transparent 52%);
+}
+body::after {
+  z-index: 3;
+  background: radial-gradient(135% 125% at 50% 46%, transparent 62%, rgba(0, 0, 0, 0.3));
+}
+
+#wrap { position: relative; width: 100vw; height: 100vh; z-index: 1; }
+#wrap canvas { display: block; }
+
+/* SVG icon defaults — every inline icon in the markup is a stroked path */
+svg { width: 1em; height: 1em; fill: none; stroke: currentColor;
+      stroke-width: 1.4; stroke-linecap: round; stroke-linejoin: round; }
+
+/* native control kept in the DOM as the source of truth, but never seen */
+.native-hidden {
+  position: absolute !important;
+  width: 1px; height: 1px;
+  opacity: 0; pointer-events: none;
+  clip: rect(0 0 0 0); overflow: hidden;
+}
+
+/* ========================================================== seal / wordmark */
+.seal {
+  flex: none;
+  width: 34px; height: 34px;
+  display: grid; place-items: center;
+  border-radius: 6px;
+  background: linear-gradient(160deg, #c4472a, #93301c);
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.18),
+    inset 0 -6px 14px rgba(0, 0, 0, 0.28),
+    0 3px 12px -4px rgba(191, 74, 43, 0.7);
+}
+.seal span {
+  font-family: "Noto Serif SC", "Songti SC", serif;
+  font-size: 11px; font-weight: 700; line-height: 1.06;
+  color: #fbf1e2; text-align: center;
+  letter-spacing: 0.02em;
+}
+.seal-lg { width: 60px; height: 60px; border-radius: 9px; }
+.seal-lg span { font-size: 19px; line-height: 1.08; }
+
+/* ============================================================ entry gate */
+#gate {
+  position: fixed; inset: 0; z-index: 60;
+  display: flex;
+  padding: 24px;
+  overflow-y: auto;
+  background:
+    radial-gradient(90% 70% at 20% 0%,   rgba(191, 74, 43, 0.16), transparent 60%),
+    radial-gradient(90% 70% at 85% 100%, rgba(220, 184, 119, 0.12), transparent 60%),
+    radial-gradient(120% 110% at 50% 40%, #17161b, #08080a 72%);
+  transition: opacity 0.55s ease, visibility 0.55s;
+}
+#gate.gone { opacity: 0; visibility: hidden; }
+
+.gate-in { margin: auto; display: grid; justify-items: center; gap: 34px; max-width: 720px; }
+
+.gate-head { display: grid; justify-items: center; text-align: center; }
+.gate-head .seal-lg { margin-bottom: 18px; animation: rise 0.7s var(--ease) both; }
+.gate-title {
+  margin: 0;
+  font-family: "Noto Serif SC", "Songti SC", serif;
+  font-size: 30px; font-weight: 600; letter-spacing: 0.18em;
+  color: var(--gold); text-indent: 0.18em;
+  text-shadow: 0 2px 24px rgba(220, 184, 119, 0.25);
+  animation: rise 0.7s 0.05s var(--ease) both;
+}
+.gate-sub {
+  margin: 6px 0 0;
+  font-size: 9.5px; font-weight: 600;
+  letter-spacing: 0.26em; text-transform: uppercase;
+  color: var(--text-mute); text-indent: 0.26em;
+  animation: rise 0.7s 0.1s var(--ease) both;
+}
+.gate-ask {
+  display: flex; align-items: center; gap: 10px;
+  margin: 22px 0 0;
+  font-family: "Noto Serif SC", "Songti SC", serif;
+  font-size: 13px; letter-spacing: 0.14em;
+  color: var(--text-dim);
+  animation: rise 0.7s 0.16s var(--ease) both;
+}
+.gate-ask span {
+  font-family: "Inter", sans-serif;
+  font-size: 9px; font-weight: 600;
+  letter-spacing: 0.14em; text-transform: uppercase;
+  color: var(--text-mute);
+}
+
+.gate-cards { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+
+.gate-card {
+  position: relative;
+  display: grid; justify-items: center;
+  width: 268px;
+  padding: 22px 22px 24px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.012));
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  cursor: pointer; text-align: center;
+  color: inherit; font: inherit;
+  transition: transform 0.22s var(--ease), border-color 0.22s ease, box-shadow 0.22s ease;
+  animation: rise 0.7s 0.24s var(--ease) both;
+}
+.gate-card:nth-child(2) { animation-delay: 0.32s; }
+.gate-card .frame { opacity: 0; border-radius: 12px; transition: opacity 0.22s ease; }
+.gate-card .art {
+  width: 100%; height: 116px;
+  color: var(--gold-dim); opacity: 0.7;
+  stroke-width: 2.2;
+  transition: color 0.22s ease, opacity 0.22s ease, transform 0.35s var(--ease);
+}
+.gate-card .art .thin { opacity: 0.5; }
+.gate-card .art circle { fill: none; }
+.gate-card .cn {
+  margin-top: 16px;
+  font-family: "Noto Serif SC", "Songti SC", serif;
+  font-size: 23px; font-weight: 600; letter-spacing: 0.14em;
+  color: var(--text); text-indent: 0.14em;
+  transition: color 0.22s ease;
+}
+.gate-card .en {
+  margin-top: 4px;
+  font-size: 9px; font-weight: 700;
+  letter-spacing: 0.24em; text-transform: uppercase;
+  color: var(--text-mute); text-indent: 0.24em;
+}
+.gate-card .desc {
+  margin-top: 12px;
+  font-size: 10.5px; line-height: 1.6;
+  color: var(--text-mute);
+}
+.gate-card .key {
+  position: absolute; top: 12px; right: 12px;
+  width: 18px; height: 18px;
+  display: grid; place-items: center;
+  border: 1px solid var(--line-hi);
+  border-radius: 4px;
+  font-size: 9px; font-weight: 700;
+  color: var(--text-mute);
+  transition: color 0.22s ease, border-color 0.22s ease;
+}
+.gate-card:hover, .gate-card:focus-visible {
+  outline: none;
+  transform: translateY(-4px);
+  border-color: rgba(220, 184, 119, 0.55);
+  box-shadow: 0 26px 54px -22px rgba(0, 0, 0, 0.95),
+              0 0 34px -14px rgba(220, 184, 119, 0.5);
+}
+.gate-card:hover .frame, .gate-card:focus-visible .frame { opacity: 1; }
+.gate-card:hover .art, .gate-card:focus-visible .art {
+  color: var(--gold); opacity: 1; transform: translateY(-3px);
+}
+.gate-card:hover .cn, .gate-card:focus-visible .cn { color: var(--gold); }
+.gate-card:hover .key, .gate-card:focus-visible .key {
+  color: var(--gold); border-color: rgba(220, 184, 119, 0.5);
+}
+.gate-card:active { transform: translateY(-1px); }
+
+.gate-foot {
+  margin: 0;
+  font-size: 10px; letter-spacing: 0.05em;
+  color: var(--text-mute); text-align: center;
+  animation: rise 0.7s 0.42s var(--ease) both;
+}
+
+@keyframes rise {
+  from { opacity: 0; transform: translateY(9px); }
+  to   { opacity: 1; transform: none; }
+}
+
+@media (max-width: 640px) {
+  .gate-in { gap: 24px; }
+  .gate-cards { grid-template-columns: 1fr; }
+  .gate-card { width: min(300px, calc(100vw - 48px)); padding: 18px; }
+  .gate-card .art { height: 92px; }
+  .gate-title { font-size: 24px; }
+}
+
+/* =================================================================== panel */
+#panel {
+  position: absolute; top: 14px; left: 14px; z-index: 4;
+  display: flex; flex-direction: column;
+  width: 344px;
+  max-height: min(736px, calc(100vh - 28px));
+  background: var(--panel-bg);
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  box-shadow:
+    0 24px 60px -16px rgba(0, 0, 0, 0.72),
+    0 2px 8px rgba(0, 0, 0, 0.35),
+    inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  backdrop-filter: blur(20px) saturate(1.25);
+  -webkit-backdrop-filter: blur(20px) saturate(1.25);
+  overflow: hidden;
+  animation: none;
+}
+body.entered #panel { animation: panelIn 0.6s var(--ease) both; }
+@keyframes panelIn {
+  from { opacity: 0; transform: translateX(-14px) scale(0.985); }
+  to   { opacity: 1; transform: none; }
+}
+
+
+/* ------------------------------------------------- HUD corner brackets */
+.frame {
+  position: absolute; inset: 0; z-index: 5;
+  pointer-events: none;
+  border-radius: 9px;
+  --b: rgba(220, 184, 119, 0.55);
+  --len: 18px;
+  background:
+    linear-gradient(var(--b), var(--b)) left  1px  top    1px / 1px var(--len) no-repeat,
+    linear-gradient(var(--b), var(--b)) left  1px  top    1px / var(--len) 1px no-repeat,
+    linear-gradient(var(--b), var(--b)) right 1px  top    1px / 1px var(--len) no-repeat,
+    linear-gradient(var(--b), var(--b)) right 1px  top    1px / var(--len) 1px no-repeat,
+    linear-gradient(var(--b), var(--b)) left  1px  bottom 1px / 1px var(--len) no-repeat,
+    linear-gradient(var(--b), var(--b)) left  1px  bottom 1px / var(--len) 1px no-repeat,
+    linear-gradient(var(--b), var(--b)) right 1px  bottom 1px / 1px var(--len) no-repeat,
+    linear-gradient(var(--b), var(--b)) right 1px  bottom 1px / var(--len) 1px no-repeat;
+}
+
+/* ----------------------------------------------------------- panel header */
+.panel-head {
+  flex: none;
+  border-bottom: 1px solid var(--line);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.05), transparent);
+}
+.head-id { display: flex; align-items: center; gap: 11px; padding: 13px 15px 12px; }
+.panel-id { min-width: 0; }
+.panel-id h1 {
+  margin: 0;
+  font-family: "Noto Serif SC", "Songti SC", serif;
+  font-size: 17px; font-weight: 600; letter-spacing: 0.08em;
+  color: var(--gold);
+  text-shadow: 0 1px 14px rgba(220, 184, 119, 0.2);
+}
+.panel-id p {
+  margin: 3px 0 0;
+  font-size: 8.5px; font-weight: 600;
+  letter-spacing: 0.15em; text-transform: uppercase;
+  color: var(--text-mute);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+
+/* live spec readout — the three figures worth seeing without opening a tab */
+.spec {
+  display: grid; grid-template-columns: repeat(3, 1fr);
+  gap: 1px;
+  background: var(--line);
+  border-top: 1px solid var(--line);
+}
+.spec-i {
+  display: grid; gap: 2px;
+  padding: 7px 10px 8px;
+  background: rgba(0, 0, 0, 0.3);
+  min-width: 0;
+}
+.spec-i em {
+  font-style: normal; font-size: 7.5px; font-weight: 600;
+  letter-spacing: 0.13em; text-transform: uppercase;
+  color: var(--text-mute);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.spec-i b {
+  font-size: 12.5px; font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--gold);
+  white-space: nowrap;
+}
+
+/* ---------------------------------------------------- rail + pane console */
+.panel-main { flex: 1 1 auto; display: flex; min-height: 0; }
+
+.rail {
+  flex: none;
+  width: 58px;
+  display: flex; flex-direction: column; gap: 2px;
+  padding: 9px 7px;
+  border-right: 1px solid var(--line);
+  background: rgba(0, 0, 0, 0.26);
+}
+.rail-tab {
+  position: relative;
+  display: grid; justify-items: center; gap: 4px;
+  padding: 9px 2px 8px;
+  background: none; border: 0; border-radius: 8px;
+  color: var(--text-mute); cursor: pointer;
+  transition: color 0.2s ease, background 0.2s ease;
+}
+.rail-tab svg { width: 17px; height: 17px; stroke-width: 1.35; }
+.rail-tab em {
+  font-family: "Noto Serif SC", "Songti SC", serif;
+  font-style: normal; font-size: 10px; font-weight: 600;
+  letter-spacing: 0.05em;
+}
+/* the gold marker that slides in on the active tab */
+.rail-tab::before {
+  content: "";
+  position: absolute; left: -7px; top: 50%;
+  width: 2px; height: 24px; margin-top: -12px;
+  border-radius: 0 2px 2px 0;
+  background: var(--gold);
+  box-shadow: 0 0 8px rgba(220, 184, 119, 0.7);
+  transform: scaleY(0);
+  transition: transform 0.28s var(--ease);
+}
+.rail-tab:hover { color: var(--text-dim); background: rgba(255, 255, 255, 0.035); }
+.rail-tab.is-active {
+  color: var(--gold);
+  background: linear-gradient(90deg, var(--gold-glow), transparent 80%);
+}
+.rail-tab.is-active::before { transform: scaleY(1); }
+.rail-tab:focus-visible { outline: 2px solid var(--gold); outline-offset: -2px; }
+
+.panes { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; min-height: 0; }
+.pane { display: none; }
+.pane.is-active {
+  display: block;
+  flex: 1 1 auto;
+  overflow-y: auto; overscroll-behavior: contain;
+  padding: 15px 16px 18px;
+  animation: paneIn 0.3s var(--ease) both;
+}
+@keyframes paneIn {
+  from { opacity: 0; transform: translateX(6px); }
+  to   { opacity: 1; transform: none; }
+}
+
+/* ------------------------------------------------------- section heading */
+.sec {
+  display: flex; align-items: center; gap: 7px;
+  margin: 0 0 12px;
+}
+.sec:not(:first-child) { margin-top: 20px; }
+.sec::before {
+  content: ""; flex: none;
+  width: 5px; height: 5px;
+  background: var(--gold-dim);
+  transform: rotate(45deg);
+}
+.sec b {
+  font-family: "Noto Serif SC", "Songti SC", serif;
+  font-size: 12px; font-weight: 600; letter-spacing: 0.09em;
+  color: var(--gold);
+}
+.sec span {
+  font-size: 8.5px; font-weight: 600;
+  letter-spacing: 0.14em; text-transform: uppercase;
+  color: var(--text-mute);
+}
+.sec::after {
+  content: ""; flex: 1; height: 1px;
+  background: linear-gradient(90deg, var(--line-hi), transparent);
+}
+
+.note {
+  margin: 14px 0 0;
+  padding: 9px 11px;
+  border-left: 2px solid var(--gold-dim);
+  background: rgba(255, 255, 255, 0.025);
+  border-radius: 0 var(--r-sm) var(--r-sm) 0;
+  font-size: 10px; line-height: 1.55;
+  color: var(--text-mute);
+}
+
+/* controls the pagoda branch of rebuild() never reads, and the reverse */
+.is-off { display: none !important; }
+.pagoda-only { display: none; }
+
+/* ================================================================== rows */
+.row { margin: 0 0 13px; }
+.row:last-child { margin-bottom: 0; }
+
+.row-head {
+  display: flex; align-items: baseline; gap: 8px;
+  margin-bottom: 7px;
+}
+.row-label {
+  font-family: "Noto Serif SC", "Songti SC", serif;
+  font-size: 12px; font-weight: 500; letter-spacing: 0.03em;
+  color: var(--text);
+}
+.row-label em {
+  font-family: "Inter", sans-serif;
+  font-style: normal; font-size: 9px; font-weight: 500;
+  letter-spacing: 0.1em; text-transform: uppercase;
+  color: var(--text-mute);
+  margin-left: 4px;
+}
+.row-val {
+  margin-left: auto;
+  padding: 2px 7px;
+  border-radius: 5px;
+  background: var(--gold-glow);
+  border: 1px solid rgba(220, 184, 119, 0.16);
+  font-size: 10px; font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--gold);
+  white-space: nowrap;
+}
+
+/* ==================================================== segmented control */
+.seg {
+  position: relative;
+  display: flex; gap: 2px;
+  padding: 3px;
+  background: rgba(0, 0, 0, 0.24);
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.3);
+}
+.seg-ind {
+  position: absolute; top: 3px; left: 3px; bottom: 3px;
+  width: 0;
+  border-radius: 6px;
+  background: linear-gradient(180deg, rgba(220, 184, 119, 0.24), rgba(220, 184, 119, 0.11));
+  box-shadow:
+    inset 0 0 0 1px rgba(220, 184, 119, 0.34),
+    0 2px 8px -3px rgba(220, 184, 119, 0.45);
+  transition: transform 0.32s var(--ease), width 0.32s var(--ease);
+  pointer-events: none;
+}
+.seg button {
+  position: relative; z-index: 1;
+  flex: 1 1 0; min-width: 0;
+  display: grid; gap: 1px;
+  padding: 6px 4px 7px;
+  background: none; border: 0; cursor: pointer;
+  color: var(--text-mute);
+  transition: color 0.18s ease;
+}
+.seg button em {
+  font-family: "Noto Serif SC", "Songti SC", serif;
+  font-style: normal; font-size: 11.5px; font-weight: 600;
+  letter-spacing: 0.04em;
+}
+.seg button i {
+  font-style: normal; font-size: 8px; font-weight: 600;
+  letter-spacing: 0.09em; text-transform: uppercase;
+  opacity: 0.72;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.seg button:hover { color: var(--text-dim); }
+.seg button[aria-selected="true"] { color: var(--gold); }
+.seg button[aria-selected="true"] i { opacity: 0.85; }
+
+/* ======================================================= toggle switch row */
+.row-switch {
+  display: flex; align-items: center; gap: 9px;
+  padding: 8px 10px;
+  margin-bottom: 7px;
+  background: var(--raise);
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  transition: border-color 0.18s ease, background 0.18s ease;
+}
+.row-switch:hover { border-color: var(--line-hi); background: var(--raise-hi); }
+.row-switch .row-label { flex: 1; }
+.row-switch .row-val {
+  margin-left: 0;
+  background: none; border: 0; padding: 0;
+  color: var(--text-mute); font-weight: 500;
+}
+
+.switch {
+  flex: none;
+  position: relative;
+  width: 38px; height: 21px;
+  padding: 0; border-radius: 11px; cursor: pointer;
+  background: rgba(0, 0, 0, 0.32);
+  border: 1px solid var(--line-hi);
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.4);
+  transition: background 0.25s ease, border-color 0.25s ease;
+}
+.switch::after {
+  content: "";
+  position: absolute; top: 2px; left: 2px;
+  width: 15px; height: 15px; border-radius: 50%;
+  background: #efe9dd;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
+  transition: transform 0.28s var(--ease), background 0.25s ease;
+}
+.switch[aria-checked="true"] {
+  background: linear-gradient(90deg, var(--cinnabar), var(--gold-dim));
+  border-color: rgba(220, 184, 119, 0.4);
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.25), 0 0 12px -3px rgba(220, 184, 119, 0.5);
+}
+.switch[aria-checked="true"]::after { transform: translateX(17px); background: #fff8ee; }
+.switch:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+.row-switch.is-na { opacity: 0.42; }
+.row-switch.is-na .switch { cursor: not-allowed; }
+
+/* ============================================================ range slider */
+.slider {
+  position: relative;
+  padding: 2px 0 0;
+}
+input[type=range] {
+  -webkit-appearance: none; appearance: none;
+  display: block;
+  width: 100%; height: 18px; margin: 0;
+  background: none; cursor: pointer;
+}
+/* track: filled portion driven by --fill, set per-input by ui.js */
+input[type=range]::-webkit-slider-runnable-track {
+  height: 5px; border-radius: 3px;
+  background:
+    linear-gradient(90deg, var(--cinnabar), var(--gold)) 0 / var(--fill, 50%) 100% no-repeat,
+    rgba(255, 255, 255, 0.09);
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.4);
+}
+input[type=range]::-moz-range-track {
+  height: 5px; border-radius: 3px;
+  background: rgba(255, 255, 255, 0.09);
+}
+input[type=range]::-moz-range-progress {
+  height: 5px; border-radius: 3px;
+  background: linear-gradient(90deg, var(--cinnabar), var(--gold));
+}
+input[type=range]::-webkit-slider-thumb {
+  -webkit-appearance: none; appearance: none;
+  width: 15px; height: 15px; margin-top: -5px;
+  border-radius: 50%;
+  background: linear-gradient(180deg, #fdf8ee, #e2d9c8);
+  border: 1.5px solid var(--gold-dim);
+  box-shadow: 0 1px 5px rgba(0, 0, 0, 0.55);
+  transition: transform 0.14s var(--ease), box-shadow 0.14s ease;
+}
+input[type=range]::-moz-range-thumb {
+  width: 14px; height: 14px; border-radius: 50%;
+  background: linear-gradient(180deg, #fdf8ee, #e2d9c8);
+  border: 1.5px solid var(--gold-dim);
+  box-shadow: 0 1px 5px rgba(0, 0, 0, 0.55);
+}
+input[type=range]:hover::-webkit-slider-thumb { transform: scale(1.15); }
+input[type=range]:active::-webkit-slider-thumb {
+  transform: scale(1.15);
+  box-shadow: 0 0 0 6px rgba(220, 184, 119, 0.16), 0 1px 5px rgba(0, 0, 0, 0.55);
+}
+input[type=range]:focus { outline: none; }
+input[type=range]:focus-visible::-webkit-slider-thumb {
+  box-shadow: 0 0 0 4px rgba(220, 184, 119, 0.35);
+}
+
+/* tick marks under discrete sliders */
+.ticks {
+  display: flex; justify-content: space-between;
+  margin: 1px 7px 0;
+  pointer-events: none;
+}
+.ticks i {
+  width: 1px; height: 4px;
+  background: rgba(255, 255, 255, 0.14);
+  transition: background 0.2s ease;
+}
+.ticks i.on { background: rgba(220, 184, 119, 0.55); }
+
+/* ========================================================= preset gallery */
+.presets {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 7px;
+}
+.preset {
+  padding: 0; overflow: hidden;
+  background: var(--raise);
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  cursor: pointer; text-align: left;
+  color: inherit; font: inherit;
+  transition: border-color 0.18s ease, transform 0.14s var(--ease), box-shadow 0.18s ease;
+}
+.preset:hover {
+  border-color: var(--line-hi);
+  transform: translateY(-1px);
+  box-shadow: 0 6px 16px -8px rgba(0, 0, 0, 0.8);
+}
+.preset .strip { display: flex; height: 24px; }
+.preset .strip i { flex: 1; }
+.preset .strip i:first-child { flex: 1.5; }
+.preset .nm {
+  display: block;
+  padding: 5px 8px 6px;
+  border-top: 1px solid rgba(0, 0, 0, 0.35);
+}
+.preset .nm em {
+  display: block;
+  font-family: "Noto Serif SC", "Songti SC", serif;
+  font-style: normal; font-size: 11.5px; font-weight: 600;
+  letter-spacing: 0.05em; color: var(--text-dim);
+  transition: color 0.18s ease;
+}
+.preset .nm i {
+  display: block; margin-top: 1px;
+  font-style: normal; font-size: 8px; font-weight: 600;
+  letter-spacing: 0.1em; text-transform: uppercase;
+  color: var(--text-mute);
+}
+.preset[aria-selected="true"] {
+  border-color: var(--gold);
+  box-shadow: 0 0 0 1px rgba(220, 184, 119, 0.35), 0 6px 18px -10px rgba(220, 184, 119, 0.6);
+}
+.preset[aria-selected="true"] .nm { background: var(--gold-glow); }
+.preset[aria-selected="true"] .nm em { color: var(--gold); }
+
+/* ========================================================== colour swatches */
+.swatches { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.sw {
+  position: relative;
+  display: flex; align-items: center; gap: 8px;
+  padding: 6px 8px;
+  background: var(--raise);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: border-color 0.18s ease, background 0.18s ease;
+}
+.sw:hover { border-color: var(--line-hi); background: var(--raise-hi); }
+.sw input[type=color] {
+  position: absolute; inset: 0;
+  width: 100%; height: 100%;
+  opacity: 0; cursor: pointer;
+  border: 0; padding: 0;
+}
+.sw-face {
+  flex: none;
+  width: 20px; height: 20px; border-radius: 5px;
+  background: #888;
+  box-shadow:
+    inset 0 0 0 1px rgba(0, 0, 0, 0.45),
+    inset 0 6px 10px -6px rgba(255, 255, 255, 0.55),
+    0 1px 4px rgba(0, 0, 0, 0.45);
+  transition: background 0.2s ease;
+}
+.sw-txt { min-width: 0; line-height: 1.15; }
+.sw-txt em {
+  display: block;
+  font-family: "Noto Serif SC", "Songti SC", serif;
+  font-style: normal; font-size: 11px; font-weight: 600;
+  color: var(--text-dim);
+}
+.sw-txt i {
+  display: block;
+  font-style: normal; font-size: 7.5px; font-weight: 600;
+  letter-spacing: 0.09em; text-transform: uppercase;
+  color: var(--text-mute);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+
+
+/* ==================================================== 坡面 curve editor */
+#curveEditor {
+  display: block;
+  width: 100%; height: auto;
+  touch-action: none;              /* the handles own the gesture, not the page */
+  overflow: visible;
+}
+#curveEditor .cv-bg {
+  fill: rgba(0, 0, 0, 0.26);
+  stroke: var(--line);
+  stroke-width: 1;
+}
+#curveEditor .cv-grid line {
+  stroke: rgba(255, 255, 255, 0.055);
+  stroke-width: 1;
+}
+#curveEditor .cv-grid line.major { stroke: rgba(255, 255, 255, 0.1); }
+#curveEditor .cv-area {
+  fill: url(#cvFill);
+  stroke: none;
+}
+/* the untouched 则例 profile, so you can see how far you have pushed it */
+#curveEditor .cv-ref {
+  stroke: rgba(255, 255, 255, 0.22);
+  stroke-width: 1.4;
+  stroke-dasharray: 3 4;
+  fill: none;
+}
+#curveEditor .cv-base {
+  stroke: rgba(220, 184, 119, 0.22);
+  stroke-width: 1;
+  stroke-dasharray: 2 4;
+  fill: none;
+}
+/* CJK and latin need different sizes here: a 9px glyph is unreadable mush,
+   while the latin caption looks oversized at the size the glyph needs */
+#curveEditor .cv-ax { fill: var(--text-mute); }
+#curveEditor .cv-ax .cn {
+  font-family: "Noto Serif SC", "Songti SC", serif;
+  font-size: 14px; font-weight: 600;
+}
+#curveEditor .cv-ax .en {
+  font-size: 9px; font-weight: 600;
+  letter-spacing: 0.14em; text-transform: uppercase;
+}
+#curveEditor .cv-ax-r { text-anchor: end; }
+#curveEditor .cv-line {
+  stroke: var(--gold);
+  stroke-width: 2.4;
+  stroke-linecap: round;
+  fill: none;
+  filter: drop-shadow(0 0 6px rgba(220, 184, 119, 0.35));
+}
+#curveEditor .cv-hit { fill: transparent; stroke: none; }
+#curveEditor .cv-h { cursor: grab; }
+#curveEditor .cv-h:active { cursor: grabbing; }
+#curveEditor .cv-h circle {
+  fill: #14131a;
+  stroke: var(--cinnabar-hi);
+  stroke-width: 2.6;
+  transition: stroke 0.15s ease, filter 0.15s ease;
+}
+#curveEditor .cv-h.cv-mid circle { stroke: var(--gold); }
+#curveEditor .cv-h:hover circle {
+  stroke: #fff0d8;
+  filter: drop-shadow(0 0 5px rgba(220, 184, 119, 0.75));
+}
+#curveEditor .cv-h.is-drag circle {
+  stroke: #fff6e6;
+  filter: drop-shadow(0 0 9px rgba(220, 184, 119, 0.95));
+}
+#curveEditor .cv-h:focus { outline: none; }
+#curveEditor .cv-h:focus-visible circle { stroke: #fff0d8; }
+#curveEditor .cv-h:focus-visible { outline: 2px solid var(--gold); outline-offset: 3px; }
+#curveEditor .cv-lbl {
+  font-family: "Noto Serif SC", "Songti SC", serif;
+  /* user units, so ~13 CSS px once the viewBox is scaled down -- CJK below
+     that turns to mush. The dark halo keeps it legible over the grid. */
+  font-size: 16px; font-weight: 600;
+  fill: var(--gold);
+  stroke: rgba(6, 6, 8, 0.85);
+  stroke-width: 3.5px;
+  paint-order: stroke fill;
+  text-anchor: middle;
+  pointer-events: none;
+}
+
+.cv-hint {
+  display: flex; align-items: baseline; gap: 7px; flex-wrap: wrap;
+  margin: 9px 0 13px;
+  color: var(--text-mute);
+}
+.cv-hint b {
+  font-family: "Noto Serif SC", "Songti SC", serif;
+  font-size: 10.5px; font-weight: 500;
+  white-space: nowrap;
+}
+.cv-hint span {
+  font-family: "Inter", sans-serif;
+  font-size: 8px; font-weight: 600;
+  letter-spacing: 0.11em; text-transform: uppercase;
+}
+#cvRead {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 1px;
+  padding: 2px;
+  background: rgba(0, 0, 0, 0.26);
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  overflow: hidden;
+}
+#cvRead .d {
+  display: flex; align-items: baseline; justify-content: space-between; gap: 6px;
+  padding: 6px 8px;
+  background: rgba(255, 255, 255, 0.022);
+}
+#cvRead .d span {
+  font-family: "Noto Serif SC", "Songti SC", serif;
+  font-size: 10.5px; color: var(--text-mute); white-space: nowrap;
+}
+#cvRead .d b {
+  font-size: 11px; font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-mute); white-space: nowrap;
+  transition: color 0.18s ease;
+}
+/* gold once the value has been moved off 则例 */
+#cvRead .d b.off { color: var(--gold); }
+.cv-reset { width: 100%; margin-top: 9px; flex-direction: row; gap: 6px; }
+
+/* ======================================================== derived readout */
+#derived, #model {
+  display: grid; grid-template-columns: 1fr 1fr;
+  gap: 1px;
+  padding: 2px;
+  background: rgba(0, 0, 0, 0.26);
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  overflow: hidden;
+}
+#derived .d, #model .d {
+  display: flex; align-items: baseline; justify-content: space-between; gap: 6px;
+  padding: 6px 8px;
+  background: rgba(255, 255, 255, 0.022);
+}
+#derived .d.wide { grid-column: 1 / -1; }
+#derived .d span, #model .d span {
+  font-family: "Noto Serif SC", "Songti SC", serif;
+  font-size: 10.5px; color: var(--text-mute);
+  white-space: nowrap;
+}
+#derived .d b, #model .d b {
+  font-size: 11px; font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-dim);
+  white-space: nowrap;
+}
+#derived .d.wide b { color: var(--gold-dim); letter-spacing: 0.02em; }
+
+/* ================================================================= buttons */
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 7px;
+  padding: 10px 12px;
+  border: 1px solid transparent;
+  border-radius: 9px;
+  cursor: pointer;
+  font-family: inherit; font-size: 12px; font-weight: 600;
+  letter-spacing: 0.02em;
+  transition: filter 0.15s ease, transform 0.1s var(--ease),
+              box-shadow 0.18s ease, border-color 0.18s ease, background 0.18s ease;
+}
+.btn svg { font-size: 15px; flex: none; }
+.btn span i {
+  font-style: normal; font-weight: 500;
+  color: rgba(255, 255, 255, 0.55);
+  margin-left: 3px;
+  font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase;
+}
+.btn-primary {
+  width: 100%;
+  color: #fff5ec;
+  background: linear-gradient(180deg, var(--cinnabar-hi), var(--cinnabar));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.22),
+    0 4px 14px -6px rgba(191, 74, 43, 0.9);
+}
+.btn-primary:hover { filter: brightness(1.1); transform: translateY(-1px);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.24), 0 8px 20px -8px rgba(191,74,43,0.95); }
+.btn-primary:active { transform: translateY(0); filter: brightness(0.94); }
+
+.btn-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 5px; margin-top: 7px; }
+.btn-ghost {
+  padding: 8px 3px;
+  flex-direction: column; gap: 4px;
+  color: var(--text-dim);
+  background: var(--raise);
+  border-color: var(--line);
+  font-size: 10.5px;
+}
+.btn-ghost svg { font-size: 14px; color: var(--gold-dim); }
+.btn-ghost:hover {
+  color: var(--text); background: var(--raise-hi);
+  border-color: var(--line-hi); transform: translateY(-1px);
+}
+.btn-ghost:active { transform: translateY(0); }
+.btn:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+.btn:disabled { cursor: progress; filter: saturate(0.5) brightness(0.85); transform: none; }
+
+.panel-foot {
+  flex: none;
+  padding: 12px 16px 14px;
+  border-top: 1px solid var(--line);
+  background: linear-gradient(0deg, rgba(0, 0, 0, 0.28), transparent);
+}
+
+
+/* ======================================================== view toolbar */
+#viewbar {
+  position: absolute; top: 16px; right: 16px; z-index: 4;
+  display: flex; align-items: center; gap: 3px;
+  padding: 5px 7px;
+  background: rgba(16, 16, 19, 0.62);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  backdrop-filter: blur(14px) saturate(1.2);
+  -webkit-backdrop-filter: blur(14px) saturate(1.2);
+  animation: none;
+}
+body.entered #viewbar { animation: rise 0.6s 0.35s var(--ease) both; }
+#viewbar .vb-label {
+  padding: 0 6px 0 3px;
+  font-family: "Noto Serif SC", "Songti SC", serif;
+  font-size: 10px; letter-spacing: 0.12em;
+  color: var(--text-mute);
+}
+#viewbar i { width: 1px; height: 16px; background: var(--line-hi); margin: 0 3px; }
+#viewbar button {
+  min-width: 28px; height: 26px;
+  display: grid; place-items: center;
+  padding: 0 6px;
+  background: none; border: 0; border-radius: 7px;
+  color: var(--text-dim); cursor: pointer;
+  font-family: "Noto Serif SC", "Songti SC", serif;
+  font-size: 12px; font-weight: 600;
+  transition: color 0.16s ease, background 0.16s ease;
+}
+#viewbar button svg { width: 14px; height: 14px; }
+#viewbar button:hover { color: var(--gold); background: rgba(255, 255, 255, 0.06); }
+#viewbar button:active { background: rgba(255, 255, 255, 0.1); }
+#viewbar button:focus-visible { outline: 2px solid var(--gold); outline-offset: -2px; }
+#viewbar #spinBtn[aria-pressed="true"] {
+  color: var(--gold);
+  background: var(--gold-glow);
+  box-shadow: inset 0 0 0 1px rgba(220, 184, 119, 0.35);
+}
+#viewbar #spinBtn[aria-pressed="true"] svg { animation: spin 3.2s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ========================================================== overlay chips */
+#hint, #stats {
+  position: absolute; bottom: 16px; z-index: 4;
+  display: flex; align-items: center; gap: 9px;
+  padding: 7px 13px;
+  font-size: 10.5px; color: var(--text-mute);
+  background: rgba(16, 16, 19, 0.6);
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  backdrop-filter: blur(14px) saturate(1.2);
+  -webkit-backdrop-filter: blur(14px) saturate(1.2);
+  animation: none;
+}
+body.entered #hint,
+body.entered #stats { animation: rise 0.6s 0.25s var(--ease) both; }
+#hint  { left: 374px; }
+#stats { right: 16px; font-variant-numeric: tabular-nums; color: var(--text-dim); }
+#stats::before {
+  content: ""; flex: none;
+  width: 5px; height: 5px; border-radius: 50%;
+  background: var(--gold);
+  box-shadow: 0 0 7px var(--gold);
+  animation: pulse 2.6s ease-in-out infinite;
+}
+@keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
+#hint b { color: var(--text-dim); font-weight: 600; }
+#hint i { width: 1px; height: 10px; background: var(--line-hi); }
+
+/* ============================================================ panel toggle */
+#panelToggle {
+  display: none;
+  position: absolute; top: 14px; left: 14px; z-index: 6;
+  width: 40px; height: 40px;
+  padding: 0; place-items: center;
+  color: var(--gold);
+  background: rgba(16, 16, 19, 0.75);
+  border: 1px solid var(--line);
+  border-radius: 11px;
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  cursor: pointer;
+}
+#panelToggle svg { width: 20px; height: 20px; stroke-width: 1.6; }
+
+/* ========================================================= panel scrollbar */
+.pane::-webkit-scrollbar { width: 9px; }
+.pane::-webkit-scrollbar-track { background: transparent; }
+.pane::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.11);
+  border-radius: 5px;
+  border: 2.5px solid transparent;
+  background-clip: padding-box;
+}
+.pane::-webkit-scrollbar-thumb:hover {
+  background: rgba(220, 184, 119, 0.4); background-clip: padding-box;
+}
+.pane { scrollbar-width: thin; scrollbar-color: rgba(255, 255, 255, 0.14) transparent; }
+
+/* ============================================================= responsive */
+@media (max-width: 900px) {
+  #hint { left: 16px; }
+}
+@media (max-width: 720px) {
+  #panelToggle { display: grid; }
+  #panel {
+    top: 64px; left: 14px; right: 14px;
+    width: auto;
+    height: auto;
+    max-height: calc(100vh - 92px);
+    transform-origin: top left;
+    transition: opacity 0.28s ease, transform 0.28s var(--ease), visibility 0.28s;
+  }
+  #panel.is-closed { opacity: 0; visibility: hidden; transform: translateY(-10px) scale(0.98); }
+  #hint { display: none; }
+  #viewbar { top: 16px; right: 14px; padding: 4px 5px; }
+  #viewbar .vb-label { display: none; }
+  .panel-main { flex-direction: column; }
+  .rail {
+    width: auto; flex-direction: row;
+    padding: 6px 8px;
+    border-right: 0; border-bottom: 1px solid var(--line);
+  }
+  .rail-tab { flex: 1; }
+  .rail-tab::before {
+    left: 50%; top: auto; bottom: -6px;
+    width: 24px; height: 2px; margin: 0 0 0 -12px;
+    border-radius: 2px 2px 0 0;
+    transform: scaleX(0);
+  }
+  .rail-tab.is-active::before { transform: scaleX(1); }
+  .rail-tab.is-active { background: linear-gradient(180deg, var(--gold-glow), transparent 80%); }
+  .presets { grid-template-columns: repeat(3, 1fr); }
+  .swatches { grid-template-columns: repeat(3, 1fr); }
+}
+@media (max-width: 420px) {
+  .presets, .swatches { grid-template-columns: 1fr 1fr; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
 </style>
 </head>
 <body>
-<div id="wrap">
-  <div id="panel">
-    <h3>古建生成器</h3>
 
-    <div class="sec">建筑类型 building</div>
-    <div class="row"><label>类型 type</label>
-      <select id="buildingType">
-        <option value="hall">大殿 hall</option>
-        <option value="pagoda">高塔 pagoda</option>
-      </select>
+<div id="gate">
+  <div class="gate-in">
+
+    <header class="gate-head">
+      <div class="seal seal-lg" aria-hidden="true"><span>古<br>建</span></div>
+      <h1 class="gate-title">古建生成器</h1>
+      <p class="gate-sub">Chinese Architecture Generator</p>
+      <p class="gate-ask">选择建筑类型 <span>choose a building to begin</span></p>
+    </header>
+
+    <div class="gate-cards">
+
+      <button class="gate-card" type="button" data-choose="hall" autofocus>
+        <span class="frame" aria-hidden="true"></span>
+        <span class="key" aria-hidden="true">1</span>
+        <svg class="art" viewBox="0 0 220 152" aria-hidden="true">
+          <path d="M14 74 Q22 62 34 60 C58 56 66 44 74 26 L146 26 C154 44 162 56 186 60 Q198 62 206 74"/>
+          <path d="M72 26 H148"/>
+          <path d="M76 26 V18 M144 26 V18"/>
+          <path d="M32 62 H188" class="thin"/>
+          <path d="M46 68 V116 M74 68 V116 M110 68 V116 M146 68 V116 M174 68 V116"/>
+          <path d="M40 74 H180"/>
+          <path d="M28 116 H192 M22 126 H198 M22 126 V136 H198 V126"/>
+          <path d="M96 136 h28 v10 h-28z"/>
+        </svg>
+        <span class="cn">大殿</span>
+        <span class="en">Hall</span>
+        <span class="desc">A single-storey timber hall — 歇山 or 庑殿 roof, 斗拱 brackets, bays across the facade.</span>
+      </button>
+
+      <button class="gate-card" type="button" data-choose="pagoda">
+        <span class="frame" aria-hidden="true"></span>
+        <span class="key" aria-hidden="true">2</span>
+        <svg class="art" viewBox="24 0 172 152" aria-hidden="true">
+          <circle cx="110" cy="9" r="3"/>
+          <path d="M110 12 V34"/>
+          <path d="M105 18 H115 M104 24 H116 M103 29 H117" class="thin"/>
+          <path d="M84 34 Q110 41 136 34"/>
+          <path d="M93 36 V52 M127 36 V52 M93 52 H127"/>
+          <path d="M78 52 Q110 60 142 52"/>
+          <path d="M88 54 V72 M132 54 V72 M88 72 H132"/>
+          <path d="M71 72 Q110 80 149 72"/>
+          <path d="M82 74 V92 M138 74 V92 M82 92 H138"/>
+          <path d="M64 92 Q110 100 156 92"/>
+          <path d="M76 94 V114 M144 94 V114 M76 114 H144"/>
+          <path d="M56 114 Q110 123 164 114"/>
+          <path d="M70 116 V136 M150 116 V136"/>
+          <path d="M40 136 H180 M34 144 H186"/>
+        </svg>
+        <span class="cn">高塔</span>
+        <span class="en">Pagoda</span>
+        <span class="desc">A stacked tower — 楼阁式 or 密檐式, 3 to 13 storeys on a square to octagonal plan.</span>
+      </button>
+
     </div>
-    <div class="row pg"><label>塔式 style</label>
-      <select id="pagodaStyle">
-        <option value="louge">楼阁式 pavilion</option>
-        <option value="miyan">密檐式 dense-eave</option>
-      </select>
-    </div>
-    <div class="row pg"><label>层数 storeys <span id="stOut"></span></label><input type="range" id="storeys" min="3" max="13" step="2" value="7"></div>
-    <div class="row pg"><label>平面边数 plan sides <span id="sdOut"></span></label><input type="range" id="sides" min="4" max="8" step="2" value="8"></div>
 
-    <div class="sec">模数 module 斗口</div>
-    <div class="row"><label>斗口等级 grade <span id="dkOut"></span></label><input type="range" id="doukou" min="1" max="11" step="1" value="6"></div>
-    <div class="row"><label>做法 class</label>
-      <select id="classType">
-        <option value="da">大式 grand (bracketed)</option>
-        <option value="xiao">小式 minor (no brackets)</option>
-      </select>
-    </div>
-    <div class="row"><label>年代 period</label>
-      <select id="period">
-        <option value="qing">清 Qing 工程做法则例</option>
-        <option value="song">宋 Song 营造法式</option>
-      </select>
-    </div>
-
-    <div class="sec">开间进深 plan</div>
-    <div class="row"><label>面阔间数 bays <span id="bayOut"></span></label><input type="range" id="bays" min="3" max="11" step="2" value="5"></div>
-    <div class="row"><label>檩数 purlins <span id="plOut"></span></label><input type="range" id="purlins" min="5" max="11" step="2" value="9"></div>
-
-    <div class="sec">屋顶 roof</div>
-    <div class="row"><label>式样 type</label>
-      <select id="roofType">
-        <option value="xieshan">歇山顶 hip-and-gable</option>
-        <option value="wudian">庑殿顶 hip roof</option>
-      </select>
-    </div>
-    <div class="row"><label>推山 tuishan <span id="tsOut"></span></label><input type="range" id="tuishan" min="0" max="1" step="1" value="1"></div>
-    <div class="row"><label>瓦垄 tile ribs <span id="tOut"></span></label><input type="range" id="tiles" min="0" max="60" step="2" value="26"></div>
-
-    <div class="sec">做法细则 rules</div>
-    <div class="row"><label>生起 shengqi <span id="sqOut"></span></label><input type="range" id="shengqi" min="0" max="1" step="1" value="1"></div>
-    <div class="row"><label>侧脚 cejiao <span id="cjOut"></span></label><input type="range" id="cejiao" min="0" max="1" step="1" value="1"></div>
-    <div class="row"><label>栏杆 balustrade <span id="rlOut"></span></label><input type="range" id="railing" min="0" max="1" step="1" value="1"></div>
-    <div class="row"><label>彩画 caihua <span id="chOut"></span></label><input type="range" id="caihua" min="0" max="1" step="1" value="1"></div>
-
-    <div class="sec">推算尺寸 derived</div>
-    <div id="derived" style="font-size:11px;line-height:1.65;color:#8f8c84;font-variant-numeric:tabular-nums;"></div>
-
-    <div class="sec">颜色 palette</div>
-    <div class="row"><label>预设 preset</label>
-      <select id="preset">
-        <option value="imperial" selected>皇家 imperial · 黄琉璃</option>
-        <option value="official">官式 official · 绿琉璃</option>
-        <option value="heaven">天坛 heaven · 蓝琉璃</option>
-        <option value="library">文渊 library · 黑琉璃</option>
-        <option value="temple">寺观 temple · 灰瓦</option>
-        <option value="jiangnan">江南 Jiangnan · 粉墙黛瓦</option>
-        <option value="lingnan">岭南 Lingnan · southern</option>
-        <option value="tibetan">藏式 Tibetan · crimson + gold</option>
-      </select>
-    </div>
-    <div class="row"><label>瓦 tile</label><input type="color" id="roofColor" value="#b8912a"></div>
-    <div class="row"><label>脊/檐口 ridge + eave trim</label><input type="color" id="trimColor" value="#d8d2c2"></div>
-    <div class="row"><label>柱 columns</label><input type="color" id="woodColor" value="#8a2a1c"></div>
-    <div class="row"><label>枋/椽 beams + rafters</label><input type="color" id="beamColor" value="#1d4a66"></div>
-    <div class="row"><label>彩画 painted detail</label><input type="color" id="caihuaColor" value="#2f7d8a"></div>
-    <div class="row"><label>斗拱 brackets</label><input type="color" id="dgColor" value="#28647a"></div>
-    <div class="row"><label>墙 wall</label><input type="color" id="wallColor" value="#9e2f20"></div>
-    <div class="row"><label>槅扇 lattice</label><input type="color" id="latticeColor" value="#7a2418"></div>
-    <div class="row"><label>基座 base stone</label><input type="color" id="baseColor" value="#c9c3b2"></div>
-    <div class="row"><label>栏杆 balustrade</label><input type="color" id="railColor" value="#d8d2c2"></div>
-
-    <button id="exportBtn">导出 OBJ export</button>
-    <button id="imgBtn" style="background:#3f6b4a;">保存图片 save JPEG</button>
-    <div style="display:flex;gap:6px;margin-top:8px;">
-      <button id="saveBtn" style="margin-top:0;background:#2a4a66;">保存 save</button>
-      <button id="loadBtn" style="margin-top:0;background:#4a4a52;">读取 load</button>
-    </div>
+    <p class="gate-foot">随时可在「形制」面板中更改 · you can switch type at any time from the 形制 tab</p>
   </div>
-  <div id="hint">drag rotate · scroll zoom · right-drag pan</div>
+</div>
+
+<div id="wrap">
+
+  <button id="panelToggle" type="button" aria-label="面板 panel">
+    <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M3 6h14M3 10h14M3 14h9"/></svg>
+  </button>
+
+  <aside id="panel">
+    <div class="frame" aria-hidden="true"></div>
+
+    <header class="panel-head">
+      <div class="head-id">
+        <div class="seal" aria-hidden="true"><span>古<br>建</span></div>
+        <div class="panel-id">
+          <h1>古建生成器</h1>
+          <p>Chinese Architecture Generator</p>
+        </div>
+      </div>
+      <div class="spec">
+        <div class="spec-i"><em>面阔 width</em><b id="specW">—</b></div>
+        <div class="spec-i"><em>柱高 height</em><b id="specH">—</b></div>
+        <div class="spec-i"><em>面数 tris</em><b id="specT">—</b></div>
+      </div>
+    </header>
+
+    <div class="panel-main">
+
+      <nav class="rail" role="tablist" aria-label="控制面板 sections">
+        <button class="rail-tab is-active" type="button" role="tab" aria-selected="true" data-tab="form" title="形制 form">
+          <svg viewBox="0 0 18 18" aria-hidden="true"><path d="M1.5 7.5 9 2.5l7.5 5"/><path d="M3.5 8v7.5h11V8"/><path d="M7 15.5v-4h4v4"/></svg>
+          <em>形制</em>
+        </button>
+        <button class="rail-tab" type="button" role="tab" aria-selected="false" data-tab="scale" title="尺度 scale">
+          <svg viewBox="0 0 18 18" aria-hidden="true"><rect x="1.5" y="6" width="15" height="6" rx="1"/><path d="M5 6v2.6M8 6v3.6M11 6v2.6M14 6v3.6"/></svg>
+          <em>尺度</em>
+        </button>
+        <button class="rail-tab" type="button" role="tab" aria-selected="false" data-tab="pitch" title="坡面 roof section">
+          <svg viewBox="0 0 18 18" aria-hidden="true"><path d="M2.5 14.5C8 14.5 12 11 15.5 3.5"/><path d="M2.5 3v11.5H15"/></svg>
+          <em>坡面</em>
+        </button>
+        <button class="rail-tab" type="button" role="tab" aria-selected="false" data-tab="detail" title="细部 detail">
+          <svg viewBox="0 0 18 18" aria-hidden="true"><path d="M2.5 5.5h5M11.5 5.5h4M2.5 12.5h3M9.5 12.5h6"/><circle cx="9.5" cy="5.5" r="2"/><circle cx="7.5" cy="12.5" r="2"/></svg>
+          <em>细部</em>
+        </button>
+        <button class="rail-tab" type="button" role="tab" aria-selected="false" data-tab="colour" title="色彩 colour">
+          <svg viewBox="0 0 18 18" aria-hidden="true"><path d="M9 2.2C6 6 4.3 8.2 4.3 10.4a4.7 4.7 0 0 0 9.4 0C13.7 8.2 12 6 9 2.2z"/><path d="M6.4 11.4a2.6 2.6 0 0 0 2.6 2.4"/></svg>
+          <em>色彩</em>
+        </button>
+        <button class="rail-tab" type="button" role="tab" aria-selected="false" data-tab="light" title="光照 light">
+          <svg viewBox="0 0 18 18" aria-hidden="true"><circle cx="9" cy="9" r="3.4"/><path d="M9 1.6v2.1M9 14.3v2.1M1.6 9h2.1M14.3 9h2.1M3.75 3.75l1.5 1.5M12.75 12.75l1.5 1.5M14.25 3.75l-1.5 1.5M5.25 12.75l-1.5 1.5"/></svg>
+          <em>光照</em>
+        </button>
+        <button class="rail-tab" type="button" role="tab" aria-selected="false" data-tab="data" title="数据 data">
+          <svg viewBox="0 0 18 18" aria-hidden="true"><path d="M2.5 15.5h13"/><path d="M4.5 15.5V9M8 15.5V4M11.5 15.5v-4.5M15 15.5V6.5"/></svg>
+          <em>数据</em>
+        </button>
+      </nav>
+
+      <div class="panes">
+
+        <!-- ================================================== 形制 form -->
+        <section class="pane is-active" data-pane="form" role="tabpanel">
+          <div class="sec"><b>建筑</b><span>building</span></div>
+
+          <div class="row" data-ctl="seg">
+            <div class="row-head"><span class="row-label">类型 <em>type</em></span></div>
+            <select id="buildingType">
+              <option value="hall">大殿 hall</option>
+              <option value="pagoda">高塔 pagoda</option>
+            </select>
+          </div>
+
+          <div class="row pg" data-ctl="seg">
+            <div class="row-head"><span class="row-label">塔式 <em>style</em></span></div>
+            <select id="pagodaStyle">
+              <option value="louge">楼阁式 pavilion</option>
+              <option value="miyan">密檐式 dense-eave</option>
+            </select>
+          </div>
+
+          <div class="row pg" data-ctl="slider">
+            <div class="row-head"><span class="row-label">层数 <em>storeys</em></span><span class="row-val" id="stOut"></span></div>
+            <input type="range" id="storeys" min="3" max="13" step="2" value="7">
+          </div>
+
+          <div class="row pg" data-ctl="slider">
+            <div class="row-head"><span class="row-label">平面边数 <em>plan sides</em></span><span class="row-val" id="sdOut"></span></div>
+            <input type="range" id="sides" min="4" max="8" step="2" value="8">
+          </div>
+
+          <div class="sec hall-only"><b>屋顶</b><span>roof</span></div>
+
+          <div class="row hall-only" data-ctl="seg">
+            <div class="row-head"><span class="row-label">式样 <em>type</em></span></div>
+            <select id="roofType">
+              <option value="xieshan">歇山顶 hip-and-gable</option>
+              <option value="wudian">庑殿顶 hip roof</option>
+            </select>
+          </div>
+
+          <div class="row row-switch hall-only" data-ctl="switch">
+            <span class="row-label">推山 <em>tuishan</em></span>
+            <span class="row-val" id="tsOut"></span>
+            <input type="range" id="tuishan" min="0" max="1" step="1" value="1">
+          </div>
+        </section>
+
+        <!-- ================================================= 尺度 scale -->
+        <section class="pane" data-pane="scale" role="tabpanel">
+          <div class="sec"><b>模数 斗口</b><span>module</span></div>
+
+          <div class="row" data-ctl="slider">
+            <div class="row-head"><span class="row-label">斗口等级 <em>grade</em></span><span class="row-val" id="dkOut"></span></div>
+            <input type="range" id="doukou" min="1" max="11" step="1" value="6">
+          </div>
+
+          <div class="row" data-ctl="seg">
+            <div class="row-head"><span class="row-label">做法 <em>class</em></span></div>
+            <select id="classType">
+              <option value="da">大式 grand (bracketed)</option>
+              <option value="xiao">小式 minor (no brackets)</option>
+            </select>
+          </div>
+
+          <div class="row" data-ctl="seg">
+            <div class="row-head"><span class="row-label">年代 <em>period</em></span></div>
+            <select id="period">
+              <option value="qing">清 Qing 工程做法则例</option>
+              <option value="song">宋 Song 营造法式</option>
+            </select>
+          </div>
+
+          <div class="sec"><b>开间进深</b><span>plan</span></div>
+
+          <div class="row" data-ctl="slider">
+            <div class="row-head"><span class="row-label">面阔间数 <em>bays</em></span><span class="row-val" id="bayOut"></span></div>
+            <input type="range" id="bays" min="3" max="11" step="2" value="5">
+          </div>
+
+          <div class="row" data-ctl="slider">
+            <div class="row-head"><span class="row-label">檩数 <em>purlins</em></span><span class="row-val" id="plOut"></span></div>
+            <input type="range" id="purlins" min="5" max="11" step="2" value="9">
+          </div>
+        </section>
+
+        <!-- ================================================= 坡面 pitch -->
+        <section class="pane" data-pane="pitch" role="tabpanel">
+          <div class="sec"><b>屋顶</b><span>roof section</span></div>
+
+          <svg id="curveEditor" viewBox="0 0 300 276" role="application"
+               aria-label="屋顶坡面曲线 roof section curve">
+            <defs>
+              <linearGradient id="cvFill" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%"   stop-color="#dcb877" stop-opacity="0.26"/>
+                <stop offset="100%" stop-color="#dcb877" stop-opacity="0.02"/>
+              </linearGradient>
+            </defs>
+            <rect class="cv-bg" x="0.5" y="0.5" width="299" height="275" rx="9"/>
+            <g id="cvGrid" class="cv-grid"></g>
+            <path id="cvArea" class="cv-area"></path>
+            <path id="cvRef" class="cv-ref"></path>
+            <path id="cvBase" class="cv-base"></path>
+            <path id="cvLine" class="cv-line"></path>
+            <text class="cv-ax" x="32" y="263"><tspan class="cn">檐</tspan><tspan class="en" dx="4">eave</tspan></text>
+            <text class="cv-ax cv-ax-r" x="274" y="263"><tspan class="cn">脊</tspan><tspan class="en" dx="4">ridge</tspan></text>
+            <g class="cv-h" data-h="tiao" tabindex="0" role="slider" aria-label="挑 eave">
+              <circle class="cv-hit" r="17"></circle><text id="cvTiaoT" class="cv-lbl">挑</text><circle id="cvTiao" r="7.5"></circle>
+            </g>
+            <g class="cv-h cv-mid" data-h="ao" tabindex="0" role="slider" aria-label="凹 curve">
+              <circle class="cv-hit" r="17"></circle><text id="cvAoT" class="cv-lbl">凹</text><circle id="cvAo" r="6.5"></circle>
+            </g>
+            <g class="cv-h" data-h="gao" tabindex="0" role="slider" aria-label="高 ridge">
+              <circle class="cv-hit" r="17"></circle><text id="cvGaoT" class="cv-lbl">高</text><circle id="cvGao" r="7.5"></circle>
+            </g>
+          </svg>
+          <p class="cv-hint"><b>拖动圆点调整</b><span>drag · arrow keys nudge</span></p>
+
+          <div id="cvRead"></div>
+          <button id="cvReset" class="btn btn-ghost cv-reset" type="button">复位 reset to 则例</button>
+
+          <p class="note">挑 sets 出檐 and 起翘, 凹 the 举架 concavity, 高 the total 举高. Reset returns the curve to the Qing coefficient ladder. A 高塔 takes 挑 and 凹; its rise is per-storey.</p>
+
+          <input type="range" id="cTiaoX" min="0"  max="28"  step="1" value="15" class="native-hidden">
+          <input type="range" id="cTiaoY" min="0"  max="30"  step="1" value="12" class="native-hidden">
+          <input type="range" id="cAoX"   min="10" max="92"  step="1" value="58" class="native-hidden">
+          <input type="range" id="cAoY"   min="0"  max="100" step="1" value="36" class="native-hidden">
+          <input type="range" id="cGaoY"  min="25" max="100" step="1" value="70" class="native-hidden">
+        </section>
+
+        <!-- ================================================ 细部 detail -->
+        <section class="pane" data-pane="detail" role="tabpanel">
+          <div class="sec"><b>屋面</b><span>roof surface</span></div>
+
+          <div class="row" data-ctl="slider">
+            <div class="row-head"><span class="row-label">瓦垄 <em>tile ribs</em></span><span class="row-val" id="tOut"></span></div>
+            <input type="range" id="tiles" min="0" max="60" step="2" value="26">
+          </div>
+
+          <div class="sec hall-only"><b>做法细则</b><span>rules</span></div>
+
+          <div class="row row-switch hall-only" data-ctl="switch">
+            <span class="row-label">生起 <em>shengqi</em></span>
+            <span class="row-val" id="sqOut"></span>
+            <input type="range" id="shengqi" min="0" max="1" step="1" value="1">
+          </div>
+
+          <div class="row row-switch hall-only" data-ctl="switch">
+            <span class="row-label">侧脚 <em>cejiao</em></span>
+            <span class="row-val" id="cjOut"></span>
+            <input type="range" id="cejiao" min="0" max="1" step="1" value="1">
+          </div>
+
+          <div class="row row-switch hall-only" data-ctl="switch">
+            <span class="row-label">栏杆 <em>balustrade</em></span>
+            <span class="row-val" id="rlOut"></span>
+            <input type="range" id="railing" min="0" max="1" step="1" value="1">
+          </div>
+
+          <div class="row row-switch hall-only" data-ctl="switch">
+            <span class="row-label">彩画 <em>caihua</em></span>
+            <span class="row-val" id="chOut"></span>
+            <input type="range" id="caihua" min="0" max="1" step="1" value="1">
+          </div>
+
+          <p class="note hall-only">生起 raises the outer columns and applies only under 宋 Song rules.</p>
+          <p class="note pagoda-only">屋顶式样 and the 做法细则 rules shape a 大殿 only — a 高塔 carries its own per-storey eaves, so they are hidden here.</p>
+        </section>
+
+        <!-- ================================================ 色彩 colour -->
+        <section class="pane" data-pane="colour" role="tabpanel">
+          <div class="sec"><b>预设</b><span>presets</span></div>
+
+          <div class="row" data-ctl="presets">
+            <select id="preset">
+              <option value="imperial" selected>皇家 imperial · 黄琉璃</option>
+              <option value="official">官式 official · 绿琉璃</option>
+              <option value="heaven">天坛 heaven · 蓝琉璃</option>
+              <option value="library">文渊 library · 黑琉璃</option>
+              <option value="temple">寺观 temple · 灰瓦</option>
+              <option value="jiangnan">江南 Jiangnan · 粉墙黛瓦</option>
+              <option value="lingnan">岭南 Lingnan · southern</option>
+              <option value="tibetan">藏式 Tibetan · crimson + gold</option>
+            </select>
+          </div>
+
+          <div class="sec"><b>自定</b><span>custom</span></div>
+
+          <div class="swatches">
+            <label class="sw" title="瓦 tile"><input type="color" id="roofColor" value="#b8912a"><span class="sw-face"></span><span class="sw-txt"><em>瓦</em><i>tile</i></span></label>
+            <label class="sw" title="脊 / 檐口 ridge + eave trim"><input type="color" id="trimColor" value="#d8d2c2"><span class="sw-face"></span><span class="sw-txt"><em>脊檐</em><i>trim</i></span></label>
+            <label class="sw" title="柱 columns"><input type="color" id="woodColor" value="#8a2a1c"><span class="sw-face"></span><span class="sw-txt"><em>柱</em><i>column</i></span></label>
+            <label class="sw" title="枋 / 椽 beams + rafters"><input type="color" id="beamColor" value="#1d4a66"><span class="sw-face"></span><span class="sw-txt"><em>枋椽</em><i>beam</i></span></label>
+            <label class="sw" title="彩画 painted detail"><input type="color" id="caihuaColor" value="#2f7d8a"><span class="sw-face"></span><span class="sw-txt"><em>彩画</em><i>caihua</i></span></label>
+            <label class="sw" title="斗拱 brackets"><input type="color" id="dgColor" value="#28647a"><span class="sw-face"></span><span class="sw-txt"><em>斗拱</em><i>bracket</i></span></label>
+            <label class="sw" title="墙 wall"><input type="color" id="wallColor" value="#9e2f20"><span class="sw-face"></span><span class="sw-txt"><em>墙</em><i>wall</i></span></label>
+            <label class="sw" title="槅扇 lattice"><input type="color" id="latticeColor" value="#7a2418"><span class="sw-face"></span><span class="sw-txt"><em>槅扇</em><i>lattice</i></span></label>
+            <label class="sw" title="基座 base stone"><input type="color" id="baseColor" value="#c9c3b2"><span class="sw-face"></span><span class="sw-txt"><em>基座</em><i>base</i></span></label>
+            <label class="sw" title="栏杆 balustrade"><input type="color" id="railColor" value="#d8d2c2"><span class="sw-face"></span><span class="sw-txt"><em>栏杆</em><i>rail</i></span></label>
+          </div>
+        </section>
+
+        <!-- ================================================= 光照 light -->
+        <section class="pane" data-pane="light" role="tabpanel">
+          <div class="sec"><b>时辰</b><span>daylight</span></div>
+
+          <div class="row" data-ctl="slider">
+            <div class="row-head"><span class="row-label">日照 <em>time of day</em></span><span class="row-val" id="dayOut"></span></div>
+            <input type="range" id="daylight" min="0" max="100" step="1" value="50">
+          </div>
+
+          <div class="sec"><b>场景</b><span>scene</span></div>
+
+          <div class="row row-switch" data-ctl="switch">
+            <span class="row-label">阴影 <em>shadows</em></span>
+            <span class="row-val" id="shOut"></span>
+            <input type="range" id="shadows" min="0" max="1" step="1" value="1">
+          </div>
+
+          <div class="row row-switch" data-ctl="switch">
+            <span class="row-label">地面 <em>ground</em></span>
+            <span class="row-val" id="gdOut"></span>
+            <input type="range" id="groundOn" min="0" max="1" step="1" value="1">
+          </div>
+
+          <p class="note">The raking light at 卯时 and 酉时 reads the 举架 roof curve and the eave upturn best; 午时 flattens them.</p>
+        </section>
+
+        <!-- ================================================== 数据 data -->
+        <section class="pane" data-pane="data" role="tabpanel">
+          <div class="sec"><b>推算尺寸</b><span>derived</span></div>
+          <div id="derived"></div>
+          <p class="note">Every figure is derived from the 斗口 module by 工程做法则例 / 营造法式 proportion, not entered directly.</p>
+
+          <div class="sec"><b>当前模型</b><span>model</span></div>
+          <div id="model"></div>
+        </section>
+
+      </div>
+    </div>
+
+    <footer class="panel-foot">
+      <button id="exportBtn" class="btn btn-primary" type="button">
+        <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 2v8M4.5 6.5 8 10l3.5-3.5M2.5 12.5h11"/></svg>
+        <span>导出 OBJ <i>export</i></span>
+      </button>
+      <div class="btn-row">
+        <button id="randBtn" class="btn btn-ghost" type="button" title="随机生成 randomise">
+          <svg viewBox="0 0 16 16" aria-hidden="true"><rect x="2.5" y="2.5" width="11" height="11" rx="2.5"/><circle cx="5.8" cy="5.8" r=".95"/><circle cx="10.2" cy="10.2" r=".95"/><circle cx="10.2" cy="5.8" r=".95"/><circle cx="5.8" cy="10.2" r=".95"/></svg>
+          <span>随机</span>
+        </button>
+        <button id="imgBtn" class="btn btn-ghost" type="button" title="保存图片 save JPEG">
+          <svg viewBox="0 0 16 16" aria-hidden="true"><rect x="2" y="3.5" width="12" height="9" rx="1.5"/><circle cx="6" cy="7" r="1.1"/><path d="m3 11.5 3.2-3 2.3 2.1 2-1.8L14 11.6"/></svg>
+          <span>图片</span>
+        </button>
+        <button id="saveBtn" class="btn btn-ghost" type="button" title="保存设计 save design">
+          <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 3h8.5L13 4.5V13H3z"/><path d="M5.5 3v3.5h5V3M5.5 13v-3.5h5V13"/></svg>
+          <span>保存</span>
+        </button>
+        <button id="loadBtn" class="btn btn-ghost" type="button" title="读取设计 load design">
+          <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2 5.5V13h12V6H8L6.5 4H2z"/></svg>
+          <span>读取</span>
+        </button>
+      </div>
+    </footer>
+
+  </aside>
+
+  <div id="viewbar">
+    <span class="vb-label">视角</span>
+    <button type="button" data-view="front" title="正立面 front elevation">正</button>
+    <button type="button" data-view="side"  title="侧立面 side elevation">侧</button>
+    <button type="button" data-view="iso"   title="斜视 three-quarter">斜</button>
+    <button type="button" data-view="top"   title="俯视 plan">顶</button>
+    <button type="button" id="fitBtn" title="全景 fit to model">全</button>
+    <i></i>
+    <button type="button" id="spinBtn" title="转台 turntable" aria-pressed="false">
+      <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M13.5 8a5.5 5.5 0 1 1-1.9-4.16"/><path d="M13.6 1.6v2.9h-2.9"/></svg>
+    </button>
+  </div>
+
+  <div id="hint">
+    <span><b>drag</b> rotate</span><i></i><span><b>scroll</b> zoom</span><i></i><span><b>right-drag</b> pan</span>
+  </div>
   <div id="stats"></div>
+
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
 <script>
+/* ---- src/scene.js ---- */
+
 var scene = new THREE.Scene();
-scene.background = new THREE.Color(0x1b1d22);
+
+// Sky, sun and fog are all repainted by applyDaylight() below, so the canvas
+// and its texture are kept around rather than built once and thrown away.
+var skyCanvas = document.createElement('canvas');
+skyCanvas.width = 2; skyCanvas.height = 256;
+var skyTex = new THREE.CanvasTexture(skyCanvas);
+skyTex.encoding = THREE.sRGBEncoding;
+scene.background = skyTex;
+
+function paintSky(top, mid, bot) {
+  var ctx = skyCanvas.getContext('2d');
+  var g = ctx.createLinearGradient(0, 0, 0, 256);
+  g.addColorStop(0.0, top);
+  g.addColorStop(0.5, mid);
+  g.addColorStop(1.0, bot);
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, 2, 256);
+  skyTex.needsUpdate = true;
+}
+paintSky('#2a2f3a', '#1b1d22', '#131418');
 scene.fog = new THREE.Fog(0x1b1d22, 45, 100);
 
 var camera = new THREE.PerspectiveCamera(42, window.innerWidth/window.innerHeight, 0.1, 200);
@@ -143,7 +1533,7 @@ controls.target.set(0, 2.2, 0);
 controls.enableDamping = true;
 controls.dampingFactor = 0.07;
 controls.minDistance = 3.5;
-controls.maxDistance = 60;
+controls.maxDistance = 130;
 controls.maxPolarAngle = Math.PI * 0.495;
 
 // procedural sky-ish environment for PBR reflections
@@ -183,13 +1573,164 @@ var rim = new THREE.DirectionalLight(0xa8b4c4, 0.16);
 rim.position.set(-9, 5, -8);
 scene.add(rim);
 
+// A flat plane to the horizon reads as grey nothing. A radial falloff pools
+// light under the building and lets the edges fall away into the fog, so the
+// model sits in a place instead of floating on a slab.
+var groundTex = (function () {
+  var c = document.createElement('canvas');
+  c.width = c.height = 512;
+  var ctx = c.getContext('2d');
+  var g = ctx.createRadialGradient(256, 256, 24, 256, 256, 252);
+  g.addColorStop(0.00, '#c6c1b4');
+  g.addColorStop(0.28, '#8b877e');
+  g.addColorStop(0.60, '#43413c');
+  g.addColorStop(1.00, '#101010');
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, 512, 512);
+  var t = new THREE.CanvasTexture(c);
+  t.wrapS = t.wrapT = THREE.ClampToEdgeWrapping;
+  t.encoding = THREE.sRGBEncoding;
+  return t;
+})();
+
 var ground = new THREE.Mesh(
   new THREE.PlaneGeometry(120, 120),
-  new THREE.MeshStandardMaterial({ color:C('#2c2b26'), roughness:0.97, metalness:0 })
+  new THREE.MeshStandardMaterial({ color:C('#4a4740'), roughness:0.97, metalness:0, map:groundTex })
 );
 ground.rotation.x = -Math.PI/2;
 ground.receiveShadow = true;
 scene.add(ground);
+
+// ============================================================================
+//  时辰 DAYLIGHT — three keyframes (dawn, noon, dusk) lerped across a 0..1
+//  slider. Light colours stay in sRGB here to match how the lights were
+//  originally authored; only material colours go through C().
+// ============================================================================
+var DAY_KEYS = [
+  { sun:'#ff9a52', si:1.20, hs:'#5f555f', hg:'#33291f', hi:0.36,
+    sky:['#382c3c','#221a21','#131015'], fog:'#221a21' },
+  { sun:'#fff4e6', si:2.00, hs:'#dfe3e6', hg:'#59493a', hi:0.55,
+    sky:['#2a2f3a','#1b1d22','#131418'], fog:'#1b1d22' },
+  { sun:'#ff7f3a', si:1.05, hs:'#5e4b56', hg:'#31251f', hi:0.34,
+    sky:['#3f2c33','#261a1e','#141012'], fog:'#261a1e' }
+];
+
+var _mixA = new THREE.Color(), _mixB = new THREE.Color();
+function mixHex(a, b, k) {
+  _mixA.set(a); _mixB.set(b);
+  return '#' + _mixA.lerp(_mixB, k).getHexString();
+}
+
+var lastDaylight = -1;
+function applyDaylight(t) {
+  t = Math.max(0, Math.min(1, t));
+  if (Math.abs(t - lastDaylight) < 0.0005) return;   // slider settled, nothing to repaint
+  lastDaylight = t;
+
+  var lo = t < 0.5 ? DAY_KEYS[0] : DAY_KEYS[1];
+  var hi = t < 0.5 ? DAY_KEYS[1] : DAY_KEYS[2];
+  var f  = t < 0.5 ? t / 0.5 : (t - 0.5) / 0.5;
+
+  sun.color.set(mixHex(lo.sun, hi.sun, f));
+  sun.intensity = lo.si + (hi.si - lo.si) * f;
+  hemi.color.set(mixHex(lo.hs, hi.hs, f));
+  hemi.groundColor.set(mixHex(lo.hg, hi.hg, f));
+  hemi.intensity = lo.hi + (hi.hi - lo.hi) * f;
+
+  // the sun arcs east to west, grazing at both ends -- 8 degrees up at 卯时
+  // and 酉时, 55 at noon, which is what throws the long eave shadows
+  var el = (8 + Math.sin(t * Math.PI) * 47) * Math.PI / 180;
+  var az = (18 + t * 96) * Math.PI / 180;
+  var r  = 18;
+  sun.position.set(r * Math.cos(el) * Math.sin(az),
+                   r * Math.sin(el),
+                   r * Math.cos(el) * Math.cos(az));
+
+  paintSky(mixHex(lo.sky[0], hi.sky[0], f),
+           mixHex(lo.sky[1], hi.sky[1], f),
+           mixHex(lo.sky[2], hi.sky[2], f));
+  scene.fog.color.set(mixHex(lo.fog, hi.fog, f));
+}
+
+// ============================================================================
+//  CAMERA FLIGHT — view presets and the entry sweep. Driven from the animate
+//  loop; any drag on the canvas cancels it so the user always wins.
+// ============================================================================
+var camFlight = null;
+
+// rebuild() records how big the thing it just built is, so the camera can frame
+// it. Derived from the real dimensions rather than a Box3, because the tile and
+// rafter runs are InstancedMesh and r128's Box3 ignores per-instance matrices.
+var frameRadius = 20;
+function fitFor(width, height) {
+  // 1.25 / 1.35 rather than a bare 0.5 half-extent: the orbit target sits below
+  // the model's centre and the camera looks in at an angle, so a distance that
+  // merely fills the frame puts you inside the eaves.
+  var t = Math.tan(camera.fov * Math.PI / 360);
+  var byHeight = (height * 1.35) / t;
+  var byWidth  = (width  * 1.25) / (t * camera.aspect);
+  frameRadius = Math.max(byHeight, byWidth);
+  frameRadius = Math.min(Math.max(frameRadius, controls.minDistance * 1.5),
+                         controls.maxDistance * 0.95);
+  return frameRadius;
+}
+
+function flyTo(pos, target, ms) {
+  camFlight = {
+    start: performance.now(), ms: ms || 700,
+    p0: camera.position.clone(), p1: pos.clone(),
+    t0: controls.target.clone(), t1: target.clone()
+  };
+}
+
+function updateCameraFlight() {
+  if (!camFlight) return;
+  var k = (performance.now() - camFlight.start) / camFlight.ms;
+  if (k >= 1) k = 1;
+  var e = 1 - Math.pow(1 - k, 3);                    // easeOutCubic
+  camera.position.lerpVectors(camFlight.p0, camFlight.p1, e);
+  controls.target.lerpVectors(camFlight.t0, camFlight.t1, e);
+  if (k === 1) camFlight = null;
+}
+
+// azimuth/elevation in degrees, orbiting whatever rebuild() last framed
+function viewPreset(azDeg, elDeg, ms, radius) {
+  var t = controls.target;
+  var r = radius || Math.max(4, camera.position.distanceTo(t));
+  var el = elDeg * Math.PI / 180, az = azDeg * Math.PI / 180;
+  flyTo(new THREE.Vector3(
+    t.x + r * Math.cos(el) * Math.sin(az),
+    t.y + r * Math.sin(el),
+    t.z + r * Math.cos(el) * Math.cos(az)
+  ), t.clone(), ms);
+}
+
+// re-frame the current model without changing which way the camera looks
+function frameModel(ms) {
+  var t = controls.target, p = camera.position;
+  var dx = p.x - t.x, dy = p.y - t.y, dz = p.z - t.z;
+  var r = Math.hypot(dx, dy, dz) || 1;
+  var az = Math.atan2(dx, dz) * 180 / Math.PI;
+  var el = Math.asin(dy / r) * 180 / Math.PI;
+  // rebuild() may have just raised the orbit target (a pagoda sits far higher
+  // than a hall), which reads as a below-ground elevation against the camera's
+  // old position. Clamp to something you can actually stand at.
+  el = Math.max(6, Math.min(80, el));
+  viewPreset(az, el, ms || 600, frameRadius);
+}
+
+// pull back and swing around into the three-quarter view
+function introFlight() {
+  var t = controls.target;
+  var r = frameRadius;
+  var el0 = 34 * Math.PI / 180, az0 = -30 * Math.PI / 180, r0 = r * 1.7;
+  camera.position.set(t.x + r0 * Math.cos(el0) * Math.sin(az0),
+                      t.y + r0 * Math.sin(el0),
+                      t.z + r0 * Math.cos(el0) * Math.cos(az0));
+  viewPreset(42, 20, 1700, r);
+}
+
+renderer.domElement.addEventListener('pointerdown', function () { camFlight = null; });
 
 
 // ============================================================================
@@ -418,6 +1959,9 @@ var buildingGroup = new THREE.Group();
 scene.add(buildingGroup);
 
 // ============================================================================
+</script>
+<script>
+/* ---- src/constants.js ---- */
 //  MODULAR PROPORTION SYSTEM
 //  Every dimension below derives from one module, per 《工程做法则例》(Qing,
 //  1734) and 《营造法式》(Song, 1103). No invented constants.
@@ -523,22 +2067,40 @@ function deriveDimensions(grade, bays, purlins, isDaShi, isSong) {
 
   return D;
 }
+</script>
+<script>
+/* ---- src/roof.js ---- */
+// ============================================================================
+//  屋顶坡面 ROOF SECTION
+//  The 坡面 curve editor drives this. The profile is a quadratic Bezier from
+//  eave to ridge over the unit square; `cx`/`cy` are its control point, and the
+//  three multipliers scale the dimensions constants.js derived.
+//
+//  The defaults reproduce the Qing 举架 coefficient ladder
+//  [0.5, 0.62, 0.72, 0.82, 0.92] to within half a percent, so an untouched
+//  curve builds exactly the roof this generator built before the editor
+//  existed. Everything else in the file reads the profile through profileH(),
+//  which needs x strictly ascending -- hence the clamps: x(t) stays monotonic
+//  only while cx is inside (0, 1), and y likewise for cy.
+// ============================================================================
+var ROOF_CURVE = { cx: 0.5118, cy: 0.3276, rise: 1, eave: 1, lift: 1 };
 
-
-// ---------- legacy normalized profile (kept for the roof surface sampler) ----------
 function solveRoofProfile(halfDepth, roofHeight, steps) {
-  steps = steps || 5;
-  var coeffs = [0.5, 0.62, 0.72, 0.82, 0.92].slice(0, steps);
-  var stepRun = halfDepth / steps;
-  var pts = [{x:0, y:0}];
-  var cx = 0, cy = 0;
-  for (var i = 0; i < steps; i++) {
-    cx += stepRun; cy += coeffs[i] * stepRun;
-    pts.push({x:cx, y:cy});
+  var cx = Math.min(0.95, Math.max(0.05, ROOF_CURVE.cx));
+  var cy = Math.min(0.95, Math.max(0.00, ROOF_CURVE.cy));
+  // sample finer than the old five-step ladder: the curve is now continuous and
+  // can be bent hard, and profileH() only interpolates linearly between samples
+  var n = Math.max(steps || 5, 12);
+  var pts = [];
+  for (var i = 0; i <= n; i++) {
+    var t = i / n, mt = 1 - t;
+    pts.push({ x: 2 * mt * t * cx + t * t,
+               y: 2 * mt * t * cy + t * t });
   }
-  var maxY = pts[pts.length-1].y, maxX = pts[pts.length-1].x;
-  return pts.map(function(p){
-    return { x: halfDepth - (p.x/maxX)*halfDepth, y: (p.y/maxY)*roofHeight };
+  // same contract as before: ordered ridge -> eave, x ascending 0 -> halfDepth,
+  // y descending roofHeight -> 0
+  return pts.map(function (p) {
+    return { x: halfDepth - p.x * halfDepth, y: p.y * roofHeight };
   }).reverse();
 }
 
@@ -974,6 +2536,9 @@ function buildRoof(P) {
 
 
 // ============================================================================
+</script>
+<script>
+/* ---- src/pagoda.js ---- */
 //  PAGODA (塔) — polygonal 攒尖顶 tier roofs + storey stacking
 //  Taper per storey from 应县木塔 measured 面阔: 968/927/883/842/798 cm
 //  -> ratios 0.958 / 0.953 / 0.954 / 0.948, mean ~= 0.953
@@ -1229,7 +2794,7 @@ function buildPagoda(D, scale, opts, mats) {
   var R0 = (D.totalWidth * scale) / 2 * (dense ? 0.30 : 1.0);
   var storeyH = D.colH * scale * (dense ? 0.55 : 1.0);
   var profile = solveRoofProfile(Math.max(0.001, D.halfDepth * scale), 1.0, 5);
-  var eaveOut = D.eaveOut * scale * (dense ? 0.5 : 1.0);
+  var eaveOut = D.eaveOut * scale * ROOF_CURVE.eave * (dense ? 0.5 : 1.0);
   var thick = Math.max(0.03, D.purlinDia * scale * 0.5);
 
   var y = 0, R = R0;
@@ -1259,7 +2824,7 @@ function buildPagoda(D, scale, opts, mats) {
     var tierRise = (dense ? 0.42 : 0.78) * storeyH;
     var roofY = y + h + (opts.dougong ? D.colDia*scale*0.4 : 0) - thick*0.5;
     var roof = buildPolygonRoof(R + eaveOut, n, tierRise,
-      D.cornerRise * scale, opts.ribs, profile, mats.tile, thick);
+      D.cornerRise * scale * ROOF_CURVE.lift, opts.ribs, profile, mats.tile, thick);
     roof.position.y = roofY;
     g.add(roof);
 
@@ -1285,7 +2850,7 @@ function buildPagoda(D, scale, opts, mats) {
 
   var capRise = storeyH * 1.05;
   var cap = buildPolygonRoof(R + eaveOut*0.7, n, capRise,
-    D.cornerRise * scale * 0.8, opts.ribs, profile, mats.tile, thick);
+    D.cornerRise * scale * ROOF_CURVE.lift * 0.8, opts.ribs, profile, mats.tile, thick);
   cap.position.y = y;
   g.add(cap);
 
@@ -1296,7 +2861,9 @@ function buildPagoda(D, scale, opts, mats) {
   g.userData.totalHeight = y + capRise + storeyH * 1.25;
   return g;
 }
-
+</script>
+<script>
+/* ---- src/hall.js ---- */
 // margin is the apron the 台明 projects beyond the columns; it has to scale
 // with the building or a slender 密檐 tower ends up on a plinth four times its
 // own width.
@@ -1674,7 +3241,9 @@ function buildSteps(halfW, baseH, tiers, mat, cheekMat) {
   });
   return g;
 }
-
+</script>
+<script>
+/* ---- src/palette.js ---- */
 var PRESETS = {
   // 黄琉璃 imperial yellow — emperor only. Vermilion walls, gilt-blue caihua.
   imperial: { roof:'#d4a017', trim:'#efe9d8', wood:'#8f1d13', beam:'#123f5c', caihua:'#1a6b7a',
@@ -1777,9 +3346,57 @@ function buildCaihua(hw, hd, y, beamH, baseMat, accentMat, goldMat, colR) {
 
 
 function val(id){ return parseFloat(document.getElementById(id).value); }
+</script>
+<script>
+/* ---- src/app.js ---- */
+// Every rebuild allocates fresh geometries, materials and texClone()d maps.
+// Detaching the old group leaves every one of them on the GPU -- drag a slider
+// for a minute and that is thousands of orphaned buffers and texture uploads.
+// Freeing them here is safe because nothing in the group is shared: the TEX.*
+// originals only ever reach a material through texClone(), and reflections come
+// from scene.environment rather than a per-material envMap.
+function disposeGroup(root) {
+  var geos = [], mats = [];
+  root.traverse(function (o) {
+    if (!o.isMesh) return;
+    if (geos.indexOf(o.geometry) < 0) geos.push(o.geometry);
+    var mm = Array.isArray(o.material) ? o.material : [o.material];
+    for (var i = 0; i < mm.length; i++)
+      if (mm[i] && mats.indexOf(mm[i]) < 0) mats.push(mm[i]);
+  });
+  for (var g = 0; g < geos.length; g++) geos[g].dispose();
+  var MAPS = ['map', 'normalMap', 'roughnessMap', 'metalnessMap', 'alphaMap', 'aoMap'];
+  for (var k = 0; k < mats.length; k++) {
+    for (var j = 0; j < MAPS.length; j++) {
+      var t = mats[k][MAPS[j]];
+      if (t && t.dispose) t.dispose();
+    }
+    mats[k].dispose();
+  }
+}
+
+// ui.js registers here rather than relying on listener ordering, so the control
+// surface always re-reads the state the model settled on -- including the
+// readout spans buildModel() writes on its way through, and the paths that
+// never fire an event at all (读取 load applies a design by assignment).
+var REBUILD_HOOKS = [];
+// ...and a pre-pass, for state the geometry itself reads. 读取 load assigns the
+// controls and calls rebuild() without firing an event, so anything feeding
+// buildModel() has to be re-derived here rather than in a post hook.
+var REBUILD_PRE = [];
 
 function rebuild() {
-  while (buildingGroup.children.length) buildingGroup.remove(buildingGroup.children[0]);
+  for (var p = 0; p < REBUILD_PRE.length; p++) REBUILD_PRE[p]();
+  buildModel();
+  for (var i = 0; i < REBUILD_HOOKS.length; i++) REBUILD_HOOKS[i]();
+}
+
+function buildModel() {
+  while (buildingGroup.children.length) {
+    var stale = buildingGroup.children[0];
+    buildingGroup.remove(stale);
+    disposeGroup(stale);
+  }
 
   var grade   = parseInt(document.getElementById('doukou').value);
   var bays    = parseInt(document.getElementById('bays').value);
@@ -1801,9 +3418,11 @@ function rebuild() {
   var hd = (D.totalDepth * scale) / 2;
   var colH = D.colH * scale;
   var baseH = D.baseH * scale;
-  var roofRise = D.roofRise * scale;
-  var eaveOut = D.eaveOut * scale;
-  var upturn = D.cornerRise * scale;
+  // 坡面 multipliers: D stays the canonical 则例 derivation, the curve editor
+  // only scales it on the way into the scene
+  var roofRise = D.roofRise * scale * ROOF_CURVE.rise;
+  var eaveOut = D.eaveOut * scale * ROOF_CURVE.eave;
+  var upturn = D.cornerRise * scale * ROOF_CURVE.lift;
 
   document.getElementById('dkOut').textContent = grade + '等 (' + D.doukouCun + '寸)';
   document.getElementById('bayOut').textContent = bays;
@@ -1816,12 +3435,22 @@ function rebuild() {
   document.getElementById('chOut').textContent = val('caihua') > 0.5 ? 'on' : 'off';
 
   var cm = D.doukouCun * 3.2;
+  // one cell per figure -- style.css lays these out as a two-column table, and
+  // ui.js mirrors the data-k ones up into the panel header's spec strip
+  function cell(key, label, value, wide) {
+    return '<div class="d' + (wide ? ' wide' : '') + '" data-k="' + key + '"><span>' +
+           label + '</span><b>' + value + '</b></div>';
+  }
   document.getElementById('derived').innerHTML =
-    '通面阔 ' + (D.totalWidth*cm/100).toFixed(1) + ' m &nbsp; 通进深 ' + (D.totalDepth*cm/100).toFixed(1) + ' m<br>' +
-    '柱高 ' + (D.colH*cm/100).toFixed(2) + ' m &nbsp; 柱径 ' + (D.colDia*cm).toFixed(0) + ' cm<br>' +
-    '明间 ' + (D.bayWidths[(bays-1)/2]*cm/100).toFixed(2) + ' m &nbsp; 出檐 ' + (D.eaveOut*cm/100).toFixed(2) + ' m<br>' +
-    '举架 ' + D.coeffs.map(function(c){return c.toFixed(2);}).join(' → ') + '<br>' +
-    '深:阔 ' + (D.totalDepth/D.totalWidth).toFixed(2) + ' &nbsp; 举高:进深 ' + (D.roofRise/D.totalDepth).toFixed(2);
+    cell('width',  '通面阔', (D.totalWidth*cm/100).toFixed(1) + ' m') +
+    cell('depth',  '通进深', (D.totalDepth*cm/100).toFixed(1) + ' m') +
+    cell('colH',   '柱高',   (D.colH*cm/100).toFixed(2) + ' m') +
+    cell('colDia', '柱径',   (D.colDia*cm).toFixed(0) + ' cm') +
+    cell('bay',    '明间',   (D.bayWidths[(bays-1)/2]*cm/100).toFixed(2) + ' m') +
+    cell('eave',   '出檐',   (D.eaveOut*ROOF_CURVE.eave*cm/100).toFixed(2) + ' m') +
+    cell('ratio',  '深:阔',  (D.totalDepth/D.totalWidth).toFixed(2)) +
+    cell('rise',   '举高:进深', (D.roofRise*ROOF_CURVE.rise/D.totalDepth).toFixed(2)) +
+    cell('coeffs', '举架', D.coeffs.map(function(c){return c.toFixed(2);}).join(' → '), true);
 
   function col(id){ return document.getElementById(id).value; }
   var cRoof=col('roofColor'), cTrim=col('trimColor'), cWood=col('woodColor'),
@@ -1906,7 +3535,9 @@ function rebuild() {
     buildingGroup.add(pg);
     worldScaleUVs(buildingGroup);
 
-    controls.target.set(0, (pg.userData.totalHeight || 10) * 0.42, 0);
+    var pgH = pg.userData.totalHeight || 10;
+    controls.target.set(0, pgH * 0.42, 0);
+    fitFor(pagodaR * 2.4, pgH);
     var ptris = 0;
     buildingGroup.traverse(function(o){
       if (o.isMesh && o.geometry.index) ptris += o.geometry.index.count/3;
@@ -1966,6 +3597,7 @@ function rebuild() {
   worldScaleUVs(buildingGroup);
 
   controls.target.set(0, (baseH + colH + roofRise) * 0.45, 0);
+  fitFor((Math.max(hw, hd) + eaveOut) * 2, baseH + colH + roofRise);
 
   var tris = 0;
   buildingGroup.traverse(function(o){
@@ -2164,7 +3796,25 @@ function fillHoles(vertLines, faceLines) {
   return { verts: verts, faces: faces, holes: holes };
 }
 
-document.getElementById('exportBtn').addEventListener('click', function(){ exportOBJ(buildingGroup); });
+// The weld + hole-fill pass is synchronous and scales with triangle count: a
+// default hall is about a second, a 13-storey pagoda is the better part of a
+// minute. Show a busy state and let the browser paint it before blocking, so a
+// long export reads as working rather than as a frozen tab.
+document.getElementById('exportBtn').addEventListener('click', function(){
+  var btn = this;
+  if (btn.disabled) return;
+  var label = btn.querySelector('span');
+  var restore = label ? label.innerHTML : '';
+  btn.disabled = true;
+  if (label) label.textContent = '导出中 working…';
+  setTimeout(function(){
+    try { exportOBJ(buildingGroup); }
+    finally {
+      btn.disabled = false;
+      if (label) label.innerHTML = restore;
+    }
+  }, 40);
+});
 
 // ---- 保存图片 JPEG capture ----
 document.getElementById('imgBtn').addEventListener('click', function(){
@@ -2177,6 +3827,8 @@ document.getElementById('imgBtn').addEventListener('click', function(){
 // ---- design save / load (localStorage, like the reference tool) ----
 var CONTROL_IDS = ['buildingType','pagodaStyle','storeys','sides','doukou','classType','period',
   'bays','purlins','roofType','tuishan','tiles','shengqi','cejiao','railing','caihua','preset',
+  'daylight','shadows','groundOn',
+  'cTiaoX','cTiaoY','cAoX','cAoY','cGaoY',
   'roofColor','trimColor','woodColor','beamColor','caihuaColor','dgColor','wallColor',
   'latticeColor','baseColor','railColor'];
 
@@ -2222,8 +3874,781 @@ applyPreset();
 rebuild();
 (function animate(){
   requestAnimationFrame(animate);
+  updateCameraFlight();
   controls.update();
   renderer.render(scene, camera);
+})();
+</script>
+<script>
+/* ---- src/ui.js ---- */
+/* ============================================================================
+   古建生成器 · control-surface layer
+   ---------------------------------------------------------------------------
+   Every control in index.html is still a plain <select> or <input>, and stays
+   the single source of truth: app.js reads .value, applyPreset() writes .value,
+   and save/load round-trips .value. This file hides those natives and draws a
+   richer control over each one, writing back to the native element and firing
+   the same 'input'/'change' events app.js already listens for.
+
+   Loaded AFTER app.js on purpose. Listener order is registration order, so on
+   every event app.js rebuilds first and this file re-reads the settled state
+   (including the 生起 "Qing: n/a" case, which app.js decides).
+   ============================================================================ */
+(function () {
+  'use strict';
+
+  var $  = function (id) { return document.getElementById(id); };
+  var $$ = function (sel, root) {
+    return Array.prototype.slice.call((root || document).querySelectorAll(sel));
+  };
+  function fire(el) {
+    el.dispatchEvent(new Event('input',  { bubbles: true }));
+    el.dispatchEvent(new Event('change', { bubbles: true }));
+  }
+  // "歇山顶 hip-and-gable" -> ["歇山顶", "hip-and-gable"]; parenthetical dropped
+  function splitLabel(text) {
+    var parts = text.trim().split(/\s+/);
+    return [parts[0] || '', (parts[1] || '').replace(/[()]/g, '')];
+  }
+
+  var syncers = [];   // run after every change, in registration order
+
+  /* ------------------------------------------------------------ segmented */
+  $$('[data-ctl="seg"]').forEach(function (row) {
+    var sel = row.querySelector('select');
+    if (!sel) return;
+
+    var seg = document.createElement('div');
+    seg.className = 'seg';
+    var ind = document.createElement('span');
+    ind.className = 'seg-ind';
+    seg.appendChild(ind);
+
+    var btns = Array.prototype.map.call(sel.options, function (opt) {
+      var p = splitLabel(opt.textContent);
+      var b = document.createElement('button');
+      b.type = 'button';
+      b.title = opt.textContent;
+      b.innerHTML = '<em></em><i></i>';
+      b.firstChild.textContent = p[0];
+      b.lastChild.textContent  = p[1];
+      b.addEventListener('click', function () {
+        if (sel.value === opt.value) return;
+        sel.value = opt.value;
+        fire(sel);
+      });
+      seg.appendChild(b);
+      return b;
+    });
+
+    sel.parentNode.appendChild(seg);
+    sel.classList.add('native-hidden');
+
+    syncers.push(function () {
+      var i = Math.max(0, sel.selectedIndex);
+      btns.forEach(function (b, k) {
+        b.setAttribute('aria-selected', k === i ? 'true' : 'false');
+      });
+      // a hidden row (.pg while in hall mode, or a collapsed group) measures 0;
+      // leave the indicator where it is until it can be measured for real
+      var w = btns[i].offsetWidth;
+      if (!w) return;
+      ind.style.width = w + 'px';
+      ind.style.transform = 'translateX(' + (btns[i].offsetLeft - 3) + 'px)';
+    });
+  });
+
+  /* -------------------------------------------------------------- sliders */
+  $$('[data-ctl="slider"]').forEach(function (row) {
+    var input = row.querySelector('input[type=range]');
+    if (!input) return;
+
+    var box = document.createElement('div');
+    box.className = 'slider';
+    input.parentNode.insertBefore(box, input);
+    box.appendChild(input);
+
+    var min = +input.min, max = +input.max, step = +input.step || 1;
+    var steps = Math.round((max - min) / step) + 1;
+    var ticks = null;
+    if (steps > 1 && steps <= 12) {
+      ticks = document.createElement('div');
+      ticks.className = 'ticks';
+      for (var i = 0; i < steps; i++) ticks.appendChild(document.createElement('i'));
+      box.appendChild(ticks);
+    }
+
+    syncers.push(function () {
+      var v = +input.value;
+      var f = max > min ? (v - min) / (max - min) : 0;
+      input.style.setProperty('--fill', (f * 100).toFixed(2) + '%');
+      if (ticks) {
+        var on = Math.round((v - min) / step);
+        for (var k = 0; k < ticks.children.length; k++)
+          ticks.children[k].classList.toggle('on', k <= on);
+      }
+    });
+  });
+
+  /* ------------------------------------------------------------- switches */
+  $$('[data-ctl="switch"]').forEach(function (row) {
+    var input = row.querySelector('input[type=range]');
+    if (!input) return;
+
+    var out = row.querySelector('.row-val');
+    var sw  = document.createElement('button');
+    sw.type = 'button';
+    sw.className = 'switch';
+    sw.setAttribute('role', 'switch');
+    sw.title = row.querySelector('.row-label').textContent.trim();
+    sw.addEventListener('click', function () {
+      if (row.classList.contains('is-na')) return;
+      input.value = (+input.value > 0.5) ? '0' : '1';
+      fire(input);
+    });
+
+    row.appendChild(sw);
+    input.classList.add('native-hidden');
+
+    syncers.push(function () {
+      // app.js writes "Qing: n/a" into 生起's readout when the period rules it
+      // out -- the rule is not applied then, so the switch must not read as on
+      var na = !!out && out.textContent.indexOf('n/a') >= 0;
+      sw.setAttribute('aria-checked', (!na && +input.value > 0.5) ? 'true' : 'false');
+      row.classList.toggle('is-na', na);
+      sw.setAttribute('aria-disabled', na ? 'true' : 'false');
+    });
+  });
+
+  /* ------------------------------------------------------- preset gallery */
+  (function () {
+    var sel = $('preset');
+    if (!sel) return;
+    var P = (typeof PRESETS !== 'undefined') ? PRESETS : {};
+
+    var grid = document.createElement('div');
+    grid.className = 'presets';
+
+    var cards = Array.prototype.map.call(sel.options, function (opt) {
+      var p = P[opt.value] || {};
+      var name = splitLabel(opt.textContent.split('·')[0]);
+      var card = document.createElement('button');
+      card.type = 'button';
+      card.className = 'preset';
+      card.title = opt.textContent;
+
+      var strip = document.createElement('span');
+      strip.className = 'strip';
+      ['roof', 'wall', 'wood', 'trim'].forEach(function (k) {
+        var chip = document.createElement('i');
+        chip.style.background = p[k] || '#3a3a3f';
+        strip.appendChild(chip);
+      });
+
+      var nm = document.createElement('span');
+      nm.className = 'nm';
+      nm.innerHTML = '<em></em><i></i>';
+      nm.firstChild.textContent = name[0];
+      nm.lastChild.textContent  = name[1];
+
+      card.appendChild(strip);
+      card.appendChild(nm);
+      card.addEventListener('click', function () {
+        sel.value = opt.value;
+        fire(sel);   // app.js's change handler runs applyPreset() + rebuild()
+      });
+      grid.appendChild(card);
+      return card;
+    });
+
+    sel.parentNode.appendChild(grid);
+    sel.classList.add('native-hidden');
+
+    syncers.push(function () {
+      cards.forEach(function (c, k) {
+        c.setAttribute('aria-selected', k === sel.selectedIndex ? 'true' : 'false');
+      });
+    });
+  })();
+
+  /* ------------------------------------------------------ colour swatches */
+  $$('.sw').forEach(function (sw) {
+    var input = sw.querySelector('input[type=color]');
+    var face  = sw.querySelector('.sw-face');
+    if (!input || !face) return;
+    syncers.push(function () {
+      face.style.background = input.value;
+      sw.title = sw.title.split(' — ')[0] + ' — ' + input.value.toUpperCase();
+    });
+  });
+
+  /* ------------------------------------------------- 坡面 curve editor */
+  // The graph is only a renderer/editor for five hidden range inputs, so save,
+  // load and the derived readouts all keep working with no special cases. The
+  // handle positions ARE the drawn curve, and the same numbers become
+  // ROOF_CURVE, so what is on the graph is what gets built.
+  (function () {
+    var svg = $('curveEditor');
+    if (!svg) return;
+
+    var IN = { tiaoX: $('cTiaoX'), tiaoY: $('cTiaoY'),
+               aoX: $('cAoX'), aoY: $('cAoY'), gaoY: $('cGaoY') };
+    var DEFAULTS = { tiaoX: 15, tiaoY: 12, aoX: 58, aoY: 36, gaoY: 70 };
+
+    // plot box inside the 300x276 viewBox -- near square, so the 举架 curve
+    // reads as a curve rather than a shallow ramp
+    var L = 30, R = 276, T = 24, B = 240;
+    var W = R - L, H = B - T;
+    var px = function (gx) { return L + gx * W; };
+    var py = function (gy) { return B - gy * H; };
+
+    var g = function (k) { return (+IN[k].value) / 100; };
+
+    // --- the curve, in graph space -----------------------------------------
+    // 凹 sits ON the curve at t = 0.5, so a quadratic Bezier through it needs
+    // control = 2*mid - (start + end)/2.
+    function geom() {
+      var x0 = g('tiaoX'), y0 = g('tiaoY');
+      var mx = g('aoX'),   my = g('aoY');
+      var x1 = 1,          y1 = g('gaoY');
+      var ctrlX = 2 * mx - (x0 + x1) / 2;
+      var ctrlY = 2 * my - (y0 + y1) / 2;
+      // normalise into the unit eave->ridge square that solveRoofProfile wants
+      var spanX = Math.max(0.05, x1 - x0);
+      var spanY = Math.max(0.08, y1 - y0);
+      return {
+        x0: x0, y0: y0, x1: x1, y1: y1, mx: mx, my: my,
+        ctrlX: ctrlX, ctrlY: ctrlY,
+        cx: (ctrlX - x0) / spanX,
+        cy: (ctrlY - y0) / spanY
+      };
+    }
+
+    // Keep the handle inside the region where the derived control point stays
+    // in solveRoofProfile's monotonic range, so the drawn curve and the built
+    // roof can never disagree -- clamping one but not the other is what would
+    // make the graph lie.
+    function clampAo(mx, my, x0, y0, y1) {
+      var spanX = Math.max(0.05, 1 - x0), spanY = Math.max(0.08, y1 - y0);
+      // cx in [0.05,0.95]  =>  ctrlX in [x0+0.05*spanX, x0+0.95*spanX]
+      var loX = (x0 + 0.05 * spanX + (x0 + 1) / 2) / 2;
+      var hiX = (x0 + 0.95 * spanX + (x0 + 1) / 2) / 2;
+      var loY = (y0 + 0.00 * spanY + (y0 + y1) / 2) / 2;
+      var hiY = (y0 + 0.95 * spanY + (y0 + y1) / 2) / 2;
+      return { mx: Math.min(hiX, Math.max(loX, mx)),
+               my: Math.min(hiY, Math.max(loY, my)) };
+    }
+
+    // --- multipliers handed to the geometry --------------------------------
+    function multipliers(q) {
+      return {
+        // dragging 挑 right shortens the eave, left deepens it
+        eave: 1.6 - (q.x0 / 0.28) * 1.12,
+        // dragging 挑 up lifts the corners
+        lift: (q.y0 / 0.30) * 2.5,
+        // 高 is the total 举高
+        rise: 0.55 + ((q.y1 - 0.25) / 0.75) * 0.75
+      };
+    }
+
+    // --- grid ---------------------------------------------------------------
+    (function grid() {
+      var frag = '';
+      for (var i = 0; i <= 8; i++) {
+        var x = L + (i / 8) * W;
+        frag += '<line class="' + (i % 4 ? '' : 'major') + '" x1="' + x.toFixed(1) +
+                '" y1="' + T + '" x2="' + x.toFixed(1) + '" y2="' + B + '"/>';
+      }
+      for (var j = 0; j <= 8; j++) {
+        var y = T + (j / 8) * H;
+        frag += '<line class="' + (j % 4 ? '' : 'major') + '" x1="' + L +
+                '" y1="' + y.toFixed(1) + '" x2="' + R + '" y2="' + y.toFixed(1) + '"/>';
+      }
+      $('cvGrid').innerHTML = frag;
+    })();
+
+    // build the readout once; render() then only writes numbers into it
+    var cells = (function () {
+      var rows = [['出檐 eave', 'eave'], ['起翘 lift', 'lift'],
+                  ['举高 rise', 'rise'], ['凹率 curve', 'cy']];
+      $('cvRead').innerHTML = rows.map(function (r) {
+        return '<div class="d"><span>' + r[0] + '</span><b data-k="' + r[1] + '"></b></div>';
+      }).join('');
+      var map = {};
+      $$('#cvRead b').forEach(function (b) { map[b.getAttribute('data-k')] = b; });
+      return map;
+    })();
+
+    function curvePath(x0, y0, cxg, cyg, x1, y1) {
+      return 'M' + px(x0).toFixed(1) + ' ' + py(y0).toFixed(1) +
+             ' Q' + px(cxg).toFixed(1) + ' ' + py(cyg).toFixed(1) +
+             ' ' + px(x1).toFixed(1) + ' ' + py(y1).toFixed(1);
+    }
+
+    // the 则例 curve, drawn once as a dashed ghost to measure deviation against
+    (function referenceCurve() {
+      var d = DEFAULTS, x0 = d.tiaoX / 100, y0 = d.tiaoY / 100, y1 = d.gaoY / 100;
+      var ctrlX = 2 * (d.aoX / 100) - (x0 + 1) / 2;
+      var ctrlY = 2 * (d.aoY / 100) - (y0 + y1) / 2;
+      $('cvRef').setAttribute('d', curvePath(x0, y0, ctrlX, ctrlY, 1, y1));
+    })();
+
+    function render() {
+      var q = geom();
+      var sx = px(q.x0), sy = py(q.y0);
+      var ex = px(q.x1), ey = py(q.y1);
+      // draw from ROOF_CURVE, not from q: those are the numbers the roof was
+      // actually built with, so the graph cannot show a shape the model isn't
+      var spanX = Math.max(0.05, q.x1 - q.x0), spanY = Math.max(0.08, q.y1 - q.y0);
+      var cxp = px(q.x0 + ROOF_CURVE.cx * spanX);
+      var cyp = py(q.y0 + ROOF_CURVE.cy * spanY);
+      var d = 'M' + sx.toFixed(1) + ' ' + sy.toFixed(1) +
+              ' Q' + cxp.toFixed(1) + ' ' + cyp.toFixed(1) +
+              ' ' + ex.toFixed(1) + ' ' + ey.toFixed(1);
+      $('cvLine').setAttribute('d', d);
+      $('cvArea').setAttribute('d', d + ' L' + ex.toFixed(1) + ' ' + py(q.y0).toFixed(1) + ' Z');
+      $('cvBase').setAttribute('d',
+        'M' + sx.toFixed(1) + ' ' + sy.toFixed(1) + ' H' + ex.toFixed(1) +
+        ' M' + ex.toFixed(1) + ' ' + sy.toFixed(1) + ' V' + ey.toFixed(1));
+
+      function place(circ, label, gx, gy, dy) {
+        var cx = px(gx).toFixed(1), cy = py(gy).toFixed(1);
+        $(circ).setAttribute('cx', cx);
+        $(circ).setAttribute('cy', cy);
+        var hit = $(circ).parentNode.querySelector('.cv-hit');
+        if (hit) { hit.setAttribute('cx', cx); hit.setAttribute('cy', cy); }
+        $(label).setAttribute('x', cx);
+        $(label).setAttribute('y', (py(gy) + dy).toFixed(1));
+      }
+      place('cvTiao', 'cvTiaoT', q.x0, q.y0, -15);
+      // the Bezier's own midpoint, so the dot always sits on the drawn line
+      place('cvAo', 'cvAoT',
+            0.25 * q.x0 + 0.5 * (q.x0 + ROOF_CURVE.cx * spanX) + 0.25 * q.x1,
+            0.25 * q.y0 + 0.5 * (q.y0 + ROOF_CURVE.cy * spanY) + 0.25 * q.y1, -14);
+      place('cvGao', 'cvGaoT', q.x1, q.y1, -15);
+
+      var m = multipliers(q);
+      function put(k, v, base) {
+        cells[k].textContent = v;
+        cells[k].classList.toggle('off', Math.abs(parseFloat(v) - base) > 0.005);
+      }
+      put('eave', m.eave.toFixed(2) + '×', 1);
+      put('lift', m.lift.toFixed(2) + '×', 1);
+      put('rise', m.rise.toFixed(2) + '×', 1);
+      put('cy',   ROOF_CURVE.cy.toFixed(2), 0.33);
+    }
+
+    // Pull the stored handles back into the region where the derived control
+    // point is inside solveRoofProfile's monotonic range. move() already clamps
+    // while dragging, but 读取 load and any direct assignment do not go through
+    // it -- without this the graph would draw a curve the roof cannot build.
+    function normalise() {
+      var x0 = g('tiaoX'), y0 = g('tiaoY');
+      set('gaoY', Math.max(g('gaoY'), y0 + 0.12));
+      var c = clampAo(g('aoX'), g('aoY'), x0, y0, g('gaoY'));
+      set('aoX', c.mx);
+      set('aoY', c.my);
+    }
+
+    // push the handle state into the geometry
+    function apply() {
+      normalise();
+      var q = geom(), m = multipliers(q);
+      ROOF_CURVE.cx = Math.min(0.95, Math.max(0.05, q.cx));
+      ROOF_CURVE.cy = Math.min(0.95, Math.max(0.00, q.cy));
+      ROOF_CURVE.eave = m.eave;
+      ROOF_CURVE.lift = m.lift;
+      ROOF_CURVE.rise = m.rise;
+    }
+
+    // Writing through the inputs keeps one source of truth. Integer steps also
+    // throttle the rebuild: a drag across the box is at most ~100 of them.
+    function set(k, v) {
+      var el = IN[k];
+      var n = Math.round(Math.min(+el.max, Math.max(+el.min, v * 100)));
+      if (n === +el.value) return false;
+      el.value = n;
+      return true;
+    }
+
+    // Dragging used to fire a full rebuild per integer step -- 52k triangles for
+    // a hall, 178k for a tall pagoda, which is what made the handles feel like
+    // treacle. The graph is cheap, so redraw it synchronously for instant
+    // feedback and let the geometry catch up at most once a frame. If a rebuild
+    // costs more than a frame, wait out its own cost before the next one so the
+    // pointer keeps getting serviced.
+    var rafId = 0, lastCost = 0, lastRun = 0;
+
+    function scheduleRebuild() {
+      if (rafId) return;
+      rafId = requestAnimationFrame(function () {
+        rafId = 0;
+        var now = performance.now();
+        if (lastCost > 16 && now - lastRun < lastCost) { scheduleRebuild(); return; }
+        var t0 = performance.now();
+        rebuild();
+        lastCost = performance.now() - t0;
+        lastRun = performance.now();
+      });
+    }
+
+    function flushRebuild() {
+      if (rafId) { cancelAnimationFrame(rafId); rafId = 0; }
+      rebuild();                       // land on the exact final state
+    }
+
+    function commit(changed) {
+      if (!changed) return;
+      apply();                         // graph first: instant, and cheap
+      render();
+      scheduleRebuild();
+    }
+
+    // --- dragging ------------------------------------------------------------
+    function local(evt) {
+      var m = svg.getScreenCTM();
+      if (!m) return null;
+      var pt = svg.createSVGPoint();
+      pt.x = evt.clientX; pt.y = evt.clientY;
+      var p = pt.matrixTransform(m.inverse());
+      return { gx: (p.x - L) / W, gy: (B - p.y) / H };
+    }
+
+    function move(which, gx, gy) {
+      var q = geom(), changed = false;
+      if (which === 'tiao') {
+        // stay left of 凹 and below 高 so the curve cannot invert
+        var x0 = Math.min(0.28, Math.max(0, Math.min(gx, q.mx - 0.06)));
+        var y0 = Math.min(0.30, Math.max(0, Math.min(gy, q.y1 - 0.12)));
+        changed = set('tiaoX', x0) | set('tiaoY', y0);
+        // 凹 may now sit outside the valid region for the new endpoints
+        var c = clampAo(g('aoX'), g('aoY'), x0, y0, q.y1);
+        changed = changed | set('aoX', c.mx) | set('aoY', c.my);
+      } else if (which === 'ao') {
+        var c2 = clampAo(gx, gy, q.x0, q.y0, q.y1);
+        changed = set('aoX', c2.mx) | set('aoY', c2.my);
+      } else {
+        var y1 = Math.min(1, Math.max(0.25, Math.max(gy, q.y0 + 0.12)));
+        changed = set('gaoY', y1);
+        var c3 = clampAo(g('aoX'), g('aoY'), q.x0, q.y0, y1);
+        changed = changed | set('aoX', c3.mx) | set('aoY', c3.my);
+      }
+      commit(!!changed);
+    }
+
+    var dragging = null;
+    $$('.cv-h', svg).forEach(function (h) {
+      var which = h.getAttribute('data-h');
+
+      h.addEventListener('pointerdown', function (e) {
+        e.preventDefault();
+        dragging = which;
+        h.classList.add('is-drag');
+        // capture on the handle so the pointer can leave it mid-drag
+        if (h.setPointerCapture) { try { h.setPointerCapture(e.pointerId); } catch (err) {} }
+      });
+      h.addEventListener('pointermove', function (e) {
+        if (dragging !== which) return;
+        var p = local(e);
+        if (p) move(which, p.gx, p.gy);
+      });
+      function end(e) {
+        if (dragging !== which) return;
+        dragging = null;
+        h.classList.remove('is-drag');
+        if (h.releasePointerCapture) { try { h.releasePointerCapture(e.pointerId); } catch (err) {} }
+        flushRebuild();
+      }
+      h.addEventListener('pointerup', end);
+      h.addEventListener('pointercancel', end);
+
+      h.addEventListener('keydown', function (e) {
+        var step = e.shiftKey ? 0.05 : 0.01, dx = 0, dy = 0;
+        if (e.key === 'ArrowLeft')       dx = -step;
+        else if (e.key === 'ArrowRight') dx =  step;
+        else if (e.key === 'ArrowUp')    dy =  step;
+        else if (e.key === 'ArrowDown')  dy = -step;
+        else return;
+        e.preventDefault();
+        var q = geom();
+        var at = which === 'tiao' ? [q.x0, q.y0] : which === 'ao' ? [q.mx, q.my] : [q.x1, q.y1];
+        move(which, at[0] + dx, at[1] + dy);
+      });
+      h.addEventListener('keyup', function () { flushRebuild(); });
+    });
+
+    $('cvReset').addEventListener('click', function () {
+      var changed = false;
+      Object.keys(DEFAULTS).forEach(function (k) {
+        if (+IN[k].value !== DEFAULTS[k]) { IN[k].value = DEFAULTS[k]; changed = true; }
+      });
+      if (changed) flushRebuild();
+    });
+
+    // 读取 load assigns the five inputs directly and never fires an event, so
+    // the curve is re-derived before every build and redrawn after it
+    REBUILD_PRE.push(apply);
+    syncers.push(render);
+
+    apply();
+    render();
+  })();
+
+  /* ------------------------------------------------------------- daylight */
+  // These three drive the scene directly. They deliberately do NOT go through
+  // rebuild(): relighting must not regenerate 50k triangles per slider pixel.
+  (function () {
+    var day = $('daylight'), sh = $('shadows'), gd = $('groundOn');
+    if (!day) return;
+
+    // 05:00 to 19:00 across the slider, named by the traditional double-hours
+    // real 时辰 boundaries: 卯 5-7, 辰 7-9, 巳 9-11, 午 11-13, 未 13-15, 申 15-17, 酉 17-19
+    var SHICHEN = [
+      [7,  '卯时 dawn'],      [9,  '辰时 morning'],  [11, '巳时 forenoon'],
+      [13, '午时 noon'],      [15, '未时 afternoon'], [17, '申时 late day'],
+      [99, '酉时 dusk']
+    ];
+    function label(t) {
+      var h = 5 + t * 14;
+      var name = SHICHEN[SHICHEN.length - 1][1];
+      for (var i = 0; i < SHICHEN.length; i++)
+        if (h < SHICHEN[i][0]) { name = SHICHEN[i][1]; break; }
+      var hh = Math.floor(h), mm = Math.round((h - hh) * 60);
+      if (mm === 60) { hh++; mm = 0; }
+      return (hh < 10 ? '0' : '') + hh + ':' + (mm < 10 ? '0' : '') + mm + ' ' + name;
+    }
+
+    syncers.push(function () {
+      var t = (+day.value) / 100;
+      applyDaylight(t);
+      sun.castShadow = (+sh.value) > 0.5;
+      ground.visible = (+gd.value) > 0.5;
+      $('dayOut').textContent = label(t);
+      $('shOut').textContent = sun.castShadow ? 'on' : 'off';
+      $('gdOut').textContent = ground.visible ? 'on' : 'off';
+    });
+
+    [day, sh, gd].forEach(function (el) {
+      el.addEventListener('input', sync);
+    });
+  })();
+
+  /* --------------------------------------------------------- view toolbar */
+  (function () {
+    var bar = $('viewbar');
+    if (!bar) return;
+    var VIEWS = { front: [0, 8], side: [90, 8], iso: [42, 20], top: [42, 74] };
+
+    $$('button[data-view]', bar).forEach(function (b) {
+      b.addEventListener('click', function () {
+        var v = VIEWS[b.getAttribute('data-view')];
+        controls.autoRotate = false;
+        spin.setAttribute('aria-pressed', 'false');
+        viewPreset(v[0], v[1], 700);
+      });
+    });
+
+    $('fitBtn').addEventListener('click', function () { frameModel(600); });
+
+    // switching 大殿 <-> 高塔 changes the model's size by a lot; a hall left at a
+    // 13-storey pagoda's zoom is a speck, so re-frame on that change only --
+    // never on an ordinary edit, which would fight the user's own zoom.
+    var lastType = $('buildingType').value;
+    syncers.push(function () {
+      var now = $('buildingType').value;
+      if (now === lastType) return;
+      lastType = now;
+      frameModel(700);
+    });
+
+    var spin = $('spinBtn');
+    controls.autoRotateSpeed = 0.9;
+    spin.addEventListener('click', function () {
+      var on = spin.getAttribute('aria-pressed') !== 'true';
+      controls.autoRotate = on;
+      spin.setAttribute('aria-pressed', on ? 'true' : 'false');
+    });
+  })();
+
+  /* ------------------------------------------------------------ 随机 random */
+  (function () {
+    var btn = $('randBtn');
+    if (!btn) return;
+
+    function pickRange(id, lo, hi) {
+      var el = $(id), step = +el.step || 1;
+      var min = lo === undefined ? +el.min : lo;
+      var max = hi === undefined ? +el.max : hi;
+      var n = Math.floor((max - min) / step) + 1;
+      el.value = min + Math.floor(Math.random() * n) * step;
+    }
+    function pickOption(id) {
+      var el = $(id);
+      el.selectedIndex = Math.floor(Math.random() * el.options.length);
+    }
+    function pickSwitch(id, onChance) {
+      $(id).value = Math.random() < onChance ? '1' : '0';
+    }
+
+    btn.addEventListener('click', function () {
+      // 建筑类型 is left alone -- it is what the entry screen asked for, and the
+      // 形制 tab is right there. Ranges are trimmed to the ones that look like a
+      // building: 0 tile ribs and a bare frame are legal but not worth rolling.
+      ['pagodaStyle', 'classType', 'period', 'roofType'].forEach(pickOption);
+      pickRange('storeys'); pickRange('sides');
+      pickRange('doukou', 3, 9);
+      pickRange('bays'); pickRange('purlins');
+      pickRange('tiles', 16, 40);
+      pickSwitch('tuishan', 0.8); pickSwitch('shengqi', 0.6);
+      pickSwitch('cejiao', 0.8);  pickSwitch('railing', 0.75);
+      pickSwitch('caihua', 0.85);
+      pickOption('preset');
+      applyPreset();
+      rebuild();
+    });
+  })();
+
+  /* --------------------------------------------- hall-only / pagoda-only */
+  // buildPagoda() is reached before rebuild() ever reads 屋顶式样, 推山 or the
+  // four 做法细则 rules, so those controls do nothing for a 高塔 -- hide them
+  // rather than leave dead switches on screen.
+  (function () {
+    var hall   = $$('.hall-only');
+    var pagoda = $$('.pagoda-only');
+    syncers.push(function () {
+      var isPagoda = $('buildingType').value === 'pagoda';
+      hall.forEach(function (el)   { el.classList.toggle('is-off', isPagoda); });
+      pagoda.forEach(function (el) { el.style.display = isPagoda ? 'block' : 'none'; });
+    });
+  })();
+
+  /* ------------------------------------------------- current-model summary */
+  (function () {
+    var box = $('model');
+    if (!box) return;
+    // the leading Chinese token of the selected option, e.g. "大殿 hall" -> 大殿
+    function cn(id) {
+      var s = $(id);
+      return s.options[s.selectedIndex].textContent.trim().split(/\s+/)[0];
+    }
+    syncers.push(function () {
+      var pagoda = $('buildingType').value === 'pagoda';
+      var rows = [
+        ['三角面', $('stats').textContent.split(' ')[0] || '—'],
+        ['类型',   cn('buildingType')],
+        ['做法',   cn('classType')],
+        ['年代',   cn('period')],
+        [pagoda ? '塔式' : '屋顶', pagoda ? cn('pagodaStyle') : cn('roofType')],
+        ['斗口',   $('dkOut').textContent]
+      ];
+      box.innerHTML = rows.map(function (r) {
+        return '<div class="d"><span>' + r[0] + '</span><b>' + r[1] + '</b></div>';
+      }).join('');
+    });
+  })();
+
+  /* --------------------------------------------------------- tab console */
+  (function () {
+    var tabs  = $$('.rail-tab');
+    var panes = $$('.pane');
+    tabs.forEach(function (tab) {
+      tab.addEventListener('click', function () {
+        var name = tab.getAttribute('data-tab');
+        tabs.forEach(function (t) {
+          var on = t === tab;
+          t.classList.toggle('is-active', on);
+          t.setAttribute('aria-selected', on ? 'true' : 'false');
+        });
+        panes.forEach(function (p) {
+          p.classList.toggle('is-active', p.getAttribute('data-pane') === name);
+        });
+        // segmented indicators in a hidden pane measure 0 and skip their sync
+        sync();
+      });
+    });
+  })();
+
+  /* --------------------------------------------------- header spec strip */
+  // app.js tags each derived figure with data-k; mirror the headline ones up
+  // into the panel header so they read without opening the 数据 tab.
+  (function () {
+    var w = $('specW'), h = $('specH'), t = $('specT');
+    var derived = $('derived'), stats = $('stats');
+    if (!w) return;
+    syncers.push(function () {
+      var cw = derived.querySelector('[data-k="width"] b');
+      var ch = derived.querySelector('[data-k="colH"] b');
+      if (cw) w.textContent = cw.textContent;
+      if (ch) h.textContent = ch.textContent;
+      // "52,404 tris · 1771 meshes" -> "52,404"
+      t.textContent = (stats.textContent.split(' ')[0]) || '—';
+    });
+  })();
+
+  /* --------------------------------------------------------- mobile drawer */
+  (function () {
+    var btn = $('panelToggle'), panel = $('panel');
+    if (!btn || !panel) return;
+    var narrow = window.matchMedia('(max-width: 720px)');
+    function fit() { panel.classList.toggle('is-closed', narrow.matches); }
+    btn.addEventListener('click', function () {
+      panel.classList.toggle('is-closed');
+      setTimeout(sync, 300);
+    });
+    (narrow.addEventListener ? narrow.addEventListener.bind(narrow, 'change')
+                             : narrow.addListener.bind(narrow))(fit);
+    fit();
+  })();
+
+  /* ------------------------------------------------------------- wiring up */
+  function sync() { for (var i = 0; i < syncers.length; i++) syncers[i](); }
+
+  // rebuild() calls every hook on its way out, so this covers all of it: direct
+  // control changes, 预设 presets (which rewrite the colour inputs), and 读取
+  // load (which assigns .value without firing a single event).
+  REBUILD_HOOKS.push(sync);
+
+  window.addEventListener('resize', sync);
+
+  sync();
+  // fonts land after first paint and change button widths under the indicator
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(sync);
+
+  /* --------------------------------------------------------------- the gate */
+  // Full-screen choice before the app is revealed. The scene is already built
+  // by the time this file runs, so entering is just: set the type, let
+  // rebuild() run if it actually changed, and uncover the canvas.
+  (function () {
+    var gate = $('gate');
+    if (!gate) return;
+    var sel = $('buildingType');
+    var done = false;
+
+    function enter(type) {
+      if (done) return;
+      done = true;
+      if (sel.value !== type) { sel.value = type; fire(sel); }
+      document.body.classList.add('entered');
+      gate.classList.add('gone');
+      introFlight();
+      // sync() once the panel is uncovered: a segmented indicator can only be
+      // measured for real when nothing is covering the pane it sits in
+      setTimeout(function () { gate.remove(); sync(); }, 600);
+    }
+
+    $$('.gate-card', gate).forEach(function (card) {
+      card.addEventListener('click', function () {
+        enter(card.getAttribute('data-choose'));
+      });
+    });
+
+    document.addEventListener('keydown', function (e) {
+      if (done) return;
+      if (e.key === '1') enter('hall');
+      else if (e.key === '2') enter('pagoda');
+    });
+  })();
+
 })();
 </script>
 </body>

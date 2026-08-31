@@ -1,5 +1,51 @@
+// Every rebuild allocates fresh geometries, materials and texClone()d maps.
+// Detaching the old group leaves every one of them on the GPU -- drag a slider
+// for a minute and that is thousands of orphaned buffers and texture uploads.
+// Freeing them here is safe because nothing in the group is shared: the TEX.*
+// originals only ever reach a material through texClone(), and reflections come
+// from scene.environment rather than a per-material envMap.
+function disposeGroup(root) {
+  var geos = [], mats = [];
+  root.traverse(function (o) {
+    if (!o.isMesh) return;
+    if (geos.indexOf(o.geometry) < 0) geos.push(o.geometry);
+    var mm = Array.isArray(o.material) ? o.material : [o.material];
+    for (var i = 0; i < mm.length; i++)
+      if (mm[i] && mats.indexOf(mm[i]) < 0) mats.push(mm[i]);
+  });
+  for (var g = 0; g < geos.length; g++) geos[g].dispose();
+  var MAPS = ['map', 'normalMap', 'roughnessMap', 'metalnessMap', 'alphaMap', 'aoMap'];
+  for (var k = 0; k < mats.length; k++) {
+    for (var j = 0; j < MAPS.length; j++) {
+      var t = mats[k][MAPS[j]];
+      if (t && t.dispose) t.dispose();
+    }
+    mats[k].dispose();
+  }
+}
+
+// ui.js registers here rather than relying on listener ordering, so the control
+// surface always re-reads the state the model settled on -- including the
+// readout spans buildModel() writes on its way through, and the paths that
+// never fire an event at all (读取 load applies a design by assignment).
+var REBUILD_HOOKS = [];
+// ...and a pre-pass, for state the geometry itself reads. 读取 load assigns the
+// controls and calls rebuild() without firing an event, so anything feeding
+// buildModel() has to be re-derived here rather than in a post hook.
+var REBUILD_PRE = [];
+
 function rebuild() {
-  while (buildingGroup.children.length) buildingGroup.remove(buildingGroup.children[0]);
+  for (var p = 0; p < REBUILD_PRE.length; p++) REBUILD_PRE[p]();
+  buildModel();
+  for (var i = 0; i < REBUILD_HOOKS.length; i++) REBUILD_HOOKS[i]();
+}
+
+function buildModel() {
+  while (buildingGroup.children.length) {
+    var stale = buildingGroup.children[0];
+    buildingGroup.remove(stale);
+    disposeGroup(stale);
+  }
 
   var grade   = parseInt(document.getElementById('doukou').value);
   var bays    = parseInt(document.getElementById('bays').value);
@@ -21,9 +67,11 @@ function rebuild() {
   var hd = (D.totalDepth * scale) / 2;
   var colH = D.colH * scale;
   var baseH = D.baseH * scale;
-  var roofRise = D.roofRise * scale;
-  var eaveOut = D.eaveOut * scale;
-  var upturn = D.cornerRise * scale;
+  // 坡面 multipliers: D stays the canonical 则例 derivation, the curve editor
+  // only scales it on the way into the scene
+  var roofRise = D.roofRise * scale * ROOF_CURVE.rise;
+  var eaveOut = D.eaveOut * scale * ROOF_CURVE.eave;
+  var upturn = D.cornerRise * scale * ROOF_CURVE.lift;
 
   document.getElementById('dkOut').textContent = grade + '等 (' + D.doukouCun + '寸)';
   document.getElementById('bayOut').textContent = bays;
@@ -36,12 +84,22 @@ function rebuild() {
   document.getElementById('chOut').textContent = val('caihua') > 0.5 ? 'on' : 'off';
 
   var cm = D.doukouCun * 3.2;
+  // one cell per figure -- style.css lays these out as a two-column table, and
+  // ui.js mirrors the data-k ones up into the panel header's spec strip
+  function cell(key, label, value, wide) {
+    return '<div class="d' + (wide ? ' wide' : '') + '" data-k="' + key + '"><span>' +
+           label + '</span><b>' + value + '</b></div>';
+  }
   document.getElementById('derived').innerHTML =
-    '通面阔 ' + (D.totalWidth*cm/100).toFixed(1) + ' m &nbsp; 通进深 ' + (D.totalDepth*cm/100).toFixed(1) + ' m<br>' +
-    '柱高 ' + (D.colH*cm/100).toFixed(2) + ' m &nbsp; 柱径 ' + (D.colDia*cm).toFixed(0) + ' cm<br>' +
-    '明间 ' + (D.bayWidths[(bays-1)/2]*cm/100).toFixed(2) + ' m &nbsp; 出檐 ' + (D.eaveOut*cm/100).toFixed(2) + ' m<br>' +
-    '举架 ' + D.coeffs.map(function(c){return c.toFixed(2);}).join(' → ') + '<br>' +
-    '深:阔 ' + (D.totalDepth/D.totalWidth).toFixed(2) + ' &nbsp; 举高:进深 ' + (D.roofRise/D.totalDepth).toFixed(2);
+    cell('width',  '通面阔', (D.totalWidth*cm/100).toFixed(1) + ' m') +
+    cell('depth',  '通进深', (D.totalDepth*cm/100).toFixed(1) + ' m') +
+    cell('colH',   '柱高',   (D.colH*cm/100).toFixed(2) + ' m') +
+    cell('colDia', '柱径',   (D.colDia*cm).toFixed(0) + ' cm') +
+    cell('bay',    '明间',   (D.bayWidths[(bays-1)/2]*cm/100).toFixed(2) + ' m') +
+    cell('eave',   '出檐',   (D.eaveOut*ROOF_CURVE.eave*cm/100).toFixed(2) + ' m') +
+    cell('ratio',  '深:阔',  (D.totalDepth/D.totalWidth).toFixed(2)) +
+    cell('rise',   '举高:进深', (D.roofRise*ROOF_CURVE.rise/D.totalDepth).toFixed(2)) +
+    cell('coeffs', '举架', D.coeffs.map(function(c){return c.toFixed(2);}).join(' → '), true);
 
   function col(id){ return document.getElementById(id).value; }
   var cRoof=col('roofColor'), cTrim=col('trimColor'), cWood=col('woodColor'),
@@ -126,7 +184,9 @@ function rebuild() {
     buildingGroup.add(pg);
     worldScaleUVs(buildingGroup);
 
-    controls.target.set(0, (pg.userData.totalHeight || 10) * 0.42, 0);
+    var pgH = pg.userData.totalHeight || 10;
+    controls.target.set(0, pgH * 0.42, 0);
+    fitFor(pagodaR * 2.4, pgH);
     var ptris = 0;
     buildingGroup.traverse(function(o){
       if (o.isMesh && o.geometry.index) ptris += o.geometry.index.count/3;
@@ -186,6 +246,7 @@ function rebuild() {
   worldScaleUVs(buildingGroup);
 
   controls.target.set(0, (baseH + colH + roofRise) * 0.45, 0);
+  fitFor((Math.max(hw, hd) + eaveOut) * 2, baseH + colH + roofRise);
 
   var tris = 0;
   buildingGroup.traverse(function(o){
@@ -384,7 +445,25 @@ function fillHoles(vertLines, faceLines) {
   return { verts: verts, faces: faces, holes: holes };
 }
 
-document.getElementById('exportBtn').addEventListener('click', function(){ exportOBJ(buildingGroup); });
+// The weld + hole-fill pass is synchronous and scales with triangle count: a
+// default hall is about a second, a 13-storey pagoda is the better part of a
+// minute. Show a busy state and let the browser paint it before blocking, so a
+// long export reads as working rather than as a frozen tab.
+document.getElementById('exportBtn').addEventListener('click', function(){
+  var btn = this;
+  if (btn.disabled) return;
+  var label = btn.querySelector('span');
+  var restore = label ? label.innerHTML : '';
+  btn.disabled = true;
+  if (label) label.textContent = '导出中 working…';
+  setTimeout(function(){
+    try { exportOBJ(buildingGroup); }
+    finally {
+      btn.disabled = false;
+      if (label) label.innerHTML = restore;
+    }
+  }, 40);
+});
 
 // ---- 保存图片 JPEG capture ----
 document.getElementById('imgBtn').addEventListener('click', function(){
@@ -397,6 +476,8 @@ document.getElementById('imgBtn').addEventListener('click', function(){
 // ---- design save / load (localStorage, like the reference tool) ----
 var CONTROL_IDS = ['buildingType','pagodaStyle','storeys','sides','doukou','classType','period',
   'bays','purlins','roofType','tuishan','tiles','shengqi','cejiao','railing','caihua','preset',
+  'daylight','shadows','groundOn',
+  'cTiaoX','cTiaoY','cAoX','cAoY','cGaoY',
   'roofColor','trimColor','woodColor','beamColor','caihuaColor','dgColor','wallColor',
   'latticeColor','baseColor','railColor'];
 
@@ -442,6 +523,7 @@ applyPreset();
 rebuild();
 (function animate(){
   requestAnimationFrame(animate);
+  updateCameraFlight();
   controls.update();
   renderer.render(scene, camera);
 })();

@@ -24,8 +24,14 @@ python3 -m http.server 8000
 ```
 then open http://localhost:8000
 
+`http.server` sends no cache headers, so Chrome applies heuristic caching and will
+happily keep running an old `src/*.js` after you edit it — a plain refresh does not
+always revalidate. If a change seems to have no effect, hard-refresh (⌘⇧R / Ctrl-F5).
+Deployed builds are unaffected: `vercel.json` sets `must-revalidate` on every path.
+
 ## Notes
-- `standalone.html` is the single-file version — works by double-clicking, no server.
-- `index.html` + `src/` is the modular version for ongoing development.
-- Keep both in sync, or delete `standalone.html` once you're working in `src/`.
+- `index.html` + `src/` is the modular version, and the one to edit.
+- `standalone.html` is the single-file version — works by double-clicking, no
+  server. It is **generated**, not hand-edited: run `python3 build-standalone.py`
+  after any change to inline `style.css` and `src/*.js` back into it.
 - Three.js loads from CDN, so there are no dependencies to install.
