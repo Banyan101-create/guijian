@@ -5,13 +5,13 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#0a0a0c">
 <meta name="description" content="Parametric generator for Chinese timber-frame architecture — 斗口 module, 举架 roof curve, 斗拱 brackets, in the browser.">
-<title>古建生成器 · Chinese Architecture Generator</title>
+<title>古建模 Gujianmo · Chinese Architecture Generator</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Serif+SC:wght@500;600;700&display=swap" rel="stylesheet">
 <style>
 /* ============================================================================
-   古建生成器 · UI theme
+   古建模 Gujianmo · UI theme
    Warm-ink dark glass with gold + cinnabar accents, tuned to sit over the
    3D scene without competing with it. Every native control is hidden and
    re-drawn by src/ui.js; the hidden input stays the source of truth.
@@ -1086,8 +1086,8 @@ body.entered #stats { animation: rise 0.6s 0.25s var(--ease) both; }
 
     <header class="gate-head">
       <div class="seal seal-lg" aria-hidden="true"><span>古<br>建</span></div>
-      <h1 class="gate-title">古建生成器</h1>
-      <p class="gate-sub">Chinese Architecture Generator</p>
+      <h1 class="gate-title">古建模</h1>
+      <p class="gate-sub">Gujianmo · Chinese Architecture Generator</p>
       <p class="gate-ask">选择建筑类型 <span>choose a building to begin</span></p>
     </header>
 
@@ -1154,7 +1154,7 @@ body.entered #stats { animation: rise 0.6s 0.25s var(--ease) both; }
       <div class="head-id">
         <div class="seal" aria-hidden="true"><span>古<br>建</span></div>
         <div class="panel-id">
-          <h1>古建生成器</h1>
+          <h1>古建模</h1>
           <p>Chinese Architecture Generator</p>
         </div>
       </div>
@@ -1320,7 +1320,7 @@ body.entered #stats { animation: rise 0.6s 0.25s var(--ease) both; }
           <div id="cvRead"></div>
           <button id="cvReset" class="btn btn-ghost cv-reset" type="button">复位 reset to 则例</button>
 
-          <p class="note">挑 sets 出檐 and 起翘, 凹 the 举架 concavity, 高 the total 举高. Reset returns the curve to the Qing coefficient ladder. A 高塔 takes 挑 and 凹; its rise is per-storey.</p>
+          <p class="note">挑 sets 出檐 and 起翘, 凹 the 举架 concavity, 高 the total 举高. The handles stay inside the range the 则例 ladders actually cover, so the section keeps its concave 举架 profile instead of bellying into a vault. Reset returns the curve to the Qing coefficient ladder. A 高塔 takes 挑 and 凹; its rise is per-storey.</p>
 
           <input type="range" id="cTiaoX" min="0"  max="28"  step="1" value="15" class="native-hidden">
           <input type="range" id="cTiaoY" min="0"  max="30"  step="1" value="12" class="native-hidden">
@@ -1364,7 +1364,22 @@ body.entered #stats { animation: rise 0.6s 0.25s var(--ease) both; }
             <input type="range" id="caihua" min="0" max="1" step="1" value="1">
           </div>
 
-          <p class="note hall-only">生起 raises the outer columns and applies only under 宋 Song rules.</p>
+          <div class="row hall-only" data-ctl="seg">
+            <span class="row-label">画等 <em>caihua grade</em></span>
+            <select id="caihuaType">
+              <option value="hexi" selected>和玺 hexi</option>
+              <option value="xuanzi">旋子 xuanzi</option>
+              <option value="sushi">苏式 sushi</option>
+            </select>
+          </div>
+
+          <div class="row row-switch hall-only" data-ctl="switch">
+            <span class="row-label">脊兽 <em>ridge beasts</em></span>
+            <span class="row-val" id="jsOut"></span>
+            <input type="range" id="beasts" min="0" max="1" step="1" value="1">
+          </div>
+
+          <p class="note hall-only">生起 raises the outer columns and applies only under 宋 Song rules. 和玺 is the imperial grade, 旋子 the general one, 苏式 the garden one; a 预设 picks the grade that goes with its rank. The 脊兽 count is not a style choice either — it is read off the 斗口 grade, 九 at the top, and only 太和殿 ever carried ten.</p>
           <p class="note pagoda-only">屋顶式样 and the 做法细则 rules shape a 大殿 only — a 高塔 carries its own per-storey eaves, so they are hidden here.</p>
         </section>
 
@@ -1388,16 +1403,16 @@ body.entered #stats { animation: rise 0.6s 0.25s var(--ease) both; }
           <div class="sec"><b>自定</b><span>custom</span></div>
 
           <div class="swatches">
-            <label class="sw" title="瓦 tile"><input type="color" id="roofColor" value="#b8912a"><span class="sw-face"></span><span class="sw-txt"><em>瓦</em><i>tile</i></span></label>
-            <label class="sw" title="脊 / 檐口 ridge + eave trim"><input type="color" id="trimColor" value="#d8d2c2"><span class="sw-face"></span><span class="sw-txt"><em>脊檐</em><i>trim</i></span></label>
-            <label class="sw" title="柱 columns"><input type="color" id="woodColor" value="#8a2a1c"><span class="sw-face"></span><span class="sw-txt"><em>柱</em><i>column</i></span></label>
-            <label class="sw" title="枋 / 椽 beams + rafters"><input type="color" id="beamColor" value="#1d4a66"><span class="sw-face"></span><span class="sw-txt"><em>枋椽</em><i>beam</i></span></label>
-            <label class="sw" title="彩画 painted detail"><input type="color" id="caihuaColor" value="#2f7d8a"><span class="sw-face"></span><span class="sw-txt"><em>彩画</em><i>caihua</i></span></label>
-            <label class="sw" title="斗拱 brackets"><input type="color" id="dgColor" value="#28647a"><span class="sw-face"></span><span class="sw-txt"><em>斗拱</em><i>bracket</i></span></label>
-            <label class="sw" title="墙 wall"><input type="color" id="wallColor" value="#9e2f20"><span class="sw-face"></span><span class="sw-txt"><em>墙</em><i>wall</i></span></label>
-            <label class="sw" title="槅扇 lattice"><input type="color" id="latticeColor" value="#7a2418"><span class="sw-face"></span><span class="sw-txt"><em>槅扇</em><i>lattice</i></span></label>
-            <label class="sw" title="基座 base stone"><input type="color" id="baseColor" value="#c9c3b2"><span class="sw-face"></span><span class="sw-txt"><em>基座</em><i>base</i></span></label>
-            <label class="sw" title="栏杆 balustrade"><input type="color" id="railColor" value="#d8d2c2"><span class="sw-face"></span><span class="sw-txt"><em>栏杆</em><i>rail</i></span></label>
+            <label class="sw" title="瓦 tile"><input type="color" id="roofColor" value="#a8802c"><span class="sw-face"></span><span class="sw-txt"><em>瓦</em><i>tile</i></span></label>
+            <label class="sw" title="脊 / 檐口 ridge + eave trim"><input type="color" id="trimColor" value="#bcb5a1"><span class="sw-face"></span><span class="sw-txt"><em>脊檐</em><i>trim</i></span></label>
+            <label class="sw" title="柱 columns"><input type="color" id="woodColor" value="#8b2f26"><span class="sw-face"></span><span class="sw-txt"><em>柱</em><i>column</i></span></label>
+            <label class="sw" title="枋 / 椽 beams + rafters"><input type="color" id="beamColor" value="#1d4257"><span class="sw-face"></span><span class="sw-txt"><em>枋椽</em><i>beam</i></span></label>
+            <label class="sw" title="彩画 painted detail"><input type="color" id="caihuaColor" value="#256a72"><span class="sw-face"></span><span class="sw-txt"><em>彩画</em><i>caihua</i></span></label>
+            <label class="sw" title="斗拱 brackets"><input type="color" id="dgColor" value="#23576a"><span class="sw-face"></span><span class="sw-txt"><em>斗拱</em><i>bracket</i></span></label>
+            <label class="sw" title="墙 wall"><input type="color" id="wallColor" value="#9a3a29"><span class="sw-face"></span><span class="sw-txt"><em>墙</em><i>wall</i></span></label>
+            <label class="sw" title="槅扇 lattice"><input type="color" id="latticeColor" value="#7c3020"><span class="sw-face"></span><span class="sw-txt"><em>槅扇</em><i>lattice</i></span></label>
+            <label class="sw" title="基座 base stone"><input type="color" id="baseColor" value="#c0baa8"><span class="sw-face"></span><span class="sw-txt"><em>基座</em><i>base</i></span></label>
+            <label class="sw" title="栏杆 balustrade"><input type="color" id="railColor" value="#c6c0ad"><span class="sw-face"></span><span class="sw-txt"><em>栏杆</em><i>rail</i></span></label>
           </div>
         </section>
 
@@ -1525,7 +1540,10 @@ renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 renderer.outputEncoding = THREE.sRGBEncoding;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure = 1.08;
+// 1.08 blew the sunlit face of the roof out to near-white, which is what made
+// the glaze read as neon rather than as fired clay. Sit the key light back and
+// let the tiles hold their own colour in the highlight.
+renderer.toneMappingExposure = 0.98;
 document.getElementById('wrap').appendChild(renderer.domElement);
 
 var controls = new THREE.OrbitControls(camera, renderer.domElement);
@@ -1560,7 +1578,7 @@ scene.environment = makeEnvMap();
 
 var hemi = new THREE.HemisphereLight(0xdfe3e6, 0x59493a, 0.55);
 scene.add(hemi);
-var sun = new THREE.DirectionalLight(0xfff4e6, 2.0);
+var sun = new THREE.DirectionalLight(0xfff4e6, 1.72);
 sun.position.set(9, 14, 7);
 sun.castShadow = true;
 sun.shadow.mapSize.set(2048, 2048);
@@ -1607,11 +1625,11 @@ scene.add(ground);
 //  originally authored; only material colours go through C().
 // ============================================================================
 var DAY_KEYS = [
-  { sun:'#ff9a52', si:1.20, hs:'#5f555f', hg:'#33291f', hi:0.36,
+  { sun:'#ffa869', si:1.10, hs:'#5f555f', hg:'#33291f', hi:0.40,
     sky:['#382c3c','#221a21','#131015'], fog:'#221a21' },
-  { sun:'#fff4e6', si:2.00, hs:'#dfe3e6', hg:'#59493a', hi:0.55,
+  { sun:'#fff4e6', si:1.72, hs:'#dfe3e6', hg:'#59493a', hi:0.58,
     sky:['#2a2f3a','#1b1d22','#131418'], fog:'#1b1d22' },
-  { sun:'#ff7f3a', si:1.05, hs:'#5e4b56', hg:'#31251f', hi:0.34,
+  { sun:'#ff8f52', si:0.98, hs:'#5e4b56', hg:'#31251f', hi:0.38,
     sky:['#3f2c33','#261a1e','#141012'], fog:'#261a1e' }
 ];
 
@@ -1833,7 +1851,10 @@ function initTextures() {
     var cols = 8, rows = 6, cw = w/cols, rh = h/rows;
     for (var x = 0; x < w; x++) {
       var ph = (x / cw) * Math.PI * 2;
-      var shade = 178 + 77 * Math.pow(0.5 + 0.5*Math.cos(ph), 0.55);
+      // the barrel's own shading, not a bleach: the old 178-255 ramp plus a
+      // strong dome highlight washed the crown of every tile to near-white, which
+      // is what drained the glaze colour out of the sunlit slope
+      var shade = 160 + 88 * Math.pow(0.5 + 0.5*Math.cos(ph), 0.55);
       ctx.fillStyle = 'rgb(' + [shade,shade,shade].join(',') + ')';
       ctx.fillRect(x, 0, 1, h);
     }
@@ -1850,8 +1871,8 @@ function initTextures() {
       for (var c2 = 0; c2 < cols; c2++) {
         var cx = c2*cw + cw/2, cy = y + rh*0.10, cr = cw*0.27;
         var dome = ctx.createRadialGradient(cx, cy - cr*0.35, cr*0.1, cx, cy, cr);
-        dome.addColorStop(0.0, 'rgba(255,255,255,0.42)');
-        dome.addColorStop(0.7, 'rgba(255,255,255,0.10)');
+        dome.addColorStop(0.0, 'rgba(255,255,255,0.22)');
+        dome.addColorStop(0.7, 'rgba(255,255,255,0.06)');
         dome.addColorStop(1.0, 'rgba(255,255,255,0.0)');
         ctx.fillStyle = dome;
         ctx.beginPath(); ctx.arc(cx, cy, cr, 0, Math.PI*2); ctx.fill();
@@ -2080,14 +2101,37 @@ function deriveDimensions(grade, bays, purlins, isDaShi, isSong) {
 //  [0.5, 0.62, 0.72, 0.82, 0.92] to within half a percent, so an untouched
 //  curve builds exactly the roof this generator built before the editor
 //  existed. Everything else in the file reads the profile through profileH(),
-//  which needs x strictly ascending -- hence the clamps: x(t) stays monotonic
-//  only while cx is inside (0, 1), and y likewise for cy.
+//  which needs x strictly ascending, so cx has to stay inside (0, 1) -- but the
+//  real bound is tighter than that and is set by CURVE_LIMITS below.
 // ============================================================================
 var ROOF_CURVE = { cx: 0.5118, cy: 0.3276, rise: 1, eave: 1, lift: 1 };
 
+// The 举架 ladders are a narrow family. Every Qing one climbs from 五举 at the
+// eave to roughly 九举 at the ridge, and the Song 举折 is gentler still, so the
+// control points that reproduce a real section all sit in one small patch of
+// the unit square. Outside it the shape stops being a roof: let cy approach cx
+// and the section flattens to a ramp, push it past and the curve bellies
+// upward into a barrel vault -- which is what the editor used to allow, and
+// what no 官式 building has ever had. These are the walls of that patch.
+var CURVE_LIMITS = {
+  cxMin: 0.40, cxMax: 0.66,        // where along the slope the bend sits
+  cyMin: 0.20, cyMax: 0.46,        // how deep the 凹 goes, in absolute terms
+  ratioMin: 0.45, ratioMax: 0.80   // and against cx, which is what keeps it concave
+};
+
+// Both the editor and the solver clamp through here, so the drawn curve and
+// the built roof cannot disagree about what is reachable.
+function clampRoofCurve(cx, cy) {
+  var L = CURVE_LIMITS;
+  cx = Math.min(L.cxMax, Math.max(L.cxMin, cx));
+  var lo = Math.max(L.cyMin, cx * L.ratioMin);
+  var hi = Math.max(lo, Math.min(L.cyMax, cx * L.ratioMax));
+  return { cx: cx, cy: Math.min(hi, Math.max(lo, cy)) };
+}
+
 function solveRoofProfile(halfDepth, roofHeight, steps) {
-  var cx = Math.min(0.95, Math.max(0.05, ROOF_CURVE.cx));
-  var cy = Math.min(0.95, Math.max(0.00, ROOF_CURVE.cy));
+  var c = clampRoofCurve(ROOF_CURVE.cx, ROOF_CURVE.cy);
+  var cx = c.cx, cy = c.cy;
   // sample finer than the old five-step ladder: the curve is now continuous and
   // can be bent hard, and profileH() only interpolates linearly between samples
   var n = Math.max(steps || 5, 12);
@@ -2228,9 +2272,42 @@ function ridgeBeam(len, thick, mat, ornament) {
   return g;
 }
 
+// ============================================================================
+//  脊兽 — THE RIDGE BEASTS
+//  The file of small figures on each 垂脊/戗脊 is a rank statement, not an
+//  ornament. 仙人骑凤 always leads, and behind him come 走兽 in odd numbers,
+//  nine at the top of the scale. Only 太和殿 was ever granted ten, and it is
+//  the only building in China that has them -- so nine is the ceiling here.
+//  The count is read off the 斗口 grade, which is what this generator uses to
+//  say how senior a building is.
+// ============================================================================
+function beastCount(grade) {
+  if (grade <= 1) return 9;
+  if (grade <= 3) return 7;
+  if (grade <= 5) return 5;
+  if (grade <= 7) return 3;
+  return 1;
+}
+
+// One 走兽: a seated silhouette, built once and instanced down the ridge. The
+// leader gets his 凤 -- a taller mount under the same body.
+function beastGeos(u) {
+  return {
+    plinth: new THREE.BoxGeometry(u * 1.6, u * 0.38, u * 1.5),
+    body:   new THREE.BoxGeometry(u * 1.30, u * 0.95, u * 1.25),
+    head:   new THREE.BoxGeometry(u * 1.05, u * 0.70, u * 0.72),
+    ear:    new THREE.BoxGeometry(u * 0.95, u * 0.30, u * 0.26),
+    mount:  new THREE.BoxGeometry(u * 1.45, u * 0.80, u * 1.7)
+  };
+}
+
 // 垂脊/戗脊 hip ridges running down the diagonal hip lines
-function hipRidges(cornerPts, apexY, mat, thick) {
+function hipRidges(cornerPts, apexY, mat, thick, beasts, beastMat) {
   var g = new THREE.Group();
+  var n = beasts || 0;
+  var geo = n > 0 ? beastGeos(thick * 0.62) : null;
+  var bm = beastMat || mat;
+
   cornerPts.forEach(function(c){
     var dir = new THREE.Vector3(c.x - c.ax, c.y - c.ay, c.z - c.az);
     var len = dir.length();
@@ -2241,6 +2318,56 @@ function hipRidges(cornerPts, apexY, mat, thick) {
     box.lookAt(new THREE.Vector3(c.x, c.y + thick*0.5, c.z));
     box.castShadow = true; box.receiveShadow = true;
     g.add(box);
+
+    if (!geo) return;
+    // The file sits on the eave half of the ridge and marches up it, the leader
+    // furthest out. Spacing is set by the run so a short 戗脊 does not end up
+    // with beasts standing on each other's tails.
+    // 走兽 are small, and they stand clear of each other: a file that touches
+    // reads as a comb from any distance. The run they occupy is capped so a
+    // short 戗脊 does not end up with beasts standing on each other's tails.
+    var u = thick * 0.70;
+    var step = Math.min(u * 4.6, (len * 0.50) / (n + 1));
+    var start = Math.max(u * 2.2, len * 0.05);
+    var eave = new THREE.Vector3(c.x, c.y + thick * 0.5, c.z);
+    var apex = new THREE.Vector3(c.ax, c.ay + thick * 0.5, c.az);
+    var along = new THREE.Vector3().subVectors(apex, eave).normalize();
+    // face out along the ridge, away from the roof
+    var look = new THREE.Vector3().subVectors(eave, apex).setY(0).normalize();
+
+    for (var i = 0; i <= n; i++) {
+      var at = new THREE.Vector3().copy(eave)
+        .addScaledVector(along, start + i * step);
+      var b = new THREE.Group();
+      var lead = (i === 0);
+      var y0 = thick * 0.75;
+      if (lead) {
+        var mt = new THREE.Mesh(geo.mount, bm);
+        mt.position.y = y0 + u * 0.42;
+        b.add(mt);
+        y0 += u * 0.80;
+      } else {
+        var pl = new THREE.Mesh(geo.plinth, bm);
+        pl.position.y = y0 + u * 0.22;
+        b.add(pl);
+        y0 += u * 0.42;
+      }
+      var bd = new THREE.Mesh(geo.body, bm);
+      bd.position.y = y0 + u * 0.52;
+      b.add(bd);
+      var hd2 = new THREE.Mesh(geo.head, bm);
+      hd2.position.set(0, y0 + u * 1.42, u * 0.32);
+      b.add(hd2);
+      var er = new THREE.Mesh(geo.ear, bm);
+      er.position.set(0, y0 + u * 1.90, u * 0.08);
+      b.add(er);
+
+      b.userData.beast = true;
+      b.position.copy(at);
+      b.lookAt(at.x + look.x, at.y, at.z + look.z);
+      b.traverse(function(m){ if (m.isMesh) { m.castShadow = true; m.receiveShadow = true; } });
+      g.add(b);
+    }
   });
   return g;
 }
@@ -2405,7 +2532,7 @@ function buildRoof(P) {
       cps.push({ ax: s[0]*ridgeHalfLen, ay: apexY, az: 0,
                  x: s[0]*halfWidth, y: eaveY0 + P.upturn, z: s[1]*halfDepth });
     });
-    group.add(hipRidges(cps, apexY, trimMat, 0.1));
+    group.add(hipRidges(cps, apexY, trimMat, 0.1, P.beasts, P.beastMat || trimMat));
     group.add(buildEaveAssembly(halfWidth, halfDepth, function(x,z){
       var dz = Math.abs(z)/halfDepth;
       var dx = Math.max(0, Math.abs(x)-ridgeHalfLen)/Math.max(halfWidth-ridgeHalfLen,1e-6);
@@ -2503,7 +2630,7 @@ function buildRoof(P) {
     scps.push({ ax: s[0]*gableHW, ay: skirtTopY, az: s[1]*upHD,
                 x: s[0]*halfWidth, y: eaveY1 + P.upturn, z: s[1]*halfDepth });
   });
-  group.add(hipRidges(scps, skirtTopY, trimMat, 0.09));
+  group.add(hipRidges(scps, skirtTopY, trimMat, 0.09, P.beasts, P.beastMat || trimMat));
 
   // 垂脊 on the upper gabled roof, ridge end down to its own eave corners
   var upRidgeY = upBase + (ridgeY - skirtTopY);
@@ -3244,31 +3371,75 @@ function buildSteps(halfW, baseH, tiers, mat, cheekMat) {
 </script>
 <script>
 /* ---- src/palette.js ---- */
+// ============================================================================
+//  色彩 — THE FIVE 正色
+//  Chinese official architecture is not painted from a free palette. It is
+//  painted from five "correct" colours, and every scheme below is a combination
+//  of them rather than a choice of hues:
+//
+//    赤 chi    the sun and fire. 朱红 on columns, doors and walls — 崇高, 富贵.
+//    黄 huang  the centre of the five phases. 黄琉璃 tile, and after the Ming the
+//              highest statement of 皇权 — the emperor's roof and no one else's.
+//    青 qing   covers both blue and green. It lives on the 梁枋 in the 彩画 and
+//              along the eaves, the colour that agrees with a timber frame.
+//    白 bai    汉白玉 platforms and 粉墙 — the ground the other colours stand on.
+//    黑 hei    灰黑 clay tile. Sober and practical, and the water phase, which is
+//              why it roofs libraries.
+//
+//  The regional split falls straight out of them. 北方官式 spends them at full
+//  strength — 红墙黄瓦, 色彩强烈鲜明, 彰显皇家威严. 江南 spends almost none:
+//  粉墙黛瓦 is 白 and 黑 by themselves, 宁静素雅, a building painted like a 水墨画.
+//
+//  The values are the pigments as they photograph on standing buildings, which
+//  is a step back from the pigment straight out of the tube — but only a step.
+//  Draining them entirely is the other way to be wrong.
+// ============================================================================
+var ZHENGSE = {
+  chi:    '#8b2f26',   // 朱红, as laid on columns — darker, lacquered
+  chiWall:'#9a3a29',   // 红墙, a 红土 wash: brighter and more orange than the columns
+  huang:  '#a8802c',   // 黄琉璃
+  qing:   '#1f5570',   // 青, the blue half — 梁枋 ground
+  lv:     '#2c6b48',   // 青, the green half — 绿琉璃 and the alternating 彩画 ground
+  bai:    '#cbc5b3',   // 汉白玉 台基
+  fen:    '#e3ded0',   // 粉墙
+  hei:    '#262a30',   // 黛瓦 / 黑琉璃
+  hui:    '#3d434a',   // 灰瓦
+  jin:    '#b8933f'    // 金 — never a 正色, only ever a highlight on the 彩画
+};
+
 var PRESETS = {
-  // 黄琉璃 imperial yellow — emperor only. Vermilion walls, gilt-blue caihua.
-  imperial: { roof:'#d4a017', trim:'#efe9d8', wood:'#8f1d13', beam:'#123f5c', caihua:'#1a6b7a',
-              dg:'#15586e', wall:'#a82a17', lattice:'#7a1810', base:'#d8d2be', rail:'#e8e2ce' },
-  // 绿琉璃 green — princes, high officials, temples
-  official: { roof:'#1f6b3d', trim:'#e4dfcc', wood:'#7a2d16', beam:'#164a68', caihua:'#c9971f',
-              dg:'#1d5f6b', wall:'#93361c', lattice:'#5e2110', base:'#cfc9b4', rail:'#e0dac6' },
-  // 蓝琉璃 azure — Temple of Heaven, altars to the sky
-  heaven:   { roof:'#1d4f8c', trim:'#eae6d6', wood:'#8f1d13', beam:'#123f5c', caihua:'#d4a017',
-              dg:'#15586e', wall:'#a82a17', lattice:'#7a1810', base:'#d8d2be', rail:'#e8e2ce' },
-  // 黑琉璃 black — libraries (water element, wards off fire) and military halls
-  library:  { roof:'#23262b', trim:'#dcd7c6', wood:'#3f2418', beam:'#1c4152', caihua:'#2f7d6b',
-              dg:'#265a63', wall:'#6b4a2c', lattice:'#3a2114', base:'#c4bfaa', rail:'#d6d1bd' },
-  // 灰瓦 vernacular grey clay — commoners; timber left dark and unpainted
-  temple:   { roof:'#3a4048', trim:'#ded8c4', wood:'#5e2a17', beam:'#7a6526', caihua:'#1d5a70',
-              dg:'#6b5720', wall:'#9c7440', lattice:'#4a2612', base:'#c9c3ac', rail:'#dcd6c2' },
-  // 江南 Jiangnan — 粉墙黛瓦, white walls and ink-dark tiles
-  jiangnan: { roof:'#1e2126', trim:'#f4f0e2', wood:'#2a1c14', beam:'#33241a', caihua:'#4a3628',
-              dg:'#33241a', wall:'#ece7d6', lattice:'#2a1c14', base:'#bdb7a2', rail:'#f0ece0' },
-  // 岭南 Lingnan — southern; ochre walls, green tile, red-gold trim
-  lingnan:  { roof:'#2d6b52', trim:'#f0e6cc', wood:'#8a3418', beam:'#a8781c', caihua:'#b03018',
-              dg:'#8a6318', wall:'#d4a95c', lattice:'#6b2410', base:'#cfc6ac', rail:'#e6dcc0' },
-  // 藏式 Tibetan-influenced — crimson, deep gold, white
-  tibetan:  { roof:'#b8891f', trim:'#f2efe4', wood:'#6b1410', beam:'#8a1a14', caihua:'#c9a02a',
-              dg:'#7a1812', wall:'#8f1810', lattice:'#5a100c', base:'#e8e4d6', rail:'#f2efe4' }
+  // 黄琉璃 imperial — 红墙黄瓦 at full strength. Emperor only.
+  imperial: { roof:ZHENGSE.huang, trim:ZHENGSE.bai,  wood:ZHENGSE.chi, beam:ZHENGSE.qing,
+              caihua:ZHENGSE.lv,  dg:'#24596b', wall:ZHENGSE.chiWall, lattice:'#82372a',
+              base:ZHENGSE.bai,   rail:'#d2ccbb', caihuaType:'hexi' },
+  // 绿琉璃 — princes, high officials, temples: one rank below the yellow roof
+  official: { roof:ZHENGSE.lv,    trim:'#c4bea9', wood:'#7e3823', beam:ZHENGSE.qing,
+              caihua:'#2f6b52',   dg:'#2a5d66', wall:'#96432c', lattice:'#672c1c',
+              base:'#bdb7a3',     rail:'#c2bca8', caihuaType:'xuanzi' },
+  // 蓝琉璃 azure — 天坛 and the altars to the sky
+  heaven:   { roof:'#2a5382',     trim:'#c9c3af', wood:ZHENGSE.chi, beam:ZHENGSE.qing,
+              caihua:ZHENGSE.jin, dg:'#24596b', wall:ZHENGSE.chiWall, lattice:'#82372a',
+              base:ZHENGSE.bai,   rail:'#d2ccbb', caihuaType:'hexi' },
+  // 黑琉璃 — 文渊阁 and the military halls: 黑 is the water phase, and water wards fire
+  library:  { roof:ZHENGSE.hei,   trim:'#bab4a2', wood:'#452a1d', beam:'#22434f',
+              caihua:'#35766a',   dg:'#2c5860', wall:'#6e5133', lattice:'#3f2618',
+              base:'#ada798',     rail:'#b6b0a0', caihuaType:'xuanzi' },
+  // 灰瓦 vernacular — commoners and small temples; timber left dark and unpainted
+  temple:   { roof:ZHENGSE.hui,   trim:'#bdb7a4', wood:'#5f3020', beam:'#75632e',
+              caihua:'#24576a',   dg:'#665a2c', wall:'#9a7746', lattice:'#4c2a18',
+              base:'#b0aa99',     rail:'#bab4a2', caihuaType:'xuanzi' },
+  // 江南 — 粉墙黛瓦. 白 and 黑 alone, and the 苏式 painting of the garden courts
+  jiangnan: { roof:ZHENGSE.hei,   trim:'#d9d5c6', wood:'#302219', beam:'#38281d',
+              caihua:'#4c392b',   dg:'#38281d', wall:ZHENGSE.fen, lattice:'#302219',
+              base:'#a8a290',     rail:'#d5d1c3', caihuaType:'sushi' },
+  // 岭南 — southern; ochre walls, green tile, and a hotter red than the north uses
+  lingnan:  { roof:'#35664f',     trim:'#d0c7af', wood:'#8a3a22', beam:'#a07c2c',
+              caihua:'#a53d24',   dg:'#856327', wall:'#c9a662', lattice:'#6b2c18',
+              base:'#b2aa94',     rail:'#c5bca3', caihuaType:'sushi' },
+  // 藏式 — crimson, deep gold and white, outside the 五色 system proper
+  tibetan:  { roof:'#ab8632',     trim:'#d6d2c6', wood:'#6d211a', beam:'#85261d',
+              caihua:'#c0a03a',   dg:'#78231a', wall:'#8c261b', lattice:'#5c1a14',
+              base:'#cbc7ba',     rail:'#d6d2c6', caihuaType:'hexi' }
 };
 
 function buildBalustrade(hw, hd, y, mat) {
@@ -3311,39 +3482,139 @@ function buildBalustrade(hw, hd, y, mat) {
   return g;
 }
 
-// 彩画 painted decoration band across the head tie-beams
-function buildCaihua(hw, hd, y, beamH, baseMat, accentMat, goldMat, colR) {
+// ============================================================================
+//  彩画 — THE THREE GRADES
+//  A painted beam is not one band of colour. It is divided along its length,
+//  and the same division carries every grade:
+//
+//    箍头  the collar at each end, against the column
+//    藻头  the zone inboard of it, where the grade's own motif sits
+//    枋心  the centre panel, roughly the middle third — the part you read first
+//
+//  The grade is a rank statement, like the roof colour and the 脊兽 count:
+//    和玺  the highest. Gold 圭线 bounding every zone and a gold 枋心, on a
+//          ground that alternates 青 and 绿 bay to bay. 皇家正殿 only.
+//    旋子  one below. 旋花 rosettes fill the 藻头, the 枋心 stays plain but for
+//          one gold line. General palace halls, side halls and temples.
+//    苏式  the garden grade. The 枋心 gives way to a 包袱, a pale bundle hung
+//          across the centre of the beam inside a coloured border — 典雅活泼,
+//          for the 内廷 and the 园林 rather than the throne hall.
+//
+//  Gold spends down the ladder: heavy on 和玺, an accent on 旋子, a thread on 苏式.
+// ============================================================================
+function buildCaihua(hw, hd, y, beamH, mats, colR, grade) {
   var g = new THREE.Group();
-  var inset = (colR || 0.08) * 0.5;
-  function band(len, isX, cx, cz) {
-    var segs = Math.max(5, Math.round(len/0.55));
-    for (var i = 0; i < segs; i++) {
-      var f = -1 + ((i+0.5)/segs)*2;
-      var segLen = (len*2/segs) * 0.82;
-      var isAccent = (i % 2 === 0);
-      var mat = isAccent ? accentMat : baseMat;
-      var w = isX ? 0.075 : segLen;
-      var d = isX ? segLen : 0.075;
-      var m = new THREE.Mesh(new THREE.BoxGeometry(w, beamH*0.55, d), mat);
-      m.position.set(isX ? cx : f*len, y, isX ? f*len : cz);
-      g.add(m);
-      // gold medallion at the centre of each accent segment
-      if (isAccent) {
-        var gm = new THREE.Mesh(new THREE.BoxGeometry(
-          isX ? 0.085 : segLen*0.3, beamH*0.26, isX ? segLen*0.3 : 0.085), goldMat);
-        gm.position.set(isX ? cx : f*len, y, isX ? f*len : cz);
-        g.add(gm);
+  var G = grade || 'hexi';
+
+  // 彩画 is paint on the outward face of the 额枋, so it has to sit on that face
+  // and not inside it. buildColumns() gives the beam a 10:8 section, so its
+  // half-thickness is 0.4 of its height, and every plate below is centred on
+  // that plane -- a plate of depth d then stands d/2 proud of the beam and the
+  // rest of it hides in the timber. That is also the relief ladder: the deeper
+  // the plate, the further forward it reads.
+  var face = beamH * 0.40;
+  var D0 = beamH * 0.10;                // ground
+  var D1 = beamH * 0.14;                // 箍头 and 藻头 fields
+  var D2 = beamH * 0.18;                // 枋心 and the rosettes
+  var D3 = beamH * 0.23;                // the gold lines, furthest forward
+
+  var cache = {};
+  function box(w, h, d) {
+    var k = w.toFixed(4) + ',' + h.toFixed(4) + ',' + d.toFixed(4);
+    return cache[k] || (cache[k] = new THREE.BoxGeometry(w, h, d));
+  }
+  function disc(r, h) {
+    var k = 'c' + r.toFixed(4) + ',' + h.toFixed(4);
+    return cache[k] || (cache[k] = new THREE.CylinderGeometry(r, r, h, 10));
+  }
+
+  // Everything is laid out along a 1-D run and then dropped onto whichever side
+  // of the building it belongs to, so the four faces cannot drift apart.
+  function put(geo, mat, isX, sgn, along, dy, rotX) {
+    var m = new THREE.Mesh(geo, mat);
+    var at = sgn * ((isX ? hw : hd) + face);
+    m.position.set(isX ? at : along, y + (dy || 0), isX ? along : at);
+    if (isX) m.rotation.y = Math.PI / 2;
+    if (rotX) m.rotation.x = rotX;
+    g.add(m);
+    return m;
+  }
+
+  function band(len, isX, sgn) {
+    var run = len * 2;
+    // 一间一段: the painting is divided per bay, so size the panels to the bay
+    var panels = Math.max(3, Math.round(run / 1.75));
+    var pw = run / panels;
+    var h = beamH * 0.86;                 // its height on the beam
+
+    for (var i = 0; i < panels; i++) {
+      var c = -len + (i + 0.5) * pw;
+      // 青绿相间: adjacent panels swap ground colour, which is the rule that
+      // makes a painted colonnade read as alternating from any angle
+      var ground = (i % 2 === 0) ? mats.qing : mats.lv;
+      var other  = (i % 2 === 0) ? mats.lv   : mats.qing;
+
+      put(box(pw * 0.995, h, D0), ground, isX, sgn, c);
+
+      var guW = pw * 0.13;                // 箍头
+      var fxW = pw * (G === 'sushi' ? 0.40 : 0.34);   // 枋心
+      [-1, 1].forEach(function (sd) {
+        put(box(guW, h * 1.02, D1), other, isX, sgn, c + sd * (pw / 2 - guW / 2));
+        // the 箍头 is edged in gold at every grade -- it is the one line that
+        // never drops off the ladder
+        put(box(pw * 0.014, h * 1.04, D3), mats.gold, isX, sgn, c + sd * (pw / 2 - guW));
+      });
+
+      var zt = (pw / 2 - guW) - fxW / 2;  // the 藻头 run, each side of the 枋心
+
+      if (G === 'hexi') {
+        // 枋心: a gold field bounded by its own 圭线
+        put(box(fxW, h * 0.84, D2), mats.gold, isX, sgn, c);
+        put(box(fxW * 0.84, h * 0.44, D3), other, isX, sgn, c);
+        [-1, 1].forEach(function (sd) {
+          put(box(pw * 0.014, h * 1.02, D3), mats.gold, isX, sgn, c + sd * fxW / 2);
+          // 藻头: gold wedges running out towards each 箍头
+          var zc = c + sd * (fxW / 2 + zt / 2);
+          put(box(zt * 0.70, h * 0.68, D1), mats.gold, isX, sgn, zc);
+          put(box(zt * 0.38, h * 0.34, D2), ground, isX, sgn, zc);
+        });
+      } else if (G === 'xuanzi') {
+        // 枋心: plain ground, one gold line through it, bounded but not filled
+        put(box(fxW, h * 0.14, D2), mats.gold, isX, sgn, c);
+        [-1, 1].forEach(function (sd) {
+          put(box(pw * 0.014, h * 0.86, D3), mats.gold, isX, sgn, c + sd * fxW / 2);
+          // 藻头: a pair of 旋花 rosettes each side, gold-centred
+          [0.32, 0.70].forEach(function (f) {
+            var zc = c + sd * (fxW / 2 + zt * f);
+            var r = Math.min(zt * 0.20, h * 0.32);
+            put(disc(r, D2), other, isX, sgn, zc, 0, Math.PI / 2);
+            put(disc(r * 0.42, D3), mats.gold, isX, sgn, zc, 0, Math.PI / 2);
+          });
+        });
+      } else {
+        // 苏式 包袱: a pale bundle slung across the middle of the beam, hanging
+        // below the beam line inside a border of the alternate colour
+        put(box(fxW, h * 1.20, D1), other, isX, sgn, c, -h * 0.12);
+        put(box(fxW * 0.86, h * 1.02, D2), mats.pale, isX, sgn, c, -h * 0.12);
+        put(box(fxW * 0.58, h * 0.30, D3), mats.accent, isX, sgn, c, -h * 0.34);
+        [-1, 1].forEach(function (sd) {
+          put(box(pw * 0.012, h * 1.22, D3), mats.gold, isX, sgn, c + sd * fxW / 2, -h * 0.12);
+          // 藻头 keeps one small motif -- 苏式 is the least crowded of the three
+          var zc = c + sd * (fxW / 2 + zt * 0.5);
+          put(box(zt * 0.32, h * 0.36, D1), mats.accent, isX, sgn, zc);
+        });
       }
     }
   }
-  band(hd-inset, true,  hw-inset, 0);
-  band(hd-inset, true, -(hw-inset), 0);
-  band(hw-inset, false, 0,  hd-inset);
-  band(hw-inset, false, 0, -(hd-inset));
-  g.traverse(function(m){ if(m.isMesh){ m.castShadow = true; } });
+
+  // butt the four runs at the corners rather than letting them cross
+  band(hd - face, true,   1);
+  band(hd - face, true,  -1);
+  band(hw - face, false,  1);
+  band(hw - face, false, -1);
+  g.traverse(function (m) { if (m.isMesh) { m.castShadow = true; } });
   return g;
 }
-
 
 function val(id){ return parseFloat(document.getElementById(id).value); }
 </script>
@@ -3432,7 +3703,9 @@ function buildModel() {
   document.getElementById('sqOut').textContent = isSong ? (useShengqi?'on':'off') : 'Qing: n/a';
   document.getElementById('cjOut').textContent = useCejiao ? 'on' : 'off';
   document.getElementById('rlOut').textContent = val('railing') > 0.5 ? 'on' : 'off';
+  var nBeasts = val('beasts') > 0.5 ? beastCount(grade) : 0;
   document.getElementById('chOut').textContent = val('caihua') > 0.5 ? 'on' : 'off';
+  document.getElementById('jsOut').textContent = nBeasts ? nBeasts + '兽 + 仙人' : 'off';
 
   var cm = D.doukouCun * 3.2;
   // one cell per figure -- style.css lays these out as a two-column table, and
@@ -3467,7 +3740,9 @@ function buildModel() {
     mat.normalScale = new THREE.Vector2(nScale, nScale);
     return mat;
   }
-  var tileMat   = skin(new THREE.MeshStandardMaterial({ color:C(cRoof), roughness:0.42, metalness:0.12, envMapIntensity:0.28, side:THREE.DoubleSide }),
+  // 琉璃瓦 is glazed, so it stays the glossiest thing on the building -- but a
+  // 0.42 roughness on a saturated colour is what read as plastic, not ceramic
+  var tileMat   = skin(new THREE.MeshStandardMaterial({ color:C(cRoof), roughness:0.52, metalness:0.08, envMapIntensity:0.24, side:THREE.DoubleSide }),
                        TEX.tile, TEX.tileN, 6, 3, 1.0);
   // ridges and mouldings are 灰塑 lime render, not plastic: give them a tooth
   var trimMat   = skin(new THREE.MeshStandardMaterial({ color:C(cTrim), roughness:0.75, metalness:0.02, envMapIntensity:0.3 }),
@@ -3565,7 +3840,12 @@ function buildModel() {
     buildingGroup.add(buildBalustrade(base.userData.topHW - 0.07, base.userData.topHD - 0.07, baseH, railMat));
   if (val('caihua') > 0.5) {
     var beamH = D.colDia * scale * 0.8;
-    buildingGroup.add(buildCaihua(hw, hd, baseH + colH - beamH*0.7, beamH, beamMat, caihuaMat, goldMat, colR));
+    // 青 and 绿 are the two grounds the painting alternates between; the swatches
+    // name them 枋椽 and 彩画, which is where the user expects to change them
+    buildingGroup.add(buildCaihua(hw, hd, baseH + colH - beamH*0.7, beamH, {
+      qing: beamMat, lv: caihuaMat, gold: goldMat,
+      pale: paperMat, accent: wallMat
+    }, colR, document.getElementById('caihuaType').value));
   }
 
   // 踏跺 as wide as the 明间, its top tread flush with the platform edge
@@ -3587,7 +3867,10 @@ function buildModel() {
     shellThick: Math.max(0.05, D.purlinDia * scale * 0.5),
     tuishan: useTuishan, purlinDia: D.purlinDia * scale,
     rafterMat: rafterMat, eaveTrimMat: eaveTrimMat, capMat: capMat,
-    tileMat: tileMat, gableMat: wallMat, trimMat: trimMat
+    tileMat: tileMat, gableMat: wallMat, trimMat: trimMat,
+    // 走兽 are glazed ceramic in the roof's own glaze, not stone: they follow
+    // 瓦 rather than 脊檐, which is why a 黄琉璃 hall carries yellow beasts
+    beasts: nBeasts, beastMat: tileMat
   });
   roof.position.y = eaveY;
   buildingGroup.add(roof);
@@ -3617,6 +3900,9 @@ function applyPreset() {
               caihuaColor:'caihua', dgColor:'dg', wallColor:'wall', latticeColor:'lattice',
               baseColor:'base', railColor:'rail' };
   Object.keys(map).forEach(function(id){ document.getElementById(id).value = p[map[id]]; });
+  // the 彩画 grade travels with the scheme: 和玺 on an imperial hall, 旋子 on a
+  // temple, 苏式 in the garden courts. It is a rank, like the roof colour.
+  if (p.caihuaType) document.getElementById('caihuaType').value = p.caihuaType;
 }
 document.getElementById('preset').addEventListener('change', function(){
   applyPreset();
@@ -3625,13 +3911,13 @@ document.getElementById('preset').addEventListener('change', function(){
 
 ['buildingType','pagodaStyle','storeys','sides',
  'doukou','classType','period','bays','purlins','roofType','tuishan','tiles','shengqi','cejiao',
- 'railing','caihua','roofColor','trimColor','woodColor','beamColor','caihuaColor',
+ 'railing','caihua','caihuaType','beasts','roofColor','trimColor','woodColor','beamColor','caihuaColor',
  'dgColor','wallColor','latticeColor','baseColor','railColor'].forEach(function(id){
   document.getElementById(id).addEventListener('input', rebuild);
 });
 
 function exportOBJ(group) {
-  var lines = ['# Chinese architecture generator'];
+  var lines = ['# 古建模 Gujianmo — Chinese architecture generator'];
   var off = 1;
   group.updateMatrixWorld(true);
 
@@ -3678,7 +3964,7 @@ function exportOBJ(group) {
   var blob = new Blob([w.lines.join('\n')], {type:'text/plain'});
   var url = URL.createObjectURL(blob);
   var a = document.createElement('a');
-  a.href = url; a.download = 'guijian_model.obj'; a.click();
+  a.href = url; a.download = 'gujianmo_model.obj'; a.click();
   URL.revokeObjectURL(url);
 }
 
@@ -3821,12 +4107,12 @@ document.getElementById('imgBtn').addEventListener('click', function(){
   renderer.render(scene, camera);
   var url = renderer.domElement.toDataURL('image/jpeg', 0.92);
   var a = document.createElement('a');
-  a.href = url; a.download = 'guijian_' + Date.now() + '.jpg'; a.click();
+  a.href = url; a.download = 'gujianmo_' + Date.now() + '.jpg'; a.click();
 });
 
 // ---- design save / load (localStorage, like the reference tool) ----
 var CONTROL_IDS = ['buildingType','pagodaStyle','storeys','sides','doukou','classType','period',
-  'bays','purlins','roofType','tuishan','tiles','shengqi','cejiao','railing','caihua','preset',
+  'bays','purlins','roofType','tuishan','tiles','shengqi','cejiao','railing','caihua','caihuaType','beasts','preset',
   'daylight','shadows','groundOn',
   'cTiaoX','cTiaoY','cAoX','cAoY','cGaoY',
   'roofColor','trimColor','woodColor','beamColor','caihuaColor','dgColor','wallColor',
@@ -3843,8 +4129,18 @@ function applyDesign(d) {
   });
   rebuild();
 }
+// Designs saved before the rename still live under the old key, so read it
+// once and carry them over rather than silently losing someone's work.
+var SAVE_KEY = 'gujianmo_saves', OLD_SAVE_KEY = 'guijian_saves';
 function getSaves() {
-  try { return JSON.parse(localStorage.getItem('guijian_saves') || '{}'); }
+  try {
+    var raw = localStorage.getItem(SAVE_KEY);
+    if (raw === null) {
+      var old = localStorage.getItem(OLD_SAVE_KEY);
+      if (old !== null) { localStorage.setItem(SAVE_KEY, old); return JSON.parse(old); }
+    }
+    return JSON.parse(raw || '{}');
+  }
   catch(e) { return {}; }
 }
 document.getElementById('saveBtn').addEventListener('click', function(){
@@ -3852,7 +4148,7 @@ document.getElementById('saveBtn').addEventListener('click', function(){
   if (!name) return;
   var saves = getSaves();
   saves[name] = snapshotDesign();
-  try { localStorage.setItem('guijian_saves', JSON.stringify(saves)); alert('已保存 saved: ' + name); }
+  try { localStorage.setItem(SAVE_KEY, JSON.stringify(saves)); alert('已保存 saved: ' + name); }
   catch(e) { alert('保存失败 save failed'); }
 });
 document.getElementById('loadBtn').addEventListener('click', function(){
@@ -3882,7 +4178,7 @@ rebuild();
 <script>
 /* ---- src/ui.js ---- */
 /* ============================================================================
-   古建生成器 · control-surface layer
+   古建模 Gujianmo · control-surface layer
    ---------------------------------------------------------------------------
    Every control in index.html is still a plain <select> or <input>, and stays
    the single source of truth: app.js reads .value, applyPreset() writes .value,
@@ -4124,30 +4420,34 @@ rebuild();
       };
     }
 
-    // Keep the handle inside the region where the derived control point stays
-    // in solveRoofProfile's monotonic range, so the drawn curve and the built
-    // roof can never disagree -- clamping one but not the other is what would
-    // make the graph lie.
+    // Keep the 凹 handle inside CURVE_LIMITS. Rather than duplicate those
+    // bounds in graph space, convert the handle to the control point the roof
+    // is actually built from, let clampRoofCurve() judge it, and convert back:
+    // one set of limits, so the graph can never draw a roof the solver refuses.
     function clampAo(mx, my, x0, y0, y1) {
       var spanX = Math.max(0.05, 1 - x0), spanY = Math.max(0.08, y1 - y0);
-      // cx in [0.05,0.95]  =>  ctrlX in [x0+0.05*spanX, x0+0.95*spanX]
-      var loX = (x0 + 0.05 * spanX + (x0 + 1) / 2) / 2;
-      var hiX = (x0 + 0.95 * spanX + (x0 + 1) / 2) / 2;
-      var loY = (y0 + 0.00 * spanY + (y0 + y1) / 2) / 2;
-      var hiY = (y0 + 0.95 * spanY + (y0 + y1) / 2) / 2;
-      return { mx: Math.min(hiX, Math.max(loX, mx)),
-               my: Math.min(hiY, Math.max(loY, my)) };
+      var ctrlX = 2 * mx - (x0 + 1) / 2;
+      var ctrlY = 2 * my - (y0 + y1) / 2;
+      var c = clampRoofCurve((ctrlX - x0) / spanX, (ctrlY - y0) / spanY);
+      return { mx: (x0 + c.cx * spanX + (x0 + 1) / 2) / 2,
+               my: (y0 + c.cy * spanY + (y0 + y1) / 2) / 2 };
     }
 
     // --- multipliers handed to the geometry --------------------------------
+    // All three pivot on the 则例 default, so an untouched handle still reads
+    // exactly 1.00x, and the gains are set so that the far edge of the plot is
+    // a building someone could have put up. The old mapping ran the eave from
+    // 0.48x to 1.6x and the corner lift to 2.5x, which is a pagoda in a cartoon.
+    function lim(v, lo, hi) { return Math.min(hi, Math.max(lo, v)); }
+
     function multipliers(q) {
       return {
         // dragging 挑 right shortens the eave, left deepens it
-        eave: 1.6 - (q.x0 / 0.28) * 1.12,
+        eave: lim(1 + (q.x0 - 0.15) * -2.0, 0.74, 1.30),
         // dragging 挑 up lifts the corners
-        lift: (q.y0 / 0.30) * 2.5,
+        lift: lim(1 + (q.y0 - 0.12) *  4.0, 0.50, 1.75),
         // 高 is the total 举高
-        rise: 0.55 + ((q.y1 - 0.25) / 0.75) * 0.75
+        rise: lim(1 + (q.y1 - 0.70) * 0.73, 0.67, 1.22)
       };
     }
 
@@ -4254,8 +4554,9 @@ rebuild();
     function apply() {
       normalise();
       var q = geom(), m = multipliers(q);
-      ROOF_CURVE.cx = Math.min(0.95, Math.max(0.05, q.cx));
-      ROOF_CURVE.cy = Math.min(0.95, Math.max(0.00, q.cy));
+      var c = clampRoofCurve(q.cx, q.cy);
+      ROOF_CURVE.cx = c.cx;
+      ROOF_CURVE.cy = c.cy;
       ROOF_CURVE.eave = m.eave;
       ROOF_CURVE.lift = m.lift;
       ROOF_CURVE.rise = m.rise;
@@ -4501,7 +4802,9 @@ rebuild();
       pickRange('tiles', 16, 40);
       pickSwitch('tuishan', 0.8); pickSwitch('shengqi', 0.6);
       pickSwitch('cejiao', 0.8);  pickSwitch('railing', 0.75);
-      pickSwitch('caihua', 0.85);
+      pickSwitch('caihua', 0.85); pickSwitch('beasts', 0.85);
+      // 预设 last, and applyPreset() after it: the scheme carries its own 彩画
+      // grade, so rolling the grade separately would only fight it
       pickOption('preset');
       applyPreset();
       rebuild();

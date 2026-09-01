@@ -1,4 +1,6 @@
-# 古建生成器 — Parametric Chinese Architecture Generator
+# 古建模 Gujianmo — Parametric Chinese Architecture Generator
+
+*古建* historic architecture, *建模* modelling.
 
 A browser-based parametric generator for traditional Chinese timber architecture.
 Produces halls (大殿) and pagodas (塔) whose dimensions derive from the historical
@@ -44,6 +46,48 @@ any size, and it's the single most important thing to preserve when editing.
 | 收山 gable inset | one 檩径 | 工程做法则例 |
 | 通进深 depth | 通面阔 × 5/8 | 大式 convention |
 | Pagoda taper | 0.953 per storey | 应县木塔 measured (陈明达 1980) |
+| 脊兽 ridge beasts | 9 / 7 / 5 / 3 / 1 by rank, led by 仙人骑凤 | 清会典 |
+
+---
+
+## 色彩 — the five 正色
+
+Colour here is not a palette, it is a rank system. Everything the generator
+paints is built from the five correct colours:
+
+| | | where it goes |
+|---|---|---|
+| 赤 chi | the sun and fire | 朱红 columns, doors, walls — 崇高 and 富贵 |
+| 黄 huang | the centre of the five phases | 黄琉璃 tile: after the Ming, the emperor's roof and no one else's |
+| 青 qing | covers blue *and* green | 梁枋彩画 and the eave work |
+| 白 bai | — | 汉白玉 platform, 粉墙 |
+| 黑 hei | the water phase, so it wards fire | 灰黑 tile, and the roof of a library |
+
+The regional split falls straight out of them. 北方官式 spends them at full
+strength — 红墙黄瓦, 色彩强烈鲜明, 彰显皇家威严. 江南 spends almost none:
+粉墙黛瓦 is 白 and 黑 by themselves, 宁静素雅, a building painted like a 水墨画.
+The eight 预设 are combinations of these, not free choices, and `ZHENGSE` in
+`src/palette.js` is the single place the pigments are defined.
+
+Values are the pigments as they photograph on standing buildings, which is one
+step back from the pigment out of the tube — but only one step. Draining them
+is the other way to be wrong.
+
+## 彩画 — the three grades
+
+A painted 额枋 is divided along its length, and the division is the same at
+every grade: **箍头** collar at each end, **藻头** inboard of it, **枋心** across
+the middle third. What fills them is the rank:
+
+| grade | 枋心 | 藻头 | gold | used on |
+|---|---|---|---|---|
+| 和玺 hexi | gold field inside its own 圭线 | gold wedges | heavy | 皇家正殿 |
+| 旋子 xuanzi | plain, one gold line | 旋花 rosettes, gold-centred | an accent | general halls, side halls, temples |
+| 苏式 sushi | a 包袱 hung below the beam line | one small motif | a thread | 内廷 and 园林 — 典雅活泼 |
+
+The ground alternates 青 and 绿 panel to panel, which is what makes a painted
+colonnade read as alternating from any angle. Picking a 预设 sets the grade that
+goes with its rank; the 画等 control overrides it.
 
 ---
 

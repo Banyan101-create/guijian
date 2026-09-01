@@ -1,5 +1,5 @@
 /* ============================================================================
-   古建生成器 · control-surface layer
+   古建模 Gujianmo · control-surface layer
    ---------------------------------------------------------------------------
    Every control in index.html is still a plain <select> or <input>, and stays
    the single source of truth: app.js reads .value, applyPreset() writes .value,
@@ -241,30 +241,34 @@
       };
     }
 
-    // Keep the handle inside the region where the derived control point stays
-    // in solveRoofProfile's monotonic range, so the drawn curve and the built
-    // roof can never disagree -- clamping one but not the other is what would
-    // make the graph lie.
+    // Keep the 凹 handle inside CURVE_LIMITS. Rather than duplicate those
+    // bounds in graph space, convert the handle to the control point the roof
+    // is actually built from, let clampRoofCurve() judge it, and convert back:
+    // one set of limits, so the graph can never draw a roof the solver refuses.
     function clampAo(mx, my, x0, y0, y1) {
       var spanX = Math.max(0.05, 1 - x0), spanY = Math.max(0.08, y1 - y0);
-      // cx in [0.05,0.95]  =>  ctrlX in [x0+0.05*spanX, x0+0.95*spanX]
-      var loX = (x0 + 0.05 * spanX + (x0 + 1) / 2) / 2;
-      var hiX = (x0 + 0.95 * spanX + (x0 + 1) / 2) / 2;
-      var loY = (y0 + 0.00 * spanY + (y0 + y1) / 2) / 2;
-      var hiY = (y0 + 0.95 * spanY + (y0 + y1) / 2) / 2;
-      return { mx: Math.min(hiX, Math.max(loX, mx)),
-               my: Math.min(hiY, Math.max(loY, my)) };
+      var ctrlX = 2 * mx - (x0 + 1) / 2;
+      var ctrlY = 2 * my - (y0 + y1) / 2;
+      var c = clampRoofCurve((ctrlX - x0) / spanX, (ctrlY - y0) / spanY);
+      return { mx: (x0 + c.cx * spanX + (x0 + 1) / 2) / 2,
+               my: (y0 + c.cy * spanY + (y0 + y1) / 2) / 2 };
     }
 
     // --- multipliers handed to the geometry --------------------------------
+    // All three pivot on the 则例 default, so an untouched handle still reads
+    // exactly 1.00x, and the gains are set so that the far edge of the plot is
+    // a building someone could have put up. The old mapping ran the eave from
+    // 0.48x to 1.6x and the corner lift to 2.5x, which is a pagoda in a cartoon.
+    function lim(v, lo, hi) { return Math.min(hi, Math.max(lo, v)); }
+
     function multipliers(q) {
       return {
         // dragging 挑 right shortens the eave, left deepens it
-        eave: 1.6 - (q.x0 / 0.28) * 1.12,
+        eave: lim(1 + (q.x0 - 0.15) * -2.0, 0.74, 1.30),
         // dragging 挑 up lifts the corners
-        lift: (q.y0 / 0.30) * 2.5,
+        lift: lim(1 + (q.y0 - 0.12) *  4.0, 0.50, 1.75),
         // 高 is the total 举高
-        rise: 0.55 + ((q.y1 - 0.25) / 0.75) * 0.75
+        rise: lim(1 + (q.y1 - 0.70) * 0.73, 0.67, 1.22)
       };
     }
 
@@ -371,8 +375,9 @@
     function apply() {
       normalise();
       var q = geom(), m = multipliers(q);
-      ROOF_CURVE.cx = Math.min(0.95, Math.max(0.05, q.cx));
-      ROOF_CURVE.cy = Math.min(0.95, Math.max(0.00, q.cy));
+      var c = clampRoofCurve(q.cx, q.cy);
+      ROOF_CURVE.cx = c.cx;
+      ROOF_CURVE.cy = c.cy;
       ROOF_CURVE.eave = m.eave;
       ROOF_CURVE.lift = m.lift;
       ROOF_CURVE.rise = m.rise;
@@ -618,7 +623,9 @@
       pickRange('tiles', 16, 40);
       pickSwitch('tuishan', 0.8); pickSwitch('shengqi', 0.6);
       pickSwitch('cejiao', 0.8);  pickSwitch('railing', 0.75);
-      pickSwitch('caihua', 0.85);
+      pickSwitch('caihua', 0.85); pickSwitch('beasts', 0.85);
+      // 预设 last, and applyPreset() after it: the scheme carries its own 彩画
+      // grade, so rolling the grade separately would only fight it
       pickOption('preset');
       applyPreset();
       rebuild();

@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#0a0a0c">
 <meta name="description" content="Parametric generator for Chinese timber-frame architecture — 斗口 module, 举架 roof curve, 斗拱 brackets, in the browser.">
-<title>古建生成器 · Chinese Architecture Generator</title>
+<title>古建模 Gujianmo · Chinese Architecture Generator</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Serif+SC:wght@500;600;700&display=swap" rel="stylesheet">
@@ -18,8 +18,8 @@
 
     <header class="gate-head">
       <div class="seal seal-lg" aria-hidden="true"><span>古<br>建</span></div>
-      <h1 class="gate-title">古建生成器</h1>
-      <p class="gate-sub">Chinese Architecture Generator</p>
+      <h1 class="gate-title">古建模</h1>
+      <p class="gate-sub">Gujianmo · Chinese Architecture Generator</p>
       <p class="gate-ask">选择建筑类型 <span>choose a building to begin</span></p>
     </header>
 
@@ -86,7 +86,7 @@
       <div class="head-id">
         <div class="seal" aria-hidden="true"><span>古<br>建</span></div>
         <div class="panel-id">
-          <h1>古建生成器</h1>
+          <h1>古建模</h1>
           <p>Chinese Architecture Generator</p>
         </div>
       </div>
@@ -252,7 +252,7 @@
           <div id="cvRead"></div>
           <button id="cvReset" class="btn btn-ghost cv-reset" type="button">复位 reset to 则例</button>
 
-          <p class="note">挑 sets 出檐 and 起翘, 凹 the 举架 concavity, 高 the total 举高. Reset returns the curve to the Qing coefficient ladder. A 高塔 takes 挑 and 凹; its rise is per-storey.</p>
+          <p class="note">挑 sets 出檐 and 起翘, 凹 the 举架 concavity, 高 the total 举高. The handles stay inside the range the 则例 ladders actually cover, so the section keeps its concave 举架 profile instead of bellying into a vault. Reset returns the curve to the Qing coefficient ladder. A 高塔 takes 挑 and 凹; its rise is per-storey.</p>
 
           <input type="range" id="cTiaoX" min="0"  max="28"  step="1" value="15" class="native-hidden">
           <input type="range" id="cTiaoY" min="0"  max="30"  step="1" value="12" class="native-hidden">
@@ -296,7 +296,22 @@
             <input type="range" id="caihua" min="0" max="1" step="1" value="1">
           </div>
 
-          <p class="note hall-only">生起 raises the outer columns and applies only under 宋 Song rules.</p>
+          <div class="row hall-only" data-ctl="seg">
+            <span class="row-label">画等 <em>caihua grade</em></span>
+            <select id="caihuaType">
+              <option value="hexi" selected>和玺 hexi</option>
+              <option value="xuanzi">旋子 xuanzi</option>
+              <option value="sushi">苏式 sushi</option>
+            </select>
+          </div>
+
+          <div class="row row-switch hall-only" data-ctl="switch">
+            <span class="row-label">脊兽 <em>ridge beasts</em></span>
+            <span class="row-val" id="jsOut"></span>
+            <input type="range" id="beasts" min="0" max="1" step="1" value="1">
+          </div>
+
+          <p class="note hall-only">生起 raises the outer columns and applies only under 宋 Song rules. 和玺 is the imperial grade, 旋子 the general one, 苏式 the garden one; a 预设 picks the grade that goes with its rank. The 脊兽 count is not a style choice either — it is read off the 斗口 grade, 九 at the top, and only 太和殿 ever carried ten.</p>
           <p class="note pagoda-only">屋顶式样 and the 做法细则 rules shape a 大殿 only — a 高塔 carries its own per-storey eaves, so they are hidden here.</p>
         </section>
 
@@ -320,16 +335,16 @@
           <div class="sec"><b>自定</b><span>custom</span></div>
 
           <div class="swatches">
-            <label class="sw" title="瓦 tile"><input type="color" id="roofColor" value="#b8912a"><span class="sw-face"></span><span class="sw-txt"><em>瓦</em><i>tile</i></span></label>
-            <label class="sw" title="脊 / 檐口 ridge + eave trim"><input type="color" id="trimColor" value="#d8d2c2"><span class="sw-face"></span><span class="sw-txt"><em>脊檐</em><i>trim</i></span></label>
-            <label class="sw" title="柱 columns"><input type="color" id="woodColor" value="#8a2a1c"><span class="sw-face"></span><span class="sw-txt"><em>柱</em><i>column</i></span></label>
-            <label class="sw" title="枋 / 椽 beams + rafters"><input type="color" id="beamColor" value="#1d4a66"><span class="sw-face"></span><span class="sw-txt"><em>枋椽</em><i>beam</i></span></label>
-            <label class="sw" title="彩画 painted detail"><input type="color" id="caihuaColor" value="#2f7d8a"><span class="sw-face"></span><span class="sw-txt"><em>彩画</em><i>caihua</i></span></label>
-            <label class="sw" title="斗拱 brackets"><input type="color" id="dgColor" value="#28647a"><span class="sw-face"></span><span class="sw-txt"><em>斗拱</em><i>bracket</i></span></label>
-            <label class="sw" title="墙 wall"><input type="color" id="wallColor" value="#9e2f20"><span class="sw-face"></span><span class="sw-txt"><em>墙</em><i>wall</i></span></label>
-            <label class="sw" title="槅扇 lattice"><input type="color" id="latticeColor" value="#7a2418"><span class="sw-face"></span><span class="sw-txt"><em>槅扇</em><i>lattice</i></span></label>
-            <label class="sw" title="基座 base stone"><input type="color" id="baseColor" value="#c9c3b2"><span class="sw-face"></span><span class="sw-txt"><em>基座</em><i>base</i></span></label>
-            <label class="sw" title="栏杆 balustrade"><input type="color" id="railColor" value="#d8d2c2"><span class="sw-face"></span><span class="sw-txt"><em>栏杆</em><i>rail</i></span></label>
+            <label class="sw" title="瓦 tile"><input type="color" id="roofColor" value="#a8802c"><span class="sw-face"></span><span class="sw-txt"><em>瓦</em><i>tile</i></span></label>
+            <label class="sw" title="脊 / 檐口 ridge + eave trim"><input type="color" id="trimColor" value="#bcb5a1"><span class="sw-face"></span><span class="sw-txt"><em>脊檐</em><i>trim</i></span></label>
+            <label class="sw" title="柱 columns"><input type="color" id="woodColor" value="#8b2f26"><span class="sw-face"></span><span class="sw-txt"><em>柱</em><i>column</i></span></label>
+            <label class="sw" title="枋 / 椽 beams + rafters"><input type="color" id="beamColor" value="#1d4257"><span class="sw-face"></span><span class="sw-txt"><em>枋椽</em><i>beam</i></span></label>
+            <label class="sw" title="彩画 painted detail"><input type="color" id="caihuaColor" value="#256a72"><span class="sw-face"></span><span class="sw-txt"><em>彩画</em><i>caihua</i></span></label>
+            <label class="sw" title="斗拱 brackets"><input type="color" id="dgColor" value="#23576a"><span class="sw-face"></span><span class="sw-txt"><em>斗拱</em><i>bracket</i></span></label>
+            <label class="sw" title="墙 wall"><input type="color" id="wallColor" value="#9a3a29"><span class="sw-face"></span><span class="sw-txt"><em>墙</em><i>wall</i></span></label>
+            <label class="sw" title="槅扇 lattice"><input type="color" id="latticeColor" value="#7c3020"><span class="sw-face"></span><span class="sw-txt"><em>槅扇</em><i>lattice</i></span></label>
+            <label class="sw" title="基座 base stone"><input type="color" id="baseColor" value="#c0baa8"><span class="sw-face"></span><span class="sw-txt"><em>基座</em><i>base</i></span></label>
+            <label class="sw" title="栏杆 balustrade"><input type="color" id="railColor" value="#c6c0ad"><span class="sw-face"></span><span class="sw-txt"><em>栏杆</em><i>rail</i></span></label>
           </div>
         </section>
 

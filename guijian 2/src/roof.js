@@ -8,14 +8,37 @@
 //  [0.5, 0.62, 0.72, 0.82, 0.92] to within half a percent, so an untouched
 //  curve builds exactly the roof this generator built before the editor
 //  existed. Everything else in the file reads the profile through profileH(),
-//  which needs x strictly ascending -- hence the clamps: x(t) stays monotonic
-//  only while cx is inside (0, 1), and y likewise for cy.
+//  which needs x strictly ascending, so cx has to stay inside (0, 1) -- but the
+//  real bound is tighter than that and is set by CURVE_LIMITS below.
 // ============================================================================
 var ROOF_CURVE = { cx: 0.5118, cy: 0.3276, rise: 1, eave: 1, lift: 1 };
 
+// The 举架 ladders are a narrow family. Every Qing one climbs from 五举 at the
+// eave to roughly 九举 at the ridge, and the Song 举折 is gentler still, so the
+// control points that reproduce a real section all sit in one small patch of
+// the unit square. Outside it the shape stops being a roof: let cy approach cx
+// and the section flattens to a ramp, push it past and the curve bellies
+// upward into a barrel vault -- which is what the editor used to allow, and
+// what no 官式 building has ever had. These are the walls of that patch.
+var CURVE_LIMITS = {
+  cxMin: 0.40, cxMax: 0.66,        // where along the slope the bend sits
+  cyMin: 0.20, cyMax: 0.46,        // how deep the 凹 goes, in absolute terms
+  ratioMin: 0.45, ratioMax: 0.80   // and against cx, which is what keeps it concave
+};
+
+// Both the editor and the solver clamp through here, so the drawn curve and
+// the built roof cannot disagree about what is reachable.
+function clampRoofCurve(cx, cy) {
+  var L = CURVE_LIMITS;
+  cx = Math.min(L.cxMax, Math.max(L.cxMin, cx));
+  var lo = Math.max(L.cyMin, cx * L.ratioMin);
+  var hi = Math.max(lo, Math.min(L.cyMax, cx * L.ratioMax));
+  return { cx: cx, cy: Math.min(hi, Math.max(lo, cy)) };
+}
+
 function solveRoofProfile(halfDepth, roofHeight, steps) {
-  var cx = Math.min(0.95, Math.max(0.05, ROOF_CURVE.cx));
-  var cy = Math.min(0.95, Math.max(0.00, ROOF_CURVE.cy));
+  var c = clampRoofCurve(ROOF_CURVE.cx, ROOF_CURVE.cy);
+  var cx = c.cx, cy = c.cy;
   // sample finer than the old five-step ladder: the curve is now continuous and
   // can be bent hard, and profileH() only interpolates linearly between samples
   var n = Math.max(steps || 5, 12);
@@ -156,9 +179,42 @@ function ridgeBeam(len, thick, mat, ornament) {
   return g;
 }
 
+// ============================================================================
+//  脊兽 — THE RIDGE BEASTS
+//  The file of small figures on each 垂脊/戗脊 is a rank statement, not an
+//  ornament. 仙人骑凤 always leads, and behind him come 走兽 in odd numbers,
+//  nine at the top of the scale. Only 太和殿 was ever granted ten, and it is
+//  the only building in China that has them -- so nine is the ceiling here.
+//  The count is read off the 斗口 grade, which is what this generator uses to
+//  say how senior a building is.
+// ============================================================================
+function beastCount(grade) {
+  if (grade <= 1) return 9;
+  if (grade <= 3) return 7;
+  if (grade <= 5) return 5;
+  if (grade <= 7) return 3;
+  return 1;
+}
+
+// One 走兽: a seated silhouette, built once and instanced down the ridge. The
+// leader gets his 凤 -- a taller mount under the same body.
+function beastGeos(u) {
+  return {
+    plinth: new THREE.BoxGeometry(u * 1.6, u * 0.38, u * 1.5),
+    body:   new THREE.BoxGeometry(u * 1.30, u * 0.95, u * 1.25),
+    head:   new THREE.BoxGeometry(u * 1.05, u * 0.70, u * 0.72),
+    ear:    new THREE.BoxGeometry(u * 0.95, u * 0.30, u * 0.26),
+    mount:  new THREE.BoxGeometry(u * 1.45, u * 0.80, u * 1.7)
+  };
+}
+
 // 垂脊/戗脊 hip ridges running down the diagonal hip lines
-function hipRidges(cornerPts, apexY, mat, thick) {
+function hipRidges(cornerPts, apexY, mat, thick, beasts, beastMat) {
   var g = new THREE.Group();
+  var n = beasts || 0;
+  var geo = n > 0 ? beastGeos(thick * 0.62) : null;
+  var bm = beastMat || mat;
+
   cornerPts.forEach(function(c){
     var dir = new THREE.Vector3(c.x - c.ax, c.y - c.ay, c.z - c.az);
     var len = dir.length();
@@ -169,6 +225,56 @@ function hipRidges(cornerPts, apexY, mat, thick) {
     box.lookAt(new THREE.Vector3(c.x, c.y + thick*0.5, c.z));
     box.castShadow = true; box.receiveShadow = true;
     g.add(box);
+
+    if (!geo) return;
+    // The file sits on the eave half of the ridge and marches up it, the leader
+    // furthest out. Spacing is set by the run so a short 戗脊 does not end up
+    // with beasts standing on each other's tails.
+    // 走兽 are small, and they stand clear of each other: a file that touches
+    // reads as a comb from any distance. The run they occupy is capped so a
+    // short 戗脊 does not end up with beasts standing on each other's tails.
+    var u = thick * 0.70;
+    var step = Math.min(u * 4.6, (len * 0.50) / (n + 1));
+    var start = Math.max(u * 2.2, len * 0.05);
+    var eave = new THREE.Vector3(c.x, c.y + thick * 0.5, c.z);
+    var apex = new THREE.Vector3(c.ax, c.ay + thick * 0.5, c.az);
+    var along = new THREE.Vector3().subVectors(apex, eave).normalize();
+    // face out along the ridge, away from the roof
+    var look = new THREE.Vector3().subVectors(eave, apex).setY(0).normalize();
+
+    for (var i = 0; i <= n; i++) {
+      var at = new THREE.Vector3().copy(eave)
+        .addScaledVector(along, start + i * step);
+      var b = new THREE.Group();
+      var lead = (i === 0);
+      var y0 = thick * 0.75;
+      if (lead) {
+        var mt = new THREE.Mesh(geo.mount, bm);
+        mt.position.y = y0 + u * 0.42;
+        b.add(mt);
+        y0 += u * 0.80;
+      } else {
+        var pl = new THREE.Mesh(geo.plinth, bm);
+        pl.position.y = y0 + u * 0.22;
+        b.add(pl);
+        y0 += u * 0.42;
+      }
+      var bd = new THREE.Mesh(geo.body, bm);
+      bd.position.y = y0 + u * 0.52;
+      b.add(bd);
+      var hd2 = new THREE.Mesh(geo.head, bm);
+      hd2.position.set(0, y0 + u * 1.42, u * 0.32);
+      b.add(hd2);
+      var er = new THREE.Mesh(geo.ear, bm);
+      er.position.set(0, y0 + u * 1.90, u * 0.08);
+      b.add(er);
+
+      b.userData.beast = true;
+      b.position.copy(at);
+      b.lookAt(at.x + look.x, at.y, at.z + look.z);
+      b.traverse(function(m){ if (m.isMesh) { m.castShadow = true; m.receiveShadow = true; } });
+      g.add(b);
+    }
   });
   return g;
 }
@@ -333,7 +439,7 @@ function buildRoof(P) {
       cps.push({ ax: s[0]*ridgeHalfLen, ay: apexY, az: 0,
                  x: s[0]*halfWidth, y: eaveY0 + P.upturn, z: s[1]*halfDepth });
     });
-    group.add(hipRidges(cps, apexY, trimMat, 0.1));
+    group.add(hipRidges(cps, apexY, trimMat, 0.1, P.beasts, P.beastMat || trimMat));
     group.add(buildEaveAssembly(halfWidth, halfDepth, function(x,z){
       var dz = Math.abs(z)/halfDepth;
       var dx = Math.max(0, Math.abs(x)-ridgeHalfLen)/Math.max(halfWidth-ridgeHalfLen,1e-6);
@@ -431,7 +537,7 @@ function buildRoof(P) {
     scps.push({ ax: s[0]*gableHW, ay: skirtTopY, az: s[1]*upHD,
                 x: s[0]*halfWidth, y: eaveY1 + P.upturn, z: s[1]*halfDepth });
   });
-  group.add(hipRidges(scps, skirtTopY, trimMat, 0.09));
+  group.add(hipRidges(scps, skirtTopY, trimMat, 0.09, P.beasts, P.beastMat || trimMat));
 
   // 垂脊 on the upper gabled roof, ridge end down to its own eave corners
   var upRidgeY = upBase + (ridgeY - skirtTopY);

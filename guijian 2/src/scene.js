@@ -32,7 +32,10 @@ renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 renderer.outputEncoding = THREE.sRGBEncoding;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure = 1.08;
+// 1.08 blew the sunlit face of the roof out to near-white, which is what made
+// the glaze read as neon rather than as fired clay. Sit the key light back and
+// let the tiles hold their own colour in the highlight.
+renderer.toneMappingExposure = 0.98;
 document.getElementById('wrap').appendChild(renderer.domElement);
 
 var controls = new THREE.OrbitControls(camera, renderer.domElement);
@@ -67,7 +70,7 @@ scene.environment = makeEnvMap();
 
 var hemi = new THREE.HemisphereLight(0xdfe3e6, 0x59493a, 0.55);
 scene.add(hemi);
-var sun = new THREE.DirectionalLight(0xfff4e6, 2.0);
+var sun = new THREE.DirectionalLight(0xfff4e6, 1.72);
 sun.position.set(9, 14, 7);
 sun.castShadow = true;
 sun.shadow.mapSize.set(2048, 2048);
@@ -114,11 +117,11 @@ scene.add(ground);
 //  originally authored; only material colours go through C().
 // ============================================================================
 var DAY_KEYS = [
-  { sun:'#ff9a52', si:1.20, hs:'#5f555f', hg:'#33291f', hi:0.36,
+  { sun:'#ffa869', si:1.10, hs:'#5f555f', hg:'#33291f', hi:0.40,
     sky:['#382c3c','#221a21','#131015'], fog:'#221a21' },
-  { sun:'#fff4e6', si:2.00, hs:'#dfe3e6', hg:'#59493a', hi:0.55,
+  { sun:'#fff4e6', si:1.72, hs:'#dfe3e6', hg:'#59493a', hi:0.58,
     sky:['#2a2f3a','#1b1d22','#131418'], fog:'#1b1d22' },
-  { sun:'#ff7f3a', si:1.05, hs:'#5e4b56', hg:'#31251f', hi:0.34,
+  { sun:'#ff8f52', si:0.98, hs:'#5e4b56', hg:'#31251f', hi:0.38,
     sky:['#3f2c33','#261a1e','#141012'], fog:'#261a1e' }
 ];
 
@@ -340,7 +343,10 @@ function initTextures() {
     var cols = 8, rows = 6, cw = w/cols, rh = h/rows;
     for (var x = 0; x < w; x++) {
       var ph = (x / cw) * Math.PI * 2;
-      var shade = 178 + 77 * Math.pow(0.5 + 0.5*Math.cos(ph), 0.55);
+      // the barrel's own shading, not a bleach: the old 178-255 ramp plus a
+      // strong dome highlight washed the crown of every tile to near-white, which
+      // is what drained the glaze colour out of the sunlit slope
+      var shade = 160 + 88 * Math.pow(0.5 + 0.5*Math.cos(ph), 0.55);
       ctx.fillStyle = 'rgb(' + [shade,shade,shade].join(',') + ')';
       ctx.fillRect(x, 0, 1, h);
     }
@@ -357,8 +363,8 @@ function initTextures() {
       for (var c2 = 0; c2 < cols; c2++) {
         var cx = c2*cw + cw/2, cy = y + rh*0.10, cr = cw*0.27;
         var dome = ctx.createRadialGradient(cx, cy - cr*0.35, cr*0.1, cx, cy, cr);
-        dome.addColorStop(0.0, 'rgba(255,255,255,0.42)');
-        dome.addColorStop(0.7, 'rgba(255,255,255,0.10)');
+        dome.addColorStop(0.0, 'rgba(255,255,255,0.22)');
+        dome.addColorStop(0.7, 'rgba(255,255,255,0.06)');
         dome.addColorStop(1.0, 'rgba(255,255,255,0.0)');
         ctx.fillStyle = dome;
         ctx.beginPath(); ctx.arc(cx, cy, cr, 0, Math.PI*2); ctx.fill();

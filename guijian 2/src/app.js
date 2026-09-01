@@ -81,7 +81,9 @@ function buildModel() {
   document.getElementById('sqOut').textContent = isSong ? (useShengqi?'on':'off') : 'Qing: n/a';
   document.getElementById('cjOut').textContent = useCejiao ? 'on' : 'off';
   document.getElementById('rlOut').textContent = val('railing') > 0.5 ? 'on' : 'off';
+  var nBeasts = val('beasts') > 0.5 ? beastCount(grade) : 0;
   document.getElementById('chOut').textContent = val('caihua') > 0.5 ? 'on' : 'off';
+  document.getElementById('jsOut').textContent = nBeasts ? nBeasts + '兽 + 仙人' : 'off';
 
   var cm = D.doukouCun * 3.2;
   // one cell per figure -- style.css lays these out as a two-column table, and
@@ -116,7 +118,9 @@ function buildModel() {
     mat.normalScale = new THREE.Vector2(nScale, nScale);
     return mat;
   }
-  var tileMat   = skin(new THREE.MeshStandardMaterial({ color:C(cRoof), roughness:0.42, metalness:0.12, envMapIntensity:0.28, side:THREE.DoubleSide }),
+  // 琉璃瓦 is glazed, so it stays the glossiest thing on the building -- but a
+  // 0.42 roughness on a saturated colour is what read as plastic, not ceramic
+  var tileMat   = skin(new THREE.MeshStandardMaterial({ color:C(cRoof), roughness:0.52, metalness:0.08, envMapIntensity:0.24, side:THREE.DoubleSide }),
                        TEX.tile, TEX.tileN, 6, 3, 1.0);
   // ridges and mouldings are 灰塑 lime render, not plastic: give them a tooth
   var trimMat   = skin(new THREE.MeshStandardMaterial({ color:C(cTrim), roughness:0.75, metalness:0.02, envMapIntensity:0.3 }),
@@ -214,7 +218,12 @@ function buildModel() {
     buildingGroup.add(buildBalustrade(base.userData.topHW - 0.07, base.userData.topHD - 0.07, baseH, railMat));
   if (val('caihua') > 0.5) {
     var beamH = D.colDia * scale * 0.8;
-    buildingGroup.add(buildCaihua(hw, hd, baseH + colH - beamH*0.7, beamH, beamMat, caihuaMat, goldMat, colR));
+    // 青 and 绿 are the two grounds the painting alternates between; the swatches
+    // name them 枋椽 and 彩画, which is where the user expects to change them
+    buildingGroup.add(buildCaihua(hw, hd, baseH + colH - beamH*0.7, beamH, {
+      qing: beamMat, lv: caihuaMat, gold: goldMat,
+      pale: paperMat, accent: wallMat
+    }, colR, document.getElementById('caihuaType').value));
   }
 
   // 踏跺 as wide as the 明间, its top tread flush with the platform edge
@@ -236,7 +245,10 @@ function buildModel() {
     shellThick: Math.max(0.05, D.purlinDia * scale * 0.5),
     tuishan: useTuishan, purlinDia: D.purlinDia * scale,
     rafterMat: rafterMat, eaveTrimMat: eaveTrimMat, capMat: capMat,
-    tileMat: tileMat, gableMat: wallMat, trimMat: trimMat
+    tileMat: tileMat, gableMat: wallMat, trimMat: trimMat,
+    // 走兽 are glazed ceramic in the roof's own glaze, not stone: they follow
+    // 瓦 rather than 脊檐, which is why a 黄琉璃 hall carries yellow beasts
+    beasts: nBeasts, beastMat: tileMat
   });
   roof.position.y = eaveY;
   buildingGroup.add(roof);
@@ -266,6 +278,9 @@ function applyPreset() {
               caihuaColor:'caihua', dgColor:'dg', wallColor:'wall', latticeColor:'lattice',
               baseColor:'base', railColor:'rail' };
   Object.keys(map).forEach(function(id){ document.getElementById(id).value = p[map[id]]; });
+  // the 彩画 grade travels with the scheme: 和玺 on an imperial hall, 旋子 on a
+  // temple, 苏式 in the garden courts. It is a rank, like the roof colour.
+  if (p.caihuaType) document.getElementById('caihuaType').value = p.caihuaType;
 }
 document.getElementById('preset').addEventListener('change', function(){
   applyPreset();
@@ -274,13 +289,13 @@ document.getElementById('preset').addEventListener('change', function(){
 
 ['buildingType','pagodaStyle','storeys','sides',
  'doukou','classType','period','bays','purlins','roofType','tuishan','tiles','shengqi','cejiao',
- 'railing','caihua','roofColor','trimColor','woodColor','beamColor','caihuaColor',
+ 'railing','caihua','caihuaType','beasts','roofColor','trimColor','woodColor','beamColor','caihuaColor',
  'dgColor','wallColor','latticeColor','baseColor','railColor'].forEach(function(id){
   document.getElementById(id).addEventListener('input', rebuild);
 });
 
 function exportOBJ(group) {
-  var lines = ['# Chinese architecture generator'];
+  var lines = ['# 古建模 Gujianmo — Chinese architecture generator'];
   var off = 1;
   group.updateMatrixWorld(true);
 
@@ -327,7 +342,7 @@ function exportOBJ(group) {
   var blob = new Blob([w.lines.join('\n')], {type:'text/plain'});
   var url = URL.createObjectURL(blob);
   var a = document.createElement('a');
-  a.href = url; a.download = 'guijian_model.obj'; a.click();
+  a.href = url; a.download = 'gujianmo_model.obj'; a.click();
   URL.revokeObjectURL(url);
 }
 
@@ -470,12 +485,12 @@ document.getElementById('imgBtn').addEventListener('click', function(){
   renderer.render(scene, camera);
   var url = renderer.domElement.toDataURL('image/jpeg', 0.92);
   var a = document.createElement('a');
-  a.href = url; a.download = 'guijian_' + Date.now() + '.jpg'; a.click();
+  a.href = url; a.download = 'gujianmo_' + Date.now() + '.jpg'; a.click();
 });
 
 // ---- design save / load (localStorage, like the reference tool) ----
 var CONTROL_IDS = ['buildingType','pagodaStyle','storeys','sides','doukou','classType','period',
-  'bays','purlins','roofType','tuishan','tiles','shengqi','cejiao','railing','caihua','preset',
+  'bays','purlins','roofType','tuishan','tiles','shengqi','cejiao','railing','caihua','caihuaType','beasts','preset',
   'daylight','shadows','groundOn',
   'cTiaoX','cTiaoY','cAoX','cAoY','cGaoY',
   'roofColor','trimColor','woodColor','beamColor','caihuaColor','dgColor','wallColor',
@@ -492,8 +507,18 @@ function applyDesign(d) {
   });
   rebuild();
 }
+// Designs saved before the rename still live under the old key, so read it
+// once and carry them over rather than silently losing someone's work.
+var SAVE_KEY = 'gujianmo_saves', OLD_SAVE_KEY = 'guijian_saves';
 function getSaves() {
-  try { return JSON.parse(localStorage.getItem('guijian_saves') || '{}'); }
+  try {
+    var raw = localStorage.getItem(SAVE_KEY);
+    if (raw === null) {
+      var old = localStorage.getItem(OLD_SAVE_KEY);
+      if (old !== null) { localStorage.setItem(SAVE_KEY, old); return JSON.parse(old); }
+    }
+    return JSON.parse(raw || '{}');
+  }
   catch(e) { return {}; }
 }
 document.getElementById('saveBtn').addEventListener('click', function(){
@@ -501,7 +526,7 @@ document.getElementById('saveBtn').addEventListener('click', function(){
   if (!name) return;
   var saves = getSaves();
   saves[name] = snapshotDesign();
-  try { localStorage.setItem('guijian_saves', JSON.stringify(saves)); alert('已保存 saved: ' + name); }
+  try { localStorage.setItem(SAVE_KEY, JSON.stringify(saves)); alert('已保存 saved: ' + name); }
   catch(e) { alert('保存失败 save failed'); }
 });
 document.getElementById('loadBtn').addEventListener('click', function(){
