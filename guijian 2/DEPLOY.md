@@ -29,6 +29,12 @@ happily keep running an old `src/*.js` after you edit it — a plain refresh doe
 always revalidate. If a change seems to have no effect, hard-refresh (⌘⇧R / Ctrl-F5).
 Deployed builds are unaffected: `vercel.json` sets `must-revalidate` on every path.
 
+## What the realism pass changed for deploying
+Nothing structural: still static, still no build step. Three.js r128 now also
+loads `examples/js/objects/Sky.js` from the same CDN. The textures are generated
+in the browser at load (about half a second), so there are no image files to
+ship.
+
 ## Notes
 - `index.html` + `src/` is the modular version, and the one to edit.
 - `standalone.html` is the single-file version — works by double-clicking, no

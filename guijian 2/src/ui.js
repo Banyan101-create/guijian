@@ -521,6 +521,7 @@
   // rebuild(): relighting must not regenerate 50k triangles per slider pixel.
   (function () {
     var day = $('daylight'), sh = $('shadows'), gd = $('groundOn');
+    var wx = $('weather'), env = $('envMode'), hq = $('hq');
     if (!day) return;
 
     // 05:00 to 19:00 across the slider, named by the traditional double-hours
@@ -540,35 +541,70 @@
       return (hh < 10 ? '0' : '') + hh + ':' + (mm < 10 ? '0' : '') + mm + ' ' + name;
     }
 
+    // relighting is cheap but rebuilding the environment map is not, so each
+    // piece is only touched when its own control actually changed
+    var last = { t: null, w: null };
     syncers.push(function () {
-      var t = (+day.value) / 100;
-      applyDaylight(t);
-      sun.castShadow = (+sh.value) > 0.5;
-      ground.visible = (+gd.value) > 0.5;
+      var t = (+day.value) / 100, w = wx.value;
+      if (t !== last.t || w !== last.w) { last.t = t; last.w = w; applyDaylight(t, w); }
+      var shOn = (+sh.value) > 0.5;
+      if (sun.castShadow !== shOn) { sun.castShadow = shOn; markShadowsDirty(); }
+      var gOn = (+gd.value) > 0.5;
+      if (SITE.visible !== gOn) { SITE.visible = gOn; siteGroup.visible = gOn; requestRender(); }
+      var hqOn = (+hq.value) > 0.5;
+      if (HQ.enabled !== hqOn) { HQ.enabled = hqOn; requestRender(); }
       $('dayOut').textContent = label(t);
-      $('shOut').textContent = sun.castShadow ? 'on' : 'off';
-      $('gdOut').textContent = ground.visible ? 'on' : 'off';
+      $('shOut').textContent = shOn ? 'on' : 'off';
+      $('gdOut').textContent = gOn ? 'on' : 'off';
+      $('hqOut').textContent = hqOn ? (HQ.ok ? 'on' : 'n/a') : 'off';
     });
 
-    [day, sh, gd].forEach(function (el) {
+    [day, sh, gd, wx, hq].forEach(function (el) {
       el.addEventListener('input', sync);
     });
+    // the setting changes what the site builds, so it goes through rebuild()
+    env.addEventListener('input', function () { SITE.mode = env.value; rebuild(); });
+    REBUILD_PRE.push(function () { SITE.mode = env.value; });
   })();
 
   /* --------------------------------------------------------- view toolbar */
   (function () {
     var bar = $('viewbar');
     if (!bar) return;
-    var VIEWS = { front: [0, 8], side: [90, 8], iso: [42, 20], top: [42, 74] };
+    var VIEWS = { front: [0, 6], side: [90, 6], back: [180, 9], iso: [36, 18], top: [36, 68] };
+
+    function stopSpin() { controls.autoRotate = false; spin.setAttribute('aria-pressed', 'false'); }
+    function leaveWalk() { if (WALK.active) { walkExit(); walk.setAttribute('aria-pressed', 'false'); } }
 
     $$('button[data-view]', bar).forEach(function (b) {
       b.addEventListener('click', function () {
-        var v = VIEWS[b.getAttribute('data-view')];
-        controls.autoRotate = false;
-        spin.setAttribute('aria-pressed', 'false');
-        viewPreset(v[0], v[1], 700);
+        var name = b.getAttribute('data-view');
+        stopSpin(); leaveWalk();
+        var I = MODEL_INFO;
+        if (name === 'eye') {
+          // standing in the court, a little off the axis, looking up at the eaves
+          var eye = 1.6 * I.M;
+          var z = I.frontZ + Math.max(I.top * 1.9, 14 * I.M);
+          flyTo(new THREE.Vector3(I.hw * 0.32, eye, z), new THREE.Vector3(0, I.top * 0.5, 0), 900);
+        } else if (name === 'detail') {
+          // the front corner: 翼角, 斗栱, 走兽 all in one frame
+          var tgt = new THREE.Vector3(I.hw * 0.97, (I.eaveY || I.top * 0.5) - 0.3 * I.M, I.hd * 0.97);
+          var k = Math.max(2.2, (I.eaveOut || 0.8) * 3.4);
+          flyTo(tgt.clone().add(new THREE.Vector3(k * 0.95, -k * 0.30, k * 1.15)), tgt, 900);
+        } else {
+          var v = VIEWS[name];
+          viewPreset(v[0], v[1], 750, frameRadius * (name === 'top' ? 1.05 : 0.95), FRAME_TARGET);
+        }
       });
     });
+
+    var walk = $('walkBtn');
+    walk.addEventListener('click', function () {
+      stopSpin();
+      if (WALK.active) { walkExit(); walk.setAttribute('aria-pressed', 'false'); }
+      else { walkEnter(); walk.setAttribute('aria-pressed', 'true'); }
+    });
+    window.onWalkChange = function (on) { walk.setAttribute('aria-pressed', on ? 'true' : 'false'); };
 
     $('fitBtn').addEventListener('click', function () { frameModel(600); });
 
@@ -587,8 +623,10 @@
     controls.autoRotateSpeed = 0.9;
     spin.addEventListener('click', function () {
       var on = spin.getAttribute('aria-pressed') !== 'true';
+      leaveWalk();
       controls.autoRotate = on;
       spin.setAttribute('aria-pressed', on ? 'true' : 'false');
+      requestRender();
     });
   })();
 
@@ -620,7 +658,7 @@
       pickRange('storeys'); pickRange('sides');
       pickRange('doukou', 3, 9);
       pickRange('bays'); pickRange('purlins');
-      pickRange('tiles', 16, 40);
+      pickRange('tileScale', 80, 130);
       pickSwitch('tuishan', 0.8); pickSwitch('shengqi', 0.6);
       pickSwitch('cejiao', 0.8);  pickSwitch('railing', 0.75);
       pickSwitch('caihua', 0.85); pickSwitch('beasts', 0.85);
@@ -696,10 +734,11 @@
   // app.js tags each derived figure with data-k; mirror the headline ones up
   // into the panel header so they read without opening the 数据 tab.
   (function () {
-    var w = $('specW'), h = $('specH'), t = $('specT');
+    var w = $('specW'), h = $('specH'), t = $('specT'), hl = $('specHL');
     var derived = $('derived'), stats = $('stats');
     if (!w) return;
     syncers.push(function () {
+      if (hl) hl.textContent = $('buildingType').value === 'pagoda' ? '塔高 height' : '柱高 height';
       var cw = derived.querySelector('[data-k="width"] b');
       var ch = derived.querySelector('[data-k="colH"] b');
       if (cw) w.textContent = cw.textContent;
@@ -755,6 +794,7 @@
       document.body.classList.add('entered');
       gate.classList.add('gone');
       introFlight();
+      requestRender();
       // sync() once the panel is uncovered: a segmented indicator can only be
       // measured for real when nothing is covering the pane it sits in
       setTimeout(function () { gate.remove(); sync(); }, 600);

@@ -92,7 +92,7 @@
       </div>
       <div class="spec">
         <div class="spec-i"><em>面阔 width</em><b id="specW">—</b></div>
-        <div class="spec-i"><em>柱高 height</em><b id="specH">—</b></div>
+        <div class="spec-i"><em id="specHL">柱高 height</em><b id="specH">—</b></div>
         <div class="spec-i"><em>面数 tris</em><b id="specT">—</b></div>
       </div>
     </header>
@@ -266,8 +266,8 @@
           <div class="sec"><b>屋面</b><span>roof surface</span></div>
 
           <div class="row" data-ctl="slider">
-            <div class="row-head"><span class="row-label">瓦垄 <em>tile ribs</em></span><span class="row-val" id="tOut"></span></div>
-            <input type="range" id="tiles" min="0" max="60" step="2" value="26">
+            <div class="row-head"><span class="row-label">瓦垄 <em>tile size</em></span><span class="row-val" id="tOut"></span></div>
+            <input type="range" id="tileScale" min="60" max="160" step="5" value="100">
           </div>
 
           <div class="sec hall-only"><b>做法细则</b><span>rules</span></div>
@@ -335,11 +335,11 @@
           <div class="sec"><b>自定</b><span>custom</span></div>
 
           <div class="swatches">
-            <label class="sw" title="瓦 tile"><input type="color" id="roofColor" value="#a8802c"><span class="sw-face"></span><span class="sw-txt"><em>瓦</em><i>tile</i></span></label>
-            <label class="sw" title="脊 / 檐口 ridge + eave trim"><input type="color" id="trimColor" value="#bcb5a1"><span class="sw-face"></span><span class="sw-txt"><em>脊檐</em><i>trim</i></span></label>
+            <label class="sw" title="瓦 tile"><input type="color" id="roofColor" value="#c28f2e"><span class="sw-face"></span><span class="sw-txt"><em>瓦</em><i>tile</i></span></label>
+            <label class="sw" title="脊 ridges, 吻兽 and eave tiles — the roof's own glaze on an official building"><input type="color" id="trimColor" value="#b9872b"><span class="sw-face"></span><span class="sw-txt"><em>脊</em><i>ridge</i></span></label>
             <label class="sw" title="柱 columns"><input type="color" id="woodColor" value="#8b2f26"><span class="sw-face"></span><span class="sw-txt"><em>柱</em><i>column</i></span></label>
-            <label class="sw" title="枋 / 椽 beams + rafters"><input type="color" id="beamColor" value="#1d4257"><span class="sw-face"></span><span class="sw-txt"><em>枋椽</em><i>beam</i></span></label>
-            <label class="sw" title="彩画 painted detail"><input type="color" id="caihuaColor" value="#256a72"><span class="sw-face"></span><span class="sw-txt"><em>彩画</em><i>caihua</i></span></label>
+            <label class="sw" title="枋 beams, 青 ground of the 彩画"><input type="color" id="beamColor" value="#1d4257"><span class="sw-face"></span><span class="sw-txt"><em>枋椽</em><i>beam</i></span></label>
+            <label class="sw" title="彩画 绿 ground, rafters (绿底)"><input type="color" id="caihuaColor" value="#256a72"><span class="sw-face"></span><span class="sw-txt"><em>彩画</em><i>caihua</i></span></label>
             <label class="sw" title="斗拱 brackets"><input type="color" id="dgColor" value="#23576a"><span class="sw-face"></span><span class="sw-txt"><em>斗拱</em><i>bracket</i></span></label>
             <label class="sw" title="墙 wall"><input type="color" id="wallColor" value="#9a3a29"><span class="sw-face"></span><span class="sw-txt"><em>墙</em><i>wall</i></span></label>
             <label class="sw" title="槅扇 lattice"><input type="color" id="latticeColor" value="#7c3020"><span class="sw-face"></span><span class="sw-txt"><em>槅扇</em><i>lattice</i></span></label>
@@ -354,10 +354,27 @@
 
           <div class="row" data-ctl="slider">
             <div class="row-head"><span class="row-label">日照 <em>time of day</em></span><span class="row-val" id="dayOut"></span></div>
-            <input type="range" id="daylight" min="0" max="100" step="1" value="50">
+            <input type="range" id="daylight" min="0" max="100" step="1" value="66">
+          </div>
+
+          <div class="row" data-ctl="seg">
+            <div class="row-head"><span class="row-label">天气 <em>weather</em></span></div>
+            <select id="weather">
+              <option value="clear">晴 clear</option>
+              <option value="hazy">霾 hazy</option>
+              <option value="overcast">阴 overcast</option>
+            </select>
           </div>
 
           <div class="sec"><b>场景</b><span>scene</span></div>
+
+          <div class="row" data-ctl="seg">
+            <div class="row-head"><span class="row-label">环境 <em>setting</em></span></div>
+            <select id="envMode">
+              <option value="court">宫院 courtyard</option>
+              <option value="open">旷野 open</option>
+            </select>
+          </div>
 
           <div class="row row-switch" data-ctl="switch">
             <span class="row-label">阴影 <em>shadows</em></span>
@@ -371,7 +388,13 @@
             <input type="range" id="groundOn" min="0" max="1" step="1" value="1">
           </div>
 
-          <p class="note">The raking light at 卯时 and 酉时 reads the 举架 roof curve and the eave upturn best; 午时 flattens them.</p>
+          <div class="row row-switch" data-ctl="switch">
+            <span class="row-label">精细 <em>ambient occlusion</em></span>
+            <span class="row-val" id="hqOut"></span>
+            <input type="range" id="hq" min="0" max="1" step="1" value="1">
+          </div>
+
+          <p class="note">The sun follows its real path over Beijing at the equinox: up due east at 06:00, fifty degrees high at noon, down due west at 18:00. Raking light at 卯时 and 酉时 reads the 举架 curve and the corner sweep best; 午时 flattens them. 精细 adds contact shadow to every still frame once the camera stops moving.</p>
         </section>
 
         <!-- ================================================== 数据 data -->
@@ -418,30 +441,41 @@
     <span class="vb-label">视角</span>
     <button type="button" data-view="front" title="正立面 front elevation">正</button>
     <button type="button" data-view="side"  title="侧立面 side elevation">侧</button>
+    <button type="button" data-view="back"  title="背立面 rear">背</button>
     <button type="button" data-view="iso"   title="斜视 three-quarter">斜</button>
-    <button type="button" data-view="top"   title="俯视 plan">顶</button>
+    <button type="button" data-view="top"   title="俯视 bird's-eye">顶</button>
+    <i></i>
+    <button type="button" data-view="eye"    title="人视 standing in the courtyard">人</button>
+    <button type="button" data-view="detail" title="近观 corner eave close-up">近</button>
     <button type="button" id="fitBtn" title="全景 fit to model">全</button>
     <i></i>
+    <button type="button" id="walkBtn" title="漫游 walk (WASD / arrows, drag to look, Esc to leave)" aria-pressed="false">游</button>
     <button type="button" id="spinBtn" title="转台 turntable" aria-pressed="false">
       <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M13.5 8a5.5 5.5 0 1 1-1.9-4.16"/><path d="M13.6 1.6v2.9h-2.9"/></svg>
     </button>
   </div>
 
   <div id="hint">
-    <span><b>drag</b> rotate</span><i></i><span><b>scroll</b> zoom</span><i></i><span><b>right-drag</b> pan</span>
+    <span><b>drag</b> rotate</span><i></i><span><b>scroll</b> zoom</span><i></i><span><b>right-drag</b> pan</span><i></i><span><b>double-click</b> focus</span>
   </div>
   <div id="stats"></div>
+  <div id="walkHint"><span><b>WASD</b> 行走 walk</span><span><b>drag</b> 环顾 look</span><span><b>shift</b> 快 faster</span><span><b>Esc</b> 退出 leave</span></div>
 
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/objects/Sky.js"></script>
+<script src="src/textures.js"></script>
 <script src="src/scene.js"></script>
+<script src="src/geom.js"></script>
+<script src="src/render.js"></script>
 <script src="src/constants.js"></script>
 <script src="src/roof.js"></script>
 <script src="src/pagoda.js"></script>
 <script src="src/hall.js"></script>
 <script src="src/palette.js"></script>
+<script src="src/site.js"></script>
 <script src="src/app.js"></script>
 <script src="src/ui.js"></script>
 </body>

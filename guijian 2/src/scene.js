@@ -1,170 +1,329 @@
+// ============================================================================
+//  SCENE — renderer, sky, sun, environment light, camera
+//
+//  The light is the thing that decides whether a model reads as a building or
+//  as a toy, so it is modelled rather than painted:
+//
+//  * Sky       — Preetham analytic daylight (three's Sky), driven by the real
+//                sun position for Beijing's latitude, not a gradient.
+//  * Ambient   — the same sky, rendered into a PMREM environment map, so every
+//                surface is lit and reflects the actual sky above it. A ground
+//                disc in that environment returns bounce light from below at
+//                the paving's albedo, which is what keeps the underside of a
+//                deep eave dark instead of glowing with horizon blue.
+//  * Haze      — fog whose colour is read back from the rendered horizon, so
+//                the ground meets the sky with no seam.
+//  * Shadows   — one sun, its frustum fitted to the building on every rebuild
+//                and never re-rendered just because the camera moved.
+// ============================================================================
+
+var IS_TOUCH = window.matchMedia && window.matchMedia('(pointer: coarse)').matches;
 
 var scene = new THREE.Scene();
 
-// Sky, sun and fog are all repainted by applyDaylight() below, so the canvas
-// and its texture are kept around rather than built once and thrown away.
-var skyCanvas = document.createElement('canvas');
-skyCanvas.width = 2; skyCanvas.height = 256;
-var skyTex = new THREE.CanvasTexture(skyCanvas);
-skyTex.encoding = THREE.sRGBEncoding;
-scene.background = skyTex;
-
-function paintSky(top, mid, bot) {
-  var ctx = skyCanvas.getContext('2d');
-  var g = ctx.createLinearGradient(0, 0, 0, 256);
-  g.addColorStop(0.0, top);
-  g.addColorStop(0.5, mid);
-  g.addColorStop(1.0, bot);
-  ctx.fillStyle = g;
-  ctx.fillRect(0, 0, 2, 256);
-  skyTex.needsUpdate = true;
-}
-paintSky('#2a2f3a', '#1b1d22', '#131418');
-scene.fog = new THREE.Fog(0x1b1d22, 45, 100);
-
-var camera = new THREE.PerspectiveCamera(42, window.innerWidth/window.innerHeight, 0.1, 200);
+var camera = new THREE.PerspectiveCamera(40, window.innerWidth / window.innerHeight, 0.05, 9000);
 camera.position.set(12, 8, 13);
 
-var renderer = new THREE.WebGLRenderer({ antialias:true, preserveDrawingBuffer:true });
+var renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
 renderer.setSize(window.innerWidth, window.innerHeight);
-renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+// The shadow map depends on the sun and the geometry, never on the camera, so
+// it is only redrawn when one of those changes (see markShadowsDirty).
+renderer.shadowMap.autoUpdate = false;
 renderer.outputEncoding = THREE.sRGBEncoding;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
-// 1.08 blew the sunlit face of the roof out to near-white, which is what made
-// the glaze read as neon rather than as fired clay. Sit the key light back and
-// let the tiles hold their own colour in the highlight.
-renderer.toneMappingExposure = 0.98;
+renderer.toneMappingExposure = 0.62;
 document.getElementById('wrap').appendChild(renderer.domElement);
 
 var controls = new THREE.OrbitControls(camera, renderer.domElement);
 controls.target.set(0, 2.2, 0);
 controls.enableDamping = true;
-controls.dampingFactor = 0.07;
-controls.minDistance = 3.5;
-controls.maxDistance = 130;
-controls.maxPolarAngle = Math.PI * 0.495;
+controls.dampingFactor = 0.08;
+controls.rotateSpeed = 0.75;
+controls.zoomSpeed = 1.1;
+controls.minDistance = 0.8;
+controls.maxDistance = 320;
+// Below the horizon is allowed -- standing in the courtyard looking up at the
+// eaves is the view a visitor actually has. The ground clamp in render.js is
+// what keeps the camera out of the paving.
+controls.maxPolarAngle = Math.PI * 0.66;
 
-// procedural sky-ish environment for PBR reflections
-function makeEnvMap() {
-  var c = document.createElement('canvas');
-  c.width = 512; c.height = 256;
-  var ctx = c.getContext('2d');
-  var g = ctx.createLinearGradient(0, 0, 0, 256);
-  g.addColorStop(0.0, '#c2c9d0');
-  g.addColorStop(0.45, '#e2e0da');
-  g.addColorStop(0.55, '#8e8a80');
-  g.addColorStop(1.0, '#3b3a36');
-  ctx.fillStyle = g;
-  ctx.fillRect(0, 0, 512, 256);
-  var tex = new THREE.CanvasTexture(c);
-  tex.mapping = THREE.EquirectangularReflectionMapping;
-  var pmrem = new THREE.PMREMGenerator(renderer);
-  pmrem.compileEquirectangularShader();
-  var env = pmrem.fromEquirectangular(tex).texture;
-  pmrem.dispose(); tex.dispose();
-  return env;
-}
-scene.environment = makeEnvMap();
+var buildingGroup = new THREE.Group();     // exported: the building only
+scene.add(buildingGroup);
+var siteGroup = new THREE.Group();         // never exported: courtyard, walls, ground
+scene.add(siteGroup);
 
-var hemi = new THREE.HemisphereLight(0xdfe3e6, 0x59493a, 0.55);
-scene.add(hemi);
-var sun = new THREE.DirectionalLight(0xfff4e6, 1.72);
-sun.position.set(9, 14, 7);
+// Hex colours are sRGB. With outputEncoding = sRGB the renderer converts
+// linear -> sRGB on output, so feeding sRGB in unconverted brightens everything
+// twice -- deep red renders as salmon. Convert on the way in.
+function C(hex) { return new THREE.Color(hex).convertSRGBToLinear(); }
+
+// ---------------------------------------------------------------------------
+//  render requests: render.js owns the loop; anything that changes the image
+//  calls requestRender(), anything that changes the sun or the geometry also
+//  calls markShadowsDirty().
+// ---------------------------------------------------------------------------
+var RENDER_STATE = { dirty: true, shadowsDirty: true, hqDone: false, lastMotion: 0 };
+function requestRender() { RENDER_STATE.dirty = true; RENDER_STATE.hqDone = false; }
+function markShadowsDirty() { RENDER_STATE.shadowsDirty = true; requestRender(); }
+
+// ============================================================================
+//  SKY + SUN
+// ============================================================================
+var sky = new THREE.Sky();
+sky.scale.setScalar(8000);   // the hills at 2600 must sit inside the sky box
+scene.add(sky);
+
+var sun = new THREE.DirectionalLight(0xffffff, 3.0);
 sun.castShadow = true;
-sun.shadow.mapSize.set(2048, 2048);
-sun.shadow.camera.left = -16; sun.shadow.camera.right = 16;
-sun.shadow.camera.top = 16; sun.shadow.camera.bottom = -16;
-sun.shadow.camera.far = 50;
-sun.shadow.bias = -0.0009;
+var SHADOW_SIZE = IS_TOUCH ? 2048 : 4096;
+SHADOW_SIZE = Math.min(SHADOW_SIZE, renderer.capabilities.maxTextureSize || 4096);
+sun.shadow.mapSize.set(SHADOW_SIZE, SHADOW_SIZE);
+sun.shadow.bias = -0.0004;
+sun.shadow.normalBias = 0.012;
+sun.shadow.radius = 2;
 scene.add(sun);
-var rim = new THREE.DirectionalLight(0xa8b4c4, 0.16);
-rim.position.set(-9, 5, -8);
-scene.add(rim);
+scene.add(sun.target);
 
-// A flat plane to the horizon reads as grey nothing. A radial falloff pools
-// light under the building and lets the edges fall away into the fog, so the
-// model sits in a place instead of floating on a slab.
-var groundTex = (function () {
-  var c = document.createElement('canvas');
-  c.width = c.height = 512;
-  var ctx = c.getContext('2d');
-  var g = ctx.createRadialGradient(256, 256, 24, 256, 256, 252);
-  g.addColorStop(0.00, '#c6c1b4');
-  g.addColorStop(0.28, '#8b877e');
-  g.addColorStop(0.60, '#43413c');
-  g.addColorStop(1.00, '#101010');
-  ctx.fillStyle = g;
-  ctx.fillRect(0, 0, 512, 512);
-  var t = new THREE.CanvasTexture(c);
-  t.wrapS = t.wrapT = THREE.ClampToEdgeWrapping;
-  t.encoding = THREE.sRGBEncoding;
-  return t;
+// a faint hemisphere fill only to stop pure-black on back faces if the
+// environment map is ever unavailable; the PMREM sky does the real work
+var hemi = new THREE.HemisphereLight(0xdfe7f0, 0x5a5048, 0.08);
+scene.add(hemi);
+
+// Linear haze, scaled to the building: nothing on the model or in its court is
+// touched, and the open ground beyond fades to the horizon over a broad band.
+// (Exponential fog crushes that whole transition into a few pixels just under
+// the horizon, which reads as a hard edge to the world.)
+scene.fog = new THREE.Fog(0xc9d3dc, 80, 600);
+var FOG_SCALE = 20;
+
+// The environment: a second Sky inside a 50-unit box, a ground disc under it,
+// and a black occluder over the sun disc (the directional light already draws
+// the sun; leaving it in the env map would light everything twice).
+var envScene = new THREE.Scene();
+var envSky = new THREE.Sky();
+envSky.scale.setScalar(50);
+envScene.add(envSky);
+var envGround = new THREE.Mesh(new THREE.CircleGeometry(80, 48),
+  new THREE.MeshBasicMaterial({ color: 0x404040, toneMapped: false }));
+envGround.rotation.x = -Math.PI / 2;
+envGround.position.y = -0.6;
+envScene.add(envGround);
+var envSunMask = new THREE.Mesh(new THREE.CircleGeometry(0.9, 24),
+  new THREE.MeshBasicMaterial({ color: 0x000000, toneMapped: false, side: THREE.DoubleSide }));
+envScene.add(envSunMask);
+
+var pmrem = new THREE.PMREMGenerator(renderer);
+var envRT = null;
+
+var WEATHER = {
+  clear:    { turbidity: 3.2, rayleigh: 1.25, mie: 0.0035, g: 0.80, sun: 1.00, fog: [2.6, 16], hills: 0.30, bounce: 1.0, ev: 1.0 },
+  hazy:     { turbidity: 8.5, rayleigh: 2.2,  mie: 0.0085, g: 0.85, sun: 0.78, fog: [1.8, 9],  hills: 0.14, bounce: 0.9, ev: 1.08 },
+  overcast: { turbidity: 16,  rayleigh: 3.6,  mie: 0.025,  g: 0.70, sun: 0.16, fog: [1.4, 7],  hills: 0.06, bounce: 0.7, ev: 1.3 }
+};
+var LIGHT = { t: 0.66, weather: 'clear', dir: new THREE.Vector3(0, 1, 0), elev: 45 };
+
+// sun path for a building at Beijing's latitude (39.9 N) facing south (+z),
+// at the equinox: sunrise due east at 06:00, 50 degrees at noon, due west at
+// 18:00. The slider runs 05:00 -> 19:00, so both ends sit in twilight.
+function sunDirection(t, out) {
+  var hour = 5 + t * 14;
+  var H = (hour - 12) * 15 * Math.PI / 180;            // hour angle
+  var phi = 39.9 * Math.PI / 180;
+  var sinEl = Math.cos(phi) * Math.cos(H);
+  var el = Math.asin(Math.max(-1, Math.min(1, sinEl)));
+  var A = Math.atan2(Math.sin(H), Math.sin(phi) * Math.cos(H)); // from south, + west
+  // a sun two degrees under the horizon still lights the sky; keep a floor so
+  // the directional light never flips beneath the ground
+  var elC = Math.max(el, -0.02);
+  out.set(-Math.sin(A) * Math.cos(elC), Math.sin(elC), Math.cos(A) * Math.cos(elC)).normalize();
+  return el * 180 / Math.PI;
+}
+
+// warm, dim, and low near the horizon (air mass), white and strong overhead
+function sunColourIntensity(elDeg, colour) {
+  var k = Math.max(0, Math.min(1, (elDeg + 1) / 6));         // fades in over the first few degrees
+  var warm = Math.max(0, Math.min(1, (elDeg - 1) / 28));
+  colour.setRGB(1.0, 0.56 + 0.40 * warm, 0.30 + 0.62 * warm);
+  return 3.1 * k * (0.45 + 0.55 * Math.pow(Math.max(0, Math.min(1, elDeg / 40)), 0.6));
+}
+
+var _fogRT = null, _fogCam = null, _fogScene = null, _fogSky = null;
+// Read the sky's actual colour just above the horizon in four directions and
+// average them. The fog is mixed in after tone mapping and encoding in r128,
+// so the readback is taken through an sRGB target and used as-is.
+function sampleHorizon() {
+  try {
+    if (!_fogRT) {
+      _fogRT = new THREE.WebGLRenderTarget(16, 16);
+      _fogRT.texture.encoding = THREE.sRGBEncoding;
+      _fogCam = new THREE.PerspectiveCamera(20, 1, 0.1, 100);
+      _fogScene = new THREE.Scene();
+      _fogSky = new THREE.Sky();
+      _fogSky.scale.setScalar(50);
+      _fogScene.add(_fogSky);
+    }
+    copySkyUniforms(_fogSky);
+    var buf = new Uint8Array(16 * 16 * 4), acc = [0, 0, 0], n = 0;
+    var prev = renderer.getRenderTarget();
+    for (var k = 0; k < 4; k++) {
+      var a = k * Math.PI / 2 + 0.4;
+      _fogCam.position.set(0, 0, 0);
+      _fogCam.lookAt(Math.sin(a), 0.035, Math.cos(a));
+      renderer.setRenderTarget(_fogRT);
+      renderer.render(_fogScene, _fogCam);
+      renderer.readRenderTargetPixels(_fogRT, 0, 0, 16, 16, buf);
+      for (var i = 0; i < buf.length; i += 4) { acc[0] += buf[i]; acc[1] += buf[i + 1]; acc[2] += buf[i + 2]; n++; }
+    }
+    renderer.setRenderTarget(prev);
+    scene.fog.color.setRGB(acc[0] / n / 255, acc[1] / n / 255, acc[2] / n / 255);
+  } catch (e) { /* keep the previous fog colour */ }
+}
+
+function copySkyUniforms(s) {
+  var src = sky.material.uniforms, dst = s.material.uniforms;
+  ['turbidity', 'rayleigh', 'mieCoefficient', 'mieDirectionalG'].forEach(function (k) {
+    dst[k].value = src[k].value;
+  });
+  dst.sunPosition.value.copy(src.sunPosition.value);
+  dst.up.value.set(0, 1, 0);
+}
+
+// paving albedo the bounce light is taken from; site.js sets it from the
+// courtyard material so a pale marble court lights the eaves more than earth
+var BOUNCE_ALBEDO = new THREE.Color(0.26, 0.25, 0.23);
+
+var _envTimer = 0;
+function rebuildEnvironment() {
+  var w = WEATHER[LIGHT.weather];
+  copySkyUniforms(envSky);
+  envSunMask.position.copy(LIGHT.dir).multiplyScalar(24);
+  envSunMask.lookAt(0, 0, 0);
+  // ground radiance ~ albedo x (direct + sky) irradiance, in the same legacy
+  // units the materials use (outgoing = albedo * I * NdotL)
+  var direct = sun.intensity * Math.max(0, LIGHT.dir.y);
+  var skyAmb = 0.55 * w.bounce;
+  envGround.material.color.copy(BOUNCE_ALBEDO).multiplyScalar(direct * 0.55 + skyAmb)
+    .multiply(new THREE.Color(1, 0.97, 0.92));
+  var next = pmrem.fromScene(envScene, 0, 0.1, 200);
+  if (envRT) envRT.dispose();
+  envRT = next;
+  scene.environment = envRT.texture;
+  requestRender();
+}
+
+function applySky() {
+  var w = WEATHER[LIGHT.weather] || WEATHER.clear;
+  var u = sky.material.uniforms;
+  u.turbidity.value = w.turbidity;
+  u.rayleigh.value = w.rayleigh;
+  u.mieCoefficient.value = w.mie;
+  u.mieDirectionalG.value = w.g;
+  u.sunPosition.value.copy(LIGHT.dir).multiplyScalar(1000);
+  u.up.value.set(0, 1, 0);
+  scene.fog.near = w.fog[0] * FOG_SCALE;
+  scene.fog.far = w.fog[1] * FOG_SCALE;
+}
+
+function setFogScale(r) {
+  FOG_SCALE = Math.max(8, r);
+  applySky();
+  requestRender();
+}
+
+// ---------------------------------------------------------------------------
+//  远山 distant hills: a ring of low ridgelines far beyond the court, coloured
+//  by hand as aerial perspective -- the horizon colour with a little of the
+//  hills' own blue-grey left in it. Unfogged, so the haze can't erase them.
+// ---------------------------------------------------------------------------
+var hills = (function () {
+  var N = 360, R = 2600, pos = [], idx = [];
+  var f = new TEXGEN.Fbm(4242, 8, 5);
+  for (var i = 0; i <= N; i++) {
+    var a = i / N * Math.PI * 2;
+    var u = i / N;
+    // higher to the north and west, as round Beijing; low and broken to the south-east
+    var dir = 0.55 + 0.45 * Math.max(0, -Math.cos(a - Math.PI * 0.15));
+    var hgt = (40 + 260 * Math.pow(f.at(u, 0.3), 1.6) * dir) * (0.6 + 0.4 * f.at(u * 3, 0.7));
+    var x = Math.sin(a) * R, z = Math.cos(a) * R;
+    pos.push(x, -20, z, x, hgt, z);
+    if (i < N) { var k = i * 2; idx.push(k, k + 1, k + 2, k + 1, k + 3, k + 2); }
+  }
+  var g = new THREE.BufferGeometry();
+  g.setIndex(idx);
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  var m = new THREE.Mesh(g, new THREE.MeshBasicMaterial({ color: 0x8090a0, fog: false, toneMapped: false, side: THREE.DoubleSide }));
+  m.frustumCulled = false;
+  scene.add(m);
+  return m;
 })();
-
-var ground = new THREE.Mesh(
-  new THREE.PlaneGeometry(120, 120),
-  new THREE.MeshStandardMaterial({ color:C('#4a4740'), roughness:0.97, metalness:0, map:groundTex })
-);
-ground.rotation.x = -Math.PI/2;
-ground.receiveShadow = true;
-scene.add(ground);
-
-// ============================================================================
-//  时辰 DAYLIGHT — three keyframes (dawn, noon, dusk) lerped across a 0..1
-//  slider. Light colours stay in sRGB here to match how the lights were
-//  originally authored; only material colours go through C().
-// ============================================================================
-var DAY_KEYS = [
-  { sun:'#ffa869', si:1.10, hs:'#5f555f', hg:'#33291f', hi:0.40,
-    sky:['#382c3c','#221a21','#131015'], fog:'#221a21' },
-  { sun:'#fff4e6', si:1.72, hs:'#dfe3e6', hg:'#59493a', hi:0.58,
-    sky:['#2a2f3a','#1b1d22','#131418'], fog:'#1b1d22' },
-  { sun:'#ff8f52', si:0.98, hs:'#5e4b56', hg:'#31251f', hi:0.38,
-    sky:['#3f2c33','#261a1e','#141012'], fog:'#261a1e' }
-];
-
-var _mixA = new THREE.Color(), _mixB = new THREE.Color();
-function mixHex(a, b, k) {
-  _mixA.set(a); _mixB.set(b);
-  return '#' + _mixA.lerp(_mixB, k).getHexString();
+function tintHills() {
+  var w = WEATHER[LIGHT.weather] || WEATHER.clear;
+  var fogC = scene.fog.color.clone();             // display-space, like the fog
+  var shade = new THREE.Color(0.30, 0.36, 0.44).lerp(fogC, 0.35);
+  var dayK = Math.max(0.15, Math.min(1, (LIGHT.elev + 4) / 20));
+  var c = fogC.clone().lerp(shade.multiplyScalar(dayK), w.hills);
+  // toneMapped off, so convert: the encoder will turn this back into exactly c
+  hills.material.color.copy(c).convertSRGBToLinear();
 }
 
-var lastDaylight = -1;
-function applyDaylight(t) {
-  t = Math.max(0, Math.min(1, t));
-  if (Math.abs(t - lastDaylight) < 0.0005) return;   // slider settled, nothing to repaint
-  lastDaylight = t;
+// Called on every slider tick: the cheap parts now, the PMREM + horizon
+// readback at most every 90 ms and once more when the slider settles.
+function applyDaylight(t, weather) {
+  if (t !== undefined && t !== null) LIGHT.t = Math.max(0, Math.min(1, t));
+  if (weather && WEATHER[weather]) LIGHT.weather = weather;
+  var w = WEATHER[LIGHT.weather];
+  LIGHT.elev = sunDirection(LIGHT.t, LIGHT.dir);
+  sun.intensity = sunColourIntensity(LIGHT.elev, sun.color) * w.sun;
+  if (LIGHT.weather === 'overcast') sun.color.lerp(new THREE.Color(0.9, 0.93, 1.0), 0.6);
+  hemi.intensity = 0.08;
+  // a camera opens up at golden hour: lift exposure as the sun drops so dawn
+  // and dusk read as warm light rather than as night
+  var low = Math.max(0, Math.min(1, (22 - LIGHT.elev) / 24));
+  renderer.toneMappingExposure = 0.62 * w.ev * (1 + 1.5 * low * low);
+  applySky();
+  placeSun();
+  markShadowsDirty();
+  clearTimeout(_envTimer);
+  var now = performance.now();
+  if (!applyDaylight._last || now - applyDaylight._last > 90) {
+    applyDaylight._last = now;
+    rebuildEnvironment(); sampleHorizon(); tintHills();
+  }
+  _envTimer = setTimeout(function () { rebuildEnvironment(); sampleHorizon(); tintHills(); requestRender(); }, 120);
+}
 
-  var lo = t < 0.5 ? DAY_KEYS[0] : DAY_KEYS[1];
-  var hi = t < 0.5 ? DAY_KEYS[1] : DAY_KEYS[2];
-  var f  = t < 0.5 ? t / 0.5 : (t - 0.5) / 0.5;
-
-  sun.color.set(mixHex(lo.sun, hi.sun, f));
-  sun.intensity = lo.si + (hi.si - lo.si) * f;
-  hemi.color.set(mixHex(lo.hs, hi.hs, f));
-  hemi.groundColor.set(mixHex(lo.hg, hi.hg, f));
-  hemi.intensity = lo.hi + (hi.hi - lo.hi) * f;
-
-  // the sun arcs east to west, grazing at both ends -- 8 degrees up at 卯时
-  // and 酉时, 55 at noon, which is what throws the long eave shadows
-  var el = (8 + Math.sin(t * Math.PI) * 47) * Math.PI / 180;
-  var az = (18 + t * 96) * Math.PI / 180;
-  var r  = 18;
-  sun.position.set(r * Math.cos(el) * Math.sin(az),
-                   r * Math.sin(el),
-                   r * Math.cos(el) * Math.cos(az));
-
-  paintSky(mixHex(lo.sky[0], hi.sky[0], f),
-           mixHex(lo.sky[1], hi.sky[1], f),
-           mixHex(lo.sky[2], hi.sky[2], f));
-  scene.fog.color.set(mixHex(lo.fog, hi.fog, f));
+// ---------------------------------------------------------------------------
+//  shadow frustum: fitted to the building's bounding sphere, so a 13-storey
+//  pagoda and a three-bay hall both get the whole map
+// ---------------------------------------------------------------------------
+var SHADOW_FIT = { center: new THREE.Vector3(0, 2, 0), radius: 10 };
+function fitShadowTo(center, radius) {
+  SHADOW_FIT.center.copy(center);
+  SHADOW_FIT.radius = radius;
+  placeSun();
+  markShadowsDirty();
+}
+function placeSun() {
+  var c = SHADOW_FIT.center, r = SHADOW_FIT.radius;
+  sun.target.position.copy(c);
+  sun.position.copy(c).addScaledVector(LIGHT.dir, r * 3);
+  var sc = sun.shadow.camera;
+  sc.left = -r; sc.right = r; sc.top = r; sc.bottom = -r;
+  sc.near = r * 0.5; sc.far = r * 5.5;
+  sc.updateProjectionMatrix();
+  // texel size in world units decides how much bias a curved roof needs
+  var texel = (2 * r) / SHADOW_SIZE;
+  sun.shadow.normalBias = texel * 1.6;
+  sun.shadow.bias = -0.00025;
+  sun.target.updateMatrixWorld();
 }
 
 // ============================================================================
-//  CAMERA FLIGHT — view presets and the entry sweep. Driven from the animate
-//  loop; any drag on the canvas cancels it so the user always wins.
+//  CAMERA FLIGHT — view presets and the entry sweep. Driven from the render
+//  loop; any pointer or wheel on the canvas cancels it so the user always wins.
 // ============================================================================
 var camFlight = null;
 
@@ -172,16 +331,14 @@ var camFlight = null;
 // it. Derived from the real dimensions rather than a Box3, because the tile and
 // rafter runs are InstancedMesh and r128's Box3 ignores per-instance matrices.
 var frameRadius = 20;
+var MODEL_INFO = { type: 'hall', hw: 4.5, hd: 2.8, baseH: 0.34, eaveY: 2.4, top: 5, M: 0.25, frontZ: 4 };
+
 function fitFor(width, height) {
-  // 1.25 / 1.35 rather than a bare 0.5 half-extent: the orbit target sits below
-  // the model's centre and the camera looks in at an angle, so a distance that
-  // merely fills the frame puts you inside the eaves.
   var t = Math.tan(camera.fov * Math.PI / 360);
-  var byHeight = (height * 1.35) / t;
-  var byWidth  = (width  * 1.25) / (t * camera.aspect);
-  frameRadius = Math.max(byHeight, byWidth);
-  frameRadius = Math.min(Math.max(frameRadius, controls.minDistance * 1.5),
-                         controls.maxDistance * 0.95);
+  var byHeight = (height * 1.25) / t;
+  var byWidth  = (width  * 1.15) / (t * camera.aspect);
+  frameRadius = Math.max(byHeight, byWidth) * 0.92;
+  frameRadius = Math.min(Math.max(frameRadius, controls.minDistance * 2), controls.maxDistance * 0.8);
   return frameRadius;
 }
 
@@ -191,22 +348,24 @@ function flyTo(pos, target, ms) {
     p0: camera.position.clone(), p1: pos.clone(),
     t0: controls.target.clone(), t1: target.clone()
   };
+  requestRender();
 }
 
 function updateCameraFlight() {
-  if (!camFlight) return;
+  if (!camFlight) return false;
   var k = (performance.now() - camFlight.start) / camFlight.ms;
   if (k >= 1) k = 1;
-  var e = 1 - Math.pow(1 - k, 3);                    // easeOutCubic
+  var e = k < 0.5 ? 4 * k * k * k : 1 - Math.pow(-2 * k + 2, 3) / 2;   // easeInOutCubic
   camera.position.lerpVectors(camFlight.p0, camFlight.p1, e);
   controls.target.lerpVectors(camFlight.t0, camFlight.t1, e);
   if (k === 1) camFlight = null;
+  return true;
 }
 
-// azimuth/elevation in degrees, orbiting whatever rebuild() last framed
-function viewPreset(azDeg, elDeg, ms, radius) {
-  var t = controls.target;
-  var r = radius || Math.max(4, camera.position.distanceTo(t));
+// azimuth/elevation in degrees about a target (default: the current one)
+function viewPreset(azDeg, elDeg, ms, radius, target) {
+  var t = target || controls.target;
+  var r = radius || Math.max(4, camera.position.distanceTo(controls.target));
   var el = elDeg * Math.PI / 180, az = azDeg * Math.PI / 180;
   flyTo(new THREE.Vector3(
     t.x + r * Math.cos(el) * Math.sin(az),
@@ -215,6 +374,7 @@ function viewPreset(azDeg, elDeg, ms, radius) {
   ), t.clone(), ms);
 }
 
+var FRAME_TARGET = new THREE.Vector3(0, 2, 0);
 // re-frame the current model without changing which way the camera looks
 function frameModel(ms) {
   var t = controls.target, p = camera.position;
@@ -222,98 +382,94 @@ function frameModel(ms) {
   var r = Math.hypot(dx, dy, dz) || 1;
   var az = Math.atan2(dx, dz) * 180 / Math.PI;
   var el = Math.asin(dy / r) * 180 / Math.PI;
-  // rebuild() may have just raised the orbit target (a pagoda sits far higher
-  // than a hall), which reads as a below-ground elevation against the camera's
-  // old position. Clamp to something you can actually stand at.
-  el = Math.max(6, Math.min(80, el));
-  viewPreset(az, el, ms || 600, frameRadius);
+  el = Math.max(8, Math.min(80, el));
+  viewPreset(az, el, ms || 650, frameRadius, FRAME_TARGET);
 }
 
 // pull back and swing around into the three-quarter view
 function introFlight() {
-  var t = controls.target;
+  var t = FRAME_TARGET;
+  controls.target.copy(t);
   var r = frameRadius;
-  var el0 = 34 * Math.PI / 180, az0 = -30 * Math.PI / 180, r0 = r * 1.7;
+  var el0 = 38 * Math.PI / 180, az0 = -24 * Math.PI / 180, r0 = r * 1.9;
   camera.position.set(t.x + r0 * Math.cos(el0) * Math.sin(az0),
                       t.y + r0 * Math.sin(el0),
                       t.z + r0 * Math.cos(el0) * Math.cos(az0));
-  viewPreset(42, 20, 1700, r);
+  viewPreset(36, 16, 2000, r, t);
 }
 
-renderer.domElement.addEventListener('pointerdown', function () { camFlight = null; });
-
+['pointerdown', 'wheel'].forEach(function (ev) {
+  renderer.domElement.addEventListener(ev, function () { camFlight = null; }, { passive: true });
+});
 
 // ============================================================================
-//  PROCEDURAL TEXTURES — drawn greyscale so the material colour tints them,
-//  keeping every colour picker functional while adding real surface detail.
+//  TEXTURES — the procedural sets from textures.js, cloned per repeat and
+//  cached, so a rebuild reuses GPU textures instead of re-uploading thirty
+//  of them for every slider tick.
 // ============================================================================
-var TEX = {};
-var MAX_ANISO = renderer.capabilities.getMaxAnisotropy();
+TEXGEN.init(renderer);
 
-function makeCanvas(w, h, draw) {
-  var c = document.createElement('canvas');
-  c.width = w; c.height = h;
-  draw(c.getContext('2d'), w, h);
-  var t = new THREE.CanvasTexture(c);
-  t.wrapS = t.wrapT = THREE.RepeatWrapping;
-  t.anisotropy = MAX_ANISO;          // stone read at a grazing angle needs all of it
-  t.encoding = THREE.sRGBEncoding;
+var TEX_CACHE = {}, TEX_USED = {};
+function texRepeat(base, rx, ry) {
+  var key = base.uuid + '|' + rx.toFixed(4) + '|' + ry.toFixed(4);
+  TEX_USED[key] = true;
+  var t = TEX_CACHE[key];
+  if (t) return t;
+  t = base.clone();
+  t.needsUpdate = true;
+  t.repeat.set(rx, ry);
+  t.userData = t.userData || {};
+  t.userData.cached = true;
+  TEX_CACHE[key] = t;
   return t;
 }
+// called after each rebuild: anything the new building didn't ask for is freed
+function purgeTextureCache() {
+  Object.keys(TEX_CACHE).forEach(function (k) {
+    if (!TEX_USED[k]) { TEX_CACHE[k].dispose(); delete TEX_CACHE[k]; }
+  });
+  TEX_USED = {};
+}
 
-// Each albedo above is drawn as a height field as well as a colour, so a Sobel
-// pass turns it into a matching normal map. This is what makes a joint read as
-// a recess instead of a printed line. Wraps at the edges so the normal map
-// tiles exactly like the albedo it came from.
-function normalFromHeight(tex, strength) {
-  var src = tex.image, w = src.width, h = src.height;
-  var d = src.getContext('2d').getImageData(0, 0, w, h).data;
-  var out = document.createElement('canvas');
-  out.width = w; out.height = h;
-  var octx = out.getContext('2d');
-  var img = octx.createImageData(w, h);
-  function H(x, y) { return d[((((y % h) + h) % h) * w + (((x % w) + w) % w)) * 4] / 255; }
-  for (var y = 0; y < h; y++) {
-    for (var x = 0; x < w; x++) {
-      var dx = (H(x-1,y-1) + 2*H(x-1,y) + H(x-1,y+1)
-              - H(x+1,y-1) - 2*H(x+1,y) - H(x+1,y+1)) * strength;
-      var dy = (H(x-1,y+1) + 2*H(x,y+1) + H(x+1,y+1)
-              - H(x-1,y-1) - 2*H(x,y-1) - H(x+1,y-1)) * strength;
-      var len = Math.sqrt(dx*dx + dy*dy + 1);
-      var i = (y * w + x) * 4;
-      img.data[i]     = (dx / len * 0.5 + 0.5) * 255;
-      img.data[i + 1] = (dy / len * 0.5 + 0.5) * 255;
-      img.data[i + 2] = (1  / len * 0.5 + 0.5) * 255;
-      img.data[i + 3] = 255;
-    }
-  }
-  octx.putImageData(img, 0, 0);
-  var t = new THREE.CanvasTexture(out);
-  t.wrapS = t.wrapT = THREE.RepeatWrapping;
-  t.anisotropy = MAX_ANISO;
-  // a normal map carries vectors, not colour -- it must stay linear
-  return t;
+// Dress a MeshStandardMaterial with one of the procedural sets. `size` is the
+// real extent of one repeat in metres; M is scene units per metre, so the
+// repeat comes out in tiles per scene unit -- which is what worldScaleUVs()
+// makes the UVs measure.
+function dress(mat, setName, M, opts) {
+  opts = opts || {};
+  var set = TEXGEN.sets[setName];
+  var size = opts.size || set.size || 1;
+  var sx = Array.isArray(size) ? size[0] : size, sy = Array.isArray(size) ? size[1] : size;
+  var rx = 1 / (sx * M), ry = 1 / (sy * M);
+  mat.map = texRepeat(set.map, rx, ry);
+  mat.normalMap = texRepeat(set.normal, rx, ry);
+  mat.roughnessMap = texRepeat(set.rough, rx, ry);
+  var ns = opts.normal === undefined ? 1 : opts.normal;
+  mat.normalScale = new THREE.Vector2(ns, ns);
+  // the roughness map holds absolute values; the scalar becomes a multiplier
+  mat.roughness = opts.roughMul === undefined ? 1 : opts.roughMul;
+  return mat;
 }
 
 // ----------------------------------------------------------------------------
 //  BoxGeometry gives every face UVs of 0..1 whatever its real size, so a 9-unit
 //  platform tier and a 0.24-unit step tread would show the same number of
-//  bricks: courses smear on the big faces, go chunky on the small ones, and
-//  never line up between neighbouring parts. Rewriting the UVs in world units
-//  gives one texel density across the whole building; each material's
-//  map.repeat then means "tiles per world unit".
+//  bricks. Rewriting the UVs in world units gives one texel density across the
+//  whole building; each material's map.repeat then means "tiles per world unit".
 // ----------------------------------------------------------------------------
 function worldScaleUVs(root) {
   root.traverse(function (o) {
     if (!o.isMesh) return;
     var geo = o.geometry, p = geo.parameters;
-    if (!p || geo.userData.uvScaled) return;
+    if (!p || geo.userData.uvScaled || geo.userData.ownUVs) return;
     var uv = geo.attributes.uv;
     if (!uv) return;
     var mats = Array.isArray(o.material) ? o.material : [o.material];
-    if (!mats.some(function (m) { return m && (m.map || m.normalMap); })) return;
+    var tex = null;
+    mats.forEach(function (m) { if (m && (m.map || m.normalMap) && !tex) tex = m.map || m.normalMap; });
+    if (!tex) return;
 
-    if (p.depth !== undefined && p.width !== undefined && uv.count === 24) {
+    if (p.depth !== undefined && p.width !== undefined && p.height !== undefined && uv.count === 24) {
       // BoxGeometry face order is +X -X +Y -Y +Z -Z, four verts each
       var f = [[p.depth, p.height], [p.depth, p.height],
                [p.width, p.depth],  [p.width, p.depth],
@@ -325,150 +481,19 @@ function worldScaleUVs(root) {
         }
       }
     } else if (p.radiusTop !== undefined) {
-      // Cylinder u wraps the circumference: round it to whole tiles or the
-      // grain tears open at the seam.
-      var circ = Math.max(1, Math.round(Math.PI * (p.radiusTop + p.radiusBottom)));
+      // Cylinder u wraps the circumference: land it on a whole number of
+      // texture repeats or the grain tears open at the seam.
+      var circ = Math.PI * (p.radiusTop + p.radiusBottom);
+      var tiles = Math.max(1, Math.round(circ * tex.repeat.x));
+      var us = tiles / tex.repeat.x;
       for (var q = 0; q < uv.count; q++)
-        uv.setXY(q, uv.getX(q) * circ, uv.getY(q) * p.height);
+        uv.setXY(q, uv.getX(q) * us, uv.getY(q) * p.height);
+    } else if (p.width !== undefined && p.height !== undefined && p.depth === undefined) {
+      for (var q2 = 0; q2 < uv.count; q2++)
+        uv.setXY(q2, uv.getX(q2) * p.width, uv.getY(q2) * p.height);
     } else return;
 
     uv.needsUpdate = true;
     geo.userData.uvScaled = true;
   });
 }
-
-function initTextures() {
-  // 筒瓦 barrel tiles: vertical half-round columns with row shadows
-  TEX.tile = makeCanvas(512, 512, function(ctx, w, h) {
-    var cols = 8, rows = 6, cw = w/cols, rh = h/rows;
-    for (var x = 0; x < w; x++) {
-      var ph = (x / cw) * Math.PI * 2;
-      // the barrel's own shading, not a bleach: the old 178-255 ramp plus a
-      // strong dome highlight washed the crown of every tile to near-white, which
-      // is what drained the glaze colour out of the sunlit slope
-      var shade = 160 + 88 * Math.pow(0.5 + 0.5*Math.cos(ph), 0.55);
-      ctx.fillStyle = 'rgb(' + [shade,shade,shade].join(',') + ')';
-      ctx.fillRect(x, 0, 1, h);
-    }
-    for (var r = 0; r < rows; r++) {
-      // each course laps the one below: a hard shadow line, then a short ramp
-      var y = r * rh;
-      var lap = ctx.createLinearGradient(0, y, 0, y + rh*0.22);
-      lap.addColorStop(0.0, 'rgba(30,30,30,0.55)');
-      lap.addColorStop(1.0, 'rgba(30,30,30,0.0)');
-      ctx.fillStyle = lap;
-      ctx.fillRect(0, y, w, rh*0.22);
-      // the rounded end of each barrel where it laps the course below: a soft
-      // highlight on the crown, a crescent of shade under it
-      for (var c2 = 0; c2 < cols; c2++) {
-        var cx = c2*cw + cw/2, cy = y + rh*0.10, cr = cw*0.27;
-        var dome = ctx.createRadialGradient(cx, cy - cr*0.35, cr*0.1, cx, cy, cr);
-        dome.addColorStop(0.0, 'rgba(255,255,255,0.22)');
-        dome.addColorStop(0.7, 'rgba(255,255,255,0.06)');
-        dome.addColorStop(1.0, 'rgba(255,255,255,0.0)');
-        ctx.fillStyle = dome;
-        ctx.beginPath(); ctx.arc(cx, cy, cr, 0, Math.PI*2); ctx.fill();
-        ctx.strokeStyle = 'rgba(60,60,60,0.28)'; ctx.lineWidth = 2.5;
-        ctx.beginPath(); ctx.arc(cx, cy, cr, 0.15*Math.PI, 0.85*Math.PI); ctx.stroke();
-      }
-    }
-  });
-
-  // wood grain: long vertical streaks with knots
-  TEX.wood = makeCanvas(128, 512, function(ctx, w, h) {
-    ctx.fillStyle = 'rgb(238,238,238)';
-    ctx.fillRect(0, 0, w, h);
-    for (var i = 0; i < 60; i++) {
-      var x = Math.random()*w, wd = 1 + Math.random()*2.5;
-      var sh = 198 + Math.random()*46;
-      ctx.strokeStyle = 'rgba(' + [sh,sh,sh].join(',') + ',0.55)';
-      ctx.lineWidth = wd;
-      ctx.beginPath();
-      ctx.moveTo(x, 0);
-      ctx.bezierCurveTo(x + (Math.random()-0.5)*14, h*0.33,
-                        x + (Math.random()-0.5)*14, h*0.66, x, h);
-      ctx.stroke();
-    }
-  });
-
-  // plaster: soft noise
-  TEX.plaster = makeCanvas(256, 256, function(ctx, w, h) {
-    ctx.fillStyle = 'rgb(242,242,242)';
-    ctx.fillRect(0, 0, w, h);
-    for (var i = 0; i < 4200; i++) {
-      var sh = 214 + Math.random()*40;
-      ctx.fillStyle = 'rgba(' + [sh,sh,sh].join(',') + ',0.25)';
-      ctx.fillRect(Math.random()*w, Math.random()*h, 1+Math.random()*2, 1+Math.random()*2);
-    }
-  });
-
-  // 条石 dressed ashlar: solid blocks standing proud of a recessed joint, each
-  // with a chamfered arris. Drawn as blocks rather than as lines on a flat
-  // ground so normalFromHeight() has a real step to work from -- lines alone
-  // give you painted-on joints that vanish under any light.
-  TEX.stone = makeCanvas(512, 512, function(ctx, w, h) {
-    var rows = 6, cols = 3, bh = h/rows, bw = w/cols, joint = 6;
-
-    // block tones are indexed by column so the pair straddling the tile seam
-    // gets one colour instead of two
-    var tone = [];
-    for (var r0 = 0; r0 < rows; r0++) {
-      tone[r0] = [];
-      for (var c0 = 0; c0 < cols; c0++) tone[r0][c0] = 222 + Math.random()*26;
-    }
-
-    ctx.fillStyle = 'rgb(132,132,132)';         // the recessed joint itself
-    ctx.fillRect(0, 0, w, h);
-
-    for (var r = 0; r < rows; r++) {
-      var off = (r % 2) * bw/2;
-      for (var b = -1; b <= cols; b++) {
-        var x = off + b*bw, y = r*bh;
-        var t = tone[r][((b % cols) + cols) % cols];
-        var fx = x + joint/2, fy = y + joint/2, fw = bw - joint, fh = bh - joint;
-
-        ctx.fillStyle = 'rgb(' + [t,t,t].join(',') + ')';
-        ctx.fillRect(fx, fy, fw, fh);
-
-        // 3 px chamfer: lit on the top and left arris, shaded on the other two
-        ctx.fillStyle = 'rgba(255,255,255,0.50)';
-        ctx.fillRect(fx, fy, fw, 3);
-        ctx.fillRect(fx, fy, 3, fh);
-        ctx.fillStyle = 'rgba(58,58,58,0.38)';
-        ctx.fillRect(fx, fy + fh - 3, fw, 3);
-        ctx.fillRect(fx + fw - 3, fy, 3, fh);
-
-        // tooled face: fine chisel speckle
-        for (var i = 0; i < 320; i++) {
-          var sh = t - 14 + Math.random()*28;
-          ctx.fillStyle = 'rgba(' + [sh,sh,sh].join(',') + ',0.30)';
-          ctx.fillRect(fx + Math.random()*fw, fy + Math.random()*fh, 2, 2);
-        }
-      }
-    }
-  });
-
-  TEX.tileN    = normalFromHeight(TEX.tile,    2.2);
-  TEX.woodN    = normalFromHeight(TEX.wood,    1.2);
-  TEX.plasterN = normalFromHeight(TEX.plaster, 1.0);
-  TEX.stoneN   = normalFromHeight(TEX.stone,   3.0);
-}
-
-// Hex colours are sRGB. With outputEncoding = sRGB the renderer converts
-// linear -> sRGB on output, so feeding sRGB in unconverted brightens everything
-// twice -- deep red renders as salmon. Convert on the way in.
-function C(hex) { return new THREE.Color(hex).convertSRGBToLinear(); }
-
-function texClone(t, rx, ry) {
-  var c = t.clone();
-  c.needsUpdate = true;
-  c.repeat.set(rx, ry);
-  return c;
-}
-
-initTextures();
-
-var buildingGroup = new THREE.Group();
-scene.add(buildingGroup);
-
-// ============================================================================

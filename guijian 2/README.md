@@ -47,6 +47,13 @@ any size, and it's the single most important thing to preserve when editing.
 | 通进深 depth | 通面阔 × 5/8 | 大式 convention |
 | Pagoda taper | 0.953 per storey | 应县木塔 measured (陈明达 1980) |
 | 脊兽 ridge beasts | 9 / 7 / 5 / 3 / 1 by rank, led by 仙人骑凤 | 清会典 |
+| 斗栱 出踩 | 3 斗口 per 拽架; 九踩 / 七踩 / 五踩 by grade | 工程做法则例 |
+| 上檐出 | 21 斗口 from the 挑檐桁, so a bracketed hall adds its 拽架 | 工程做法则例 |
+| 额枋 | 大额枋 6.6, 由额垫板 2, 小额枋 4.8 斗口 high | 工程做法则例 |
+| 平板枋 | 3.5 × 2 斗口 | 工程做法则例 |
+| 须弥座 | 圭角 10 · 下枋 8 · 下枭 7 · 束腰 8 · 上枭 7 · 上枋 9 份 | 清式营造则例 |
+| 冲三 corner run-out | 3 椽径 in plan, as well as 翘四 up | 清式营造则例 |
+| 椽当 | rafters at 3 斗口 centres (one 椽径 gap) | 工程做法则例 |
 
 ---
 
@@ -85,9 +92,16 @@ the middle third. What fills them is the rank:
 | 旋子 xuanzi | plain, one gold line | 旋花 rosettes, gold-centred | an accent | general halls, side halls, temples |
 | 苏式 sushi | a 包袱 hung below the beam line | one small motif | a thread | 内廷 and 园林 — 典雅活泼 |
 
-The ground alternates 青 and 绿 panel to panel, which is what makes a painted
-colonnade read as alternating from any angle. Picking a 预设 sets the grade that
-goes with its rank; the 画等 control overrides it.
+The ground alternates 青 and 绿 bay to bay, and the 大额枋 and 小额枋 of one bay
+swap, which is what makes a painted colonnade read as alternating from any
+angle. Picking a 预设 sets the grade that goes with its rank; the 画等 control
+overrides it.
+
+The painting is drawn onto a canvas sized to each bay's real clear span
+(`TEXGEN.caihuaTexture`, textures.js), so every bay gets its own
+箍头/藻头/枋心 division -- 一间一段. It was previously a run of identical
+panels divided evenly along the facade, which put 枋心 across columns. The
+canvas is cached by grade, length and colours, so a rebuild reuses it.
 
 ---
 
@@ -95,21 +109,99 @@ goes with its rank; the 画等 control overrides it.
 
 ```
 src/
-  scene.js      renderer, lighting, environment map, camera
+  textures.js   procedural albedo / normal / roughness sets, 菱花 lattice, 彩画 painter
+  scene.js      renderer, Preetham sky, sun path, PMREM environment, fog, camera, texture cache
+  geom.js       mergeStatic (draw-call batching), sweepGeometry, frustum + lathe helpers
+  render.js     on-demand loop, HQ still (MSAA + SSAO), walk mode, double-click focus, keys
   constants.js  斗口/材份 tables, 举架 ladders, deriveDimensions()
-  roof.js       rectangular roof engine (庑殿/歇山), eave assembly, ridges
-  pagoda.js     polygonal 攒尖 roof engine, storey stacking, 塔刹 finial
-  hall.js       base, columns, walls, lattice, dougong, balustrade, caihua, steps
-  palette.js    six historically-grounded colour presets
-  app.js        rebuild(), UI wiring, OBJ export with vertex welding
+  roof.js       roof faces (庑殿/歇山 + polygonal), ridges, 吻兽, eave tiles, rafters
+  pagoda.js     storey stacking, 塔刹 finial
+  hall.js       须弥座, balustrade, steps, columns, 额枋 + 彩画, 斗栱, walls, 槅扇
+  palette.js    the five 正色 and the eight presets
+  site.js       courtyard, 御路, palace wall and gate (never exported)
+  app.js        rebuild(), materials, OBJ export with per-part welding
+  ui.js         control surface
 ```
 
-Load order matters: `scene → constants → roof → pagoda → hall → palette → app`.
+Load order matters: `textures → scene → geom → render → constants → roof →
+pagoda → hall → palette → site → app → ui`. Three.js r128, its OrbitControls
+and its `Sky` come from the CDN.
 
 Bay widths are **unequal** (77 斗口 at the 明间, −11 per bay outward), so
 anything that has to line up with a bay — columns, 槅扇, 斗栱 — must take its
 positions from `bayAxes(D, scale)`. Dividing the facade evenly is the one thing
 that will silently put panels across columns.
+
+---
+
+## 真实感 — what makes it read as a building
+
+**Light is modelled, not painted.** The sky is the Preetham analytic daylight
+model (three's `Sky`), and the sun follows its real path over Beijing (39.9 N)
+at the equinox -- up due east at 06:00, 50 degrees at noon, down due west at
+18:00. The same sky is rendered into a PMREM environment map, so every surface
+is lit by and reflects the actual sky above it; a ground disc in that
+environment returns bounce light at the paving's albedo, which keeps the
+underside of a deep eave dark instead of glowing blue. Fog colour is read back
+from the rendered horizon, so the ground meets the sky without a seam. Three
+weathers (晴 / 霾 / 阴) change turbidity, haze and sun strength together.
+
+**Everything has a real size.** `M` (scene units per metre) is derived from the
+斗口 grade, so the structure stays modular while the parts a person touches are
+cut from metres: risers 15 cm, balustrades 0.9 m, door leaves about 0.95 m,
+bricks 48 × 24 cm, a palace wall 6.5 m. The old generator had three 45 cm steps
+on a default hall; it now has nine.
+
+**A place, not a stage.** The hall stands in a 城砖-paved court with a raised
+御路 to its steps, inside a 6.5 m palace wall with a glazed coping and a 9 × 9
+studded gate; beyond it, instanced halls of the palace city recede into the
+haze, and a ring of hills sits on the horizon in aerial-perspective colour. The
+wall takes the scheme's wall colour, so a 江南 hall gets 粉墙. 环境 → 旷野 drops
+the court for open ground. None of it is exported.
+
+**The roof is built the way a roof is.** Each slope is its own closed shell with
+a tiled top and a timber soffit. The 歇山 front and back slopes run unbroken from
+ridge to eave and overhang the 山花 as the 出山; below the break the sides are a
+hipped skirt (撒头). The section is the exact Bezier, not a polyline, so it has no
+facets. Ridges are swept along the true surface curve, so a hip ridge follows
+the concave 举架 instead of spanning it with daylight underneath. The eave
+carries 瓦当 and 滴水 on the tile rhythm, 飞椽 over 檐椽 at 3 斗口 centres fanning
+into the corner as 翼角椽, the 角梁 with its 套兽, and the corner runs out in plan
+(冲三) as well as up (翘四).
+
+**Tiles at their real spacing.** 瓦垄 spacing follows the building's rank (a
+larger 样 on a larger hall) -- about 36 cm on a grade-6 hall, which is roughly
+110 runs across the front. The tile texture carries 筒瓦 barrels, 板瓦 channels
+and laps (压七露三); it runs down every face, including the hip ends, where the
+old single grid laid it across the slope.
+
+**Materials.** Every surface has albedo, normal and roughness maps, drawn at load
+from seeded noise (textures.js): glossy glaze on tile crowns, dull dirty
+channels, lacquer with 断纹 cracks, weathered 红土 lime render, 汉白玉 ashlar
+with fine joints, 金砖 paving, rubbed 干摆 brick. Courtyard tone is varied with
+vertex colour over a subdivided plane, so the texture repeat disappears.
+
+**Ambient occlusion.** Rendering is on demand. While the camera moves the scene
+is drawn directly; once it stops, one more frame is drawn through the HQ path
+(4x MSAA colour, a normal + depth pass, 16-sample SSAO, depth-aware blur) and
+stays on screen at no further cost. The shadow map is only redrawn when the
+sun or the geometry changes, never because the camera moved. 精细 turns HQ off.
+
+**Draw calls.** `mergeStatic()` folds every non-instanced part into one mesh per
+material after each build: a default hall goes from about 5,000 draw calls to
+under 60. Each merged mesh keeps every original part's geometry and matrix in
+`userData.parts`, and `exportOBJ()` exports those, so the OBJ is still one
+closed part per piece.
+
+## 视角 — viewing
+
+正 / 侧 / 背 / 斜 / 顶 orbit the model; 人 stands you in the courtyard at eye height
+looking up at the eaves; 近 flies to the front corner (翼角, 斗栱 and 走兽 in one
+frame); 全 re-frames. Double-click anything to fly to it and orbit it at arm's
+length. Arrow keys orbit, +/- zoom, F frames. 游 is a walk mode: WASD or arrows,
+drag to look, shift to hurry, Esc to leave -- it climbs the 台基 by the steps
+and won't walk you through a wall. The camera can look up from below the eave
+line; it is kept above the paving, not above the horizon.
 
 ---
 
@@ -126,7 +218,10 @@ Ratios were checked against measured buildings:
 | taper sequence | 968→923→879→838→798 | 968→927→883→842→798 (0.5% err) |
 
 Automated: 1,424 UI states, 320 hall builds, 216 pagoda builds — no exceptions,
-no NaN vertices, no inverted normals.
+no NaN vertices, no inverted normals. After the realism pass: 58 builds across
+both roof types, 大式/小式, 清/宋, grades 1–11, 3–11 bays, 5–11 purlins, every
+preset and 18 pagoda configurations — no exceptions, no NaN positions or
+instance matrices.
 
 ---
 
@@ -135,6 +230,10 @@ no NaN vertices, no inverted normals.
 `exportOBJ()` walks the scene, **flattens InstancedMesh instances** (otherwise
 every rafter is lost), **welds coincident vertices per part**, drops degenerate
 triangles, and **fan-fills any remaining boundary loops**.
+
+After the realism pass (merged meshes exported part by part): default hall
+154,963 vertices / 273,578 triangles, 5-storey pagoda 271,878 / 483,916 — zero
+boundary edges and zero non-manifold edges in both.
 
 Result: **watertight**. Verified across 110 configurations (all bay/purlin/roof
 type/class combinations plus every pagoda variant) — zero boundary edges, zero
@@ -153,23 +252,24 @@ Three subtleties worth knowing before editing this code:
    false positives wherever winding is inconsistent, and patching those
    already-closed regions is what creates non-manifold geometry.
 
-**Texel density:** `worldScaleUVs()` (scene.js) rewrites box and cylinder UVs in
-world units after every rebuild, because `BoxGeometry` hands each face 0..1 UVs
-whatever its real size — leave it out and a 9-unit platform tier and a
-0.24-unit step tread show the same four bricks. Because of it, `map.repeat`
-means **tiles per world unit**, not tiles per face; the numbers in `app.js` are
-therefore real-world texture sizes. The roof shell carries its own UVs and is
-skipped.
+**Texel density:** `worldScaleUVs()` (scene.js) rewrites box, cylinder and plane
+UVs in world units after every rebuild, because `BoxGeometry` hands each face
+0..1 UVs whatever its real size. Because of it, `map.repeat` means **tiles per
+world unit**; `dress()` sets it from each texture set's real size in metres and
+`M`, so a brick is brick-sized at every grade. Geometry that lays its own UVs
+(roof faces, sweeps, rings) sets `geometry.userData.ownUVs` and is skipped.
+Cylinder UVs are rounded to a whole number of repeats so the grain never tears
+at the seam.
 
 **Normal maps:** every albedo canvas is drawn as a height field as well as a
 colour, and `normalFromHeight()` Sobels it into a tiling normal map. Those must
 stay **linear** — an sRGB normal map is silently wrong, not obviously wrong.
 
-**Tile spacing follows the ribs.** The roof shell models `ribs` corrugations;
-the tile texture carries 8 barrels per tile. `tileMatFor()` (roof.js) clones the
-material per surface with `repeat.x = ribCount / 8` so painted barrels land on
-modelled ribs. Set the two independently and they beat into moiré. The 歇山
-upper roof has its own rib count (0.55x) and so needs its own clone.
+**Tile UVs are in tile units.** A roof face's `u` is its lateral coordinate
+divided by the 瓦垄 spacing (+0.5, so a crest sits on the centreline) and `v` is
+arc length up the slope from the eave divided by the course length; the tile
+texture holds 4 × 4 cells, hence `repeat = 0.25`. 瓦当 are placed at the same
+crests, so the end caps always land on the runs.
 
 **Colour space:** hex values are sRGB but Three r128 feeds them in as linear
 while `outputEncoding = sRGBEncoding` converts linear -> sRGB on output. Passing
@@ -185,14 +285,18 @@ boundary edges, a sphere 30, a torus 56. The fan-fill pass handles this.
 1. **Grade and size are independent** — you can build an 18 m hall on grade-11
    timber, giving 1.9 m columns. Physically absurd; real builders matched grade
    to size. Consider constraining or warning.
-3. **平水 makes the top step steeper than its coefficient** (45.9° vs 42°). This
+2. **平水 makes the top step steeper than its coefficient** (45.9° vs 42°). This
    is correct behaviour, documented here so nobody "fixes" it.
-3. Not yet built: 攒尖顶 for halls, 重檐 double-eave, 走兽 roof figurines,
-   save/load designs, texture maps (currently flat PBR colours only).
+3. **The pagoda is built at 0.62 of the hall's scale per 斗口** but at full
+   storey height, so a 13-storey 楼阁式 tower on a grade-1 module is taller than
+   any that stood. The ratios match 应县木塔; the absolute size follows the grade.
+4. Not yet built: 攒尖顶 for halls, 重檐 double-eave, interiors (藻井, 天花).
 
 ---
 
 ## Running
 
-Single file: open `chinese_hall_roof_prototype.html` in a browser.
-Modular: serve `src/` with the load order above. Three.js r128 via CDN.
+Single file: open `standalone.html` in a browser (regenerate it with
+`python3 build-standalone.py` after editing `src/`).
+Modular: serve the folder (`python3 -m http.server`) and open `index.html`.
+Three.js r128 via CDN.
