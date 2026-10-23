@@ -4558,34 +4558,153 @@ function buildPagodaStorey(R, n, height, colDia, mats, withBalcony, M) {
       g.add(beam);
     });
   }
-  if (withBalcony) {
-    // 平座 railing, sized in metres like the hall's
-    var rr = R * 1.07, postH = 1.05 * M, pw = 0.16 * M;
-    var postGeo = new THREE.BoxGeometry(pw, postH, pw);
-    for (var e2 = 0; e2 < n; e2++) {
-      var a1 = (e2 / n) * Math.PI * 2 + Math.PI / n, a2b = ((e2 + 1) / n) * Math.PI * 2 + Math.PI / n;
-      var p1 = new THREE.Vector3(Math.cos(a1) * rr, 0, Math.sin(a1) * rr);
-      var p2 = new THREE.Vector3(Math.cos(a2b) * rr, 0, Math.sin(a2b) * rr);
-      var L = p1.distanceTo(p2), np = Math.max(2, Math.round(L / (1.2 * M)));
-      var ang = Math.atan2(p2.z - p1.z, p2.x - p1.x);
-      for (var q = 0; q < np; q++) {
-        var f = q / np;
-        part(postGeo, mats.rail, p1.x + (p2.x - p1.x) * f, postH / 2, p1.z + (p2.z - p1.z) * f, -ang, g);
-      }
-      [[postH * 0.96, 0.09 * M, 0.1 * M], [postH * 0.5, 0.06 * M, 0.07 * M], [0.06 * M, 0.12 * M, 0.22 * M]].forEach(function (c) {
-        var seg = new THREE.Mesh(new THREE.BoxGeometry(L * 1.01, c[1], c[2]), mats.rail);
-        seg.position.set((p1.x + p2.x) / 2, c[0], (p1.z + p2.z) / 2);
-        seg.rotation.y = -ang;
-        seg.castShadow = true; seg.receiveShadow = true;
-        g.add(seg);
-      });
-      // 华板 panels between the rails
-      var hb = new THREE.Mesh(new THREE.BoxGeometry(L * 0.98, postH * 0.36, 0.05 * M), mats.rail);
-      hb.position.set((p1.x + p2.x) / 2, postH * 0.26, (p1.z + p2.z) / 2);
-      hb.rotation.y = -ang;
-      g.add(hb);
+  return g;
+}
+
+
+// A convex n-gon prism standing on y0. ExtrudeGeometry lays its UVs out in world
+// units, which is what the world-scaled textures expect, and the shape's
+// corners are placed exactly where the columns' are.
+function polyPrism(R, n, y0, h, mat, g) {
+  var shape = new THREE.Shape();
+  for (var k = 0; k < n; k++) {
+    var th = (k / n) * Math.PI * 2 + Math.PI / n;
+    var px = Math.cos(th) * R, py = -Math.sin(th) * R;
+    if (k === 0) shape.moveTo(px, py); else shape.lineTo(px, py);
+  }
+  shape.closePath();
+  var geo = new THREE.ExtrudeGeometry(shape, { depth: h, bevelEnabled: false });
+  geo.rotateX(-Math.PI / 2);
+  return part(geo, mat, 0, y0, 0, 0, g);
+}
+
+// 勾栏: a lacquered timber balustrade. 地栿 sill, 华板 panel with a gilt-edged
+// raised centre, 步步锦 lattice between two rails, 盆唇 and 寻杖 above, and a
+// 望柱 with a lotus head at every bay. The lattice is cut out, so you see
+// through it the way you do through the real thing.
+function buildPagodaRail(R, n, mats, M) {
+  var g = new THREE.Group();
+  var G = railGeos(M);
+  var postW = 0.2 * M, postH = 1.05 * M;
+  var lattice = mats.railGrid || mats.grid;
+  var seen = {};
+  function post(x, z) {
+    var k = x.toFixed(3) + ',' + z.toFixed(3);
+    if (seen[k]) return;
+    seen[k] = true;
+    part(G.post, mats.wood, x, postH / 2, z, 0, g);
+    part(G.collar, mats.gold, x, postH + 0.025 * M, z, 0, g);
+    part(G.head, mats.wood, x, postH + 0.05 * M, z, 0, g);
+  }
+  for (var e = 0; e < n; e++) {
+    var a1 = (e / n) * Math.PI * 2 + Math.PI / n, a2 = ((e + 1) / n) * Math.PI * 2 + Math.PI / n;
+    var p1 = new THREE.Vector3(Math.cos(a1) * R, 0, Math.sin(a1) * R);
+    var p2 = new THREE.Vector3(Math.cos(a2) * R, 0, Math.sin(a2) * R);
+    var L = p1.distanceTo(p2), np = Math.max(2, Math.round(L / (1.5 * M)));
+    var ang = Math.atan2(p2.z - p1.z, p2.x - p1.x);
+    for (var q = 0; q <= np; q++) {
+      var f = q / np;
+      post(p1.x + (p2.x - p1.x) * f, p1.z + (p2.z - p1.z) * f);
+    }
+    for (var j = 0; j < np; j++) {
+      var cf = (j + 0.5) / np;
+      var pl = L / np - postW;
+      if (pl <= 0) continue;
+      var grp = new THREE.Group();
+      grp.position.set(p1.x + (p2.x - p1.x) * cf, 0, p1.z + (p2.z - p1.z) * cf);
+      grp.rotation.y = -ang;
+      part(new THREE.BoxGeometry(pl + postW * 0.5, 0.09 * M, 0.26 * M), mats.beam, 0, 0.045 * M, 0, 0, grp);          // 地栿
+      part(new THREE.BoxGeometry(pl, 0.34 * M, 0.07 * M), mats.board, 0, 0.26 * M, 0, 0, grp);                         // 华板
+      part(new THREE.BoxGeometry(pl * 0.86, 0.25 * M, 0.012 * M), mats.gold, 0, 0.26 * M, 0.04 * M, 0, grp);           // gilt edging
+      part(new THREE.BoxGeometry(pl * 0.80, 0.19 * M, 0.02 * M), mats.beam, 0, 0.26 * M, 0.046 * M, 0, grp);           // raised centre
+      part(new THREE.BoxGeometry(pl, 0.05 * M, 0.09 * M), mats.wood, 0, 0.465 * M, 0, 0, grp);                         // lower rail
+      var lat = new THREE.Mesh(new THREE.PlaneGeometry(pl, 0.38 * M), lattice);                                         // 步步锦
+      lat.position.set(0, 0.68 * M, 0);
+      lat.receiveShadow = true; lat.castShadow = true;
+      grp.add(lat);
+      part(new THREE.BoxGeometry(pl, 0.05 * M, 0.12 * M), mats.wood, 0, 0.90 * M, 0, 0, grp);                          // 盆唇
+      part(new THREE.BoxGeometry(pl, 0.08 * M, 0.10 * M), mats.wood, 0, 0.99 * M, 0, 0, grp);                          // 寻杖
+      g.add(grp);
     }
   }
+  return g;
+}
+
+// 平坐: the storey above does not stand on the roof below, it stands on a deck
+// carried by a short, solid layer of its own: a walled drum rising out of the
+// roof, a band of brackets under the deck edge, then the deck and its
+// balustrade. That is what fills the gap between floors.
+function buildPingzuo(R, n, y, prev, o) {
+  var g = new THREE.Group(), M = o.M, mats = o.mats;
+  var hfn = roofProfileFn(prev.rise);
+  var Rp = R * (o.dense ? 0.995 : 0.97);
+  var td = Math.min(1, Rp / prev.Rr);
+  var yLow = prev.roofY + hfn(td) - o.thick * 2.4;
+  if (o.dense) {
+    polyPrism(Rp, n, yLow, Math.max(0.01, y - yLow), mats.wall, g);
+    return g;
+  }
+  var deckT = 0.34 * M, slabT = 0.04 * M;
+  var u = o.u, steps = 2;
+  var bandH = o.dougong ? (2 * u + (steps + 1) * 2 * u + 2 * u) : 0.5 * M;
+  var yTop = y - deckT - bandH;
+  if (yTop < yLow + 0.4 * M) yLow = yTop - 0.4 * M;
+  var rDeck = R * 1.14;
+  // drum, with 枋 bands where it meets the roof and the brackets
+  polyPrism(Rp, n, yLow, yTop - yLow, mats.wall, g);
+  polyPrism(Rp * 1.012, n, yTop - 0.42 * M, 0.42 * M, mats.beam, g);
+  // posts at each corner and mid-face, proud of the wall; raised panels between
+  var colD = o.colDia * 0.85, visLow = yLow + o.thick * 3.0;
+  var postGeo = new THREE.CylinderGeometry(colD * 0.46, colD * 0.5, yTop - yLow, 14);
+  var apo = Rp * Math.cos(Math.PI / n);
+  for (var k = 0; k < n; k++) {
+    var th = (k / n) * Math.PI * 2 + Math.PI / n;
+    part(postGeo, mats.wood, Math.cos(th) * Rp, (yLow + yTop) / 2, Math.sin(th) * Rp, 0, g);
+    var thm = th + Math.PI / n;
+    part(postGeo, mats.wood, Math.cos(thm) * (apo + colD * 0.2), (yLow + yTop) / 2, Math.sin(thm) * (apo + colD * 0.2), 0, g);
+    var len = 2 * Rp * Math.sin(Math.PI / n);
+    var ph = (yTop - 0.42 * M) - visLow;
+    if (ph > 0.9 * M) {
+      var cx = Math.cos(thm) * (apo + 0.02 * M), cz = Math.sin(thm) * (apo + 0.02 * M);
+      var ry = Math.atan2(cx, cz);
+      var py = visLow + ph / 2 + 0.05 * M;
+      [-1, 1].forEach(function (sd) {
+        var off = sd * len * 0.25;
+        var px = cx + Math.cos(ry) * off, pz = cz - Math.sin(ry) * off;
+        var pw = len * 0.38, phh = Math.min(ph * 0.72, 2.4 * M);
+        part(new THREE.BoxGeometry(pw, phh, 0.07 * M), mats.beam, px, py, pz, ry, g);
+        part(new THREE.BoxGeometry(pw * 0.88, phh * 0.86, 0.09 * M), mats.gold, px, py, pz, ry, g);
+        part(new THREE.BoxGeometry(pw * 0.84, phh * 0.82, 0.10 * M), mats.board, px, py, pz, ry, g);
+      });
+    }
+  }
+  // the brackets that carry the deck, with their backing board
+  if (o.dougong) {
+    var tpl = dougongTemplate(u, steps, false);
+    var per = 3;
+    for (var s = 0; s < n * per; s++) {
+      var ths = (s / (n * per)) * Math.PI * 2 + Math.PI / n;
+      var pr = polyRadius(Rp, n, ths - Math.PI / n);
+      var set = new THREE.Group();
+      set.position.set(Math.cos(ths) * pr, yTop, Math.sin(ths) * pr);
+      set.rotation.y = Math.atan2(Math.cos(ths), Math.sin(ths));
+      var even = s % 2 === 0;
+      tpl.forEach(function (pp) {
+        part(pp.geo, pp.alt ? (even ? mats.dgB : mats.dg) : (even ? mats.dg : mats.dgB), pp.x, pp.y, pp.z, 0, set);
+      });
+      g.add(set);
+    }
+    polyPrism(Rp * 1.02, n, yTop, bandH, mats.board, g);
+  } else {
+    polyPrism(Rp * 1.04, n, yTop, bandH * 0.5, mats.beam, g);
+    polyPrism(Rp * 1.09, n, yTop + bandH * 0.5, bandH * 0.5, mats.beam, g);
+  }
+  // the deck: a painted edge beam, planks on top
+  polyPrism(rDeck, n, y - deckT, deckT - slabT, mats.beam, g);
+  polyPrism(rDeck * 0.995, n, y - slabT, slabT, mats.deck || mats.board, g);
+  var rail = buildPagodaRail(R * 1.07, n, mats, M);
+  rail.position.y = y;
+  g.add(rail);
   return g;
 }
 
@@ -4628,12 +4747,15 @@ function buildPagoda(D, scale, opts, mats, env) {
   // eye reads the rhythm, not the count, and it halves the instance load
   var rafter = { spacing: 4.5 * u, r: 0.75 * u, fly: 1.5 * u, flyLen: 7 * u * (dense ? 0.5 : 1) };
 
-  var y = 0, R = R0;
+  var y = 0, R = R0, prev = null;
   for (var i = 0; i < storeys; i++) {
     var isFirst = (i === 0);
     var h = dense ? (isFirst ? storeyH * 5.0 : storeyH * 0.34) : storeyH;
 
-    var body = buildPagodaStorey(R, n, h, colDia, mats, !dense && !isFirst, env.M);
+    if (prev) {
+      g.add(buildPingzuo(R, n, y, prev, { dense: dense, dougong: opts.dougong, u: u, colDia: colDia, thick: thick, M: env.M, mats: mats }));
+    }
+    var body = buildPagodaStorey(R, n, h, colDia, mats, false, env.M);
     body.position.y = y;
     g.add(body);
 
@@ -4682,6 +4804,7 @@ function buildPagoda(D, scale, opts, mats, env) {
     roof.position.y = roofY;
     g.add(roof);
 
+    prev = { Rr: Rr, roofY: roofY, rise: tierRise };
     y += h + dgH + tierRise * (dense ? 0.70 : 0.62);
     R = nextR;
   }
@@ -5905,7 +6028,15 @@ function buildModel() {
     alphaTest: 0.5, side: THREE.DoubleSide, roughness: 0.6, metalness: 0.0
   });
 
+  // 平坐 deck planks, and the finer 步步锦 lattice a balustrade carries
+  var deckMat = dress(std('#7a5638'), 'slab', Me, { size: 1.28, normal: 0.6 });
+  var railGridMat = new THREE.MeshStandardMaterial({
+    map: texRepeat(TEXGEN.latticeTexture('step', cLattice), 1 / (0.15 * Me), 1 / (0.15 * Me)),
+    alphaTest: 0.5, side: THREE.DoubleSide, roughness: 0.6, metalness: 0.0
+  });
+
   var mats = {
+    deck: deckMat, railGrid: railGridMat,
     tile: tileMat, soffit: soffit, ridge: ridgeMat, fascia: fasciaMat, rafter: rafterMat,
     flyEnd: flyEnd, rafterEnd: rafterEnd, gold: goldMat, gable: fasciaMat,
     column: lacquer, beam: beamMat, board: boardMat, plate: beamMat, queti: quetiMat,

@@ -161,7 +161,15 @@ function buildModel() {
     alphaTest: 0.5, side: THREE.DoubleSide, roughness: 0.6, metalness: 0.0
   });
 
+  // 平坐 deck planks, and the finer 步步锦 lattice a balustrade carries
+  var deckMat = dress(std('#7a5638'), 'slab', Me, { size: 1.28, normal: 0.6 });
+  var railGridMat = new THREE.MeshStandardMaterial({
+    map: texRepeat(TEXGEN.latticeTexture('step', cLattice), 1 / (0.15 * Me), 1 / (0.15 * Me)),
+    alphaTest: 0.5, side: THREE.DoubleSide, roughness: 0.6, metalness: 0.0
+  });
+
   var mats = {
+    deck: deckMat, railGrid: railGridMat,
     tile: tileMat, soffit: soffit, ridge: ridgeMat, fascia: fasciaMat, rafter: rafterMat,
     flyEnd: flyEnd, rafterEnd: rafterEnd, gold: goldMat, gable: fasciaMat,
     column: lacquer, beam: beamMat, board: boardMat, plate: beamMat, queti: quetiMat,
