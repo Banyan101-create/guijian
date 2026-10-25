@@ -561,7 +561,7 @@
       var shOn = (+sh.value) > 0.5;
       if (sun.castShadow !== shOn) { sun.castShadow = shOn; markShadowsDirty(); }
       var gOn = (+gd.value) > 0.5;
-      if (SITE.visible !== gOn) { SITE.visible = gOn; siteGroup.visible = gOn; applyNightLights(); requestRender(); }
+      if (SITE.visible !== gOn) { SITE.visible = gOn; siteGroup.visible = gOn; worldGroup.visible = gOn; applyNightLights(); requestRender(); }
       var hqOn = (+hq.value) > 0.5;
       if (HQ.enabled !== hqOn) { HQ.enabled = hqOn; requestRender(); }
       $('dayOut').textContent = label(minutes);

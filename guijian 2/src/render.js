@@ -246,6 +246,17 @@ function fitNearPlane() {
 }
 
 // ---------------------------------------------------------------------------
+//  haze follows the viewing distance as well as the building: pulled back to
+//  take in the whole city, the city should still be there, not lost in fog
+// ---------------------------------------------------------------------------
+var FOG_BASE = 20;
+function fitFog() {
+  var d = WALK.active ? 0 : camera.position.distanceTo(controls.target);
+  var want = Math.max(FOG_BASE, d * 0.5);
+  if (Math.abs(want - FOG_SCALE) / FOG_SCALE > 0.06) { FOG_SCALE = want; applySky(); }
+}
+
+// ---------------------------------------------------------------------------
 //  camera limits: never under the paving, never with the target underground
 // ---------------------------------------------------------------------------
 function clampCamera() {
@@ -415,7 +426,7 @@ document.addEventListener('keyup', function (e) { WALK.keys[e.code] = false; });
 window.addEventListener('blur', function () { WALK.keys = {}; });
 
 // ---------------------------------------------------------------------------
-controls.addEventListener('change', function () { RENDER_STATE.lastMotion = performance.now(); requestRender(); });
+controls.addEventListener('change', function () { RENDER_STATE.lastMotion = performance.now(); fitFog(); requestRender(); });
 
 window.addEventListener('resize', function () {
   camera.aspect = window.innerWidth / window.innerHeight;
@@ -434,7 +445,7 @@ function startLoop() {
     if (!WALK.active) moved = controls.update() || moved;
     else moved = walkUpdate(dt) || moved;
     if (!WALK.active) moved = clampCamera() || moved;
-    if (moved || camFlight) fitNearPlane();
+    if (moved || camFlight) { fitNearPlane(); fitFog(); }
     if (controls.autoRotate) moved = true;
     if (moved) { RENDER_STATE.lastMotion = now; RENDER_STATE.dirty = true; RENDER_STATE.hqDone = false; }
     if (RENDER_STATE.dirty) {

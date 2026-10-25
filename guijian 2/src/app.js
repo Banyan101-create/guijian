@@ -74,7 +74,6 @@ function buildModel() {
 
   var hw = (D.totalWidth * scale) / 2;
   var hd = (D.totalDepth * scale) / 2;
-  var colH = D.colH * scale;
   var baseH = D.baseH * scale;
   // 踩: the bracket rank follows the building's -- 九踩 on the greatest halls,
   // 七踩, then 五踩
@@ -82,8 +81,6 @@ function buildModel() {
   var dgOut = 3 * u * dgSteps;
   // 上檐出 is measured from the 挑檐桁, so on a bracketed hall the 拽架 add to it
   var eaveOut = D.eaveOut * scale * ROOF_CURVE.eave + dgOut;
-  var roofRise = D.roofRise * scale * ROOF_CURVE.rise;
-  var upturn = D.cornerRise * scale * ROOF_CURVE.lift;
   // 瓦垄: tile size follows the building's rank (larger 样 on larger halls)
   var tileM = (0.18 + 0.05 * D.doukouCun) * tileScale;
   var ridgeM = 0.55 + 0.12 * D.doukouCun;
@@ -201,23 +198,18 @@ function buildModel() {
     brick: dress(std('#8f8e8a'), 'wallBrick', Me),
     cap: dress(std(cRoof), 'stone', Me, { size: 1.4, roughMul: 0.6 }),
     door: dress(std(cWood), 'lacquer', Me),
-    cityWall: std('#' + new THREE.Color(cWall).multiplyScalar(0.82).getHexString(), { roughness: 0.92 }),
-    cityEave: std('#2f2622', { roughness: 0.9 }),
     cityGround: dress(std('#7e7b75', { vertexColors: true }), 'brick', 1, { size: 1.92 * Me, normal: 0.3 }),
-    cityRoof: std('#' + new THREE.Color(cRoof).multiplyScalar(0.82).getHexString(), { roughness: 0.5 }),
-    cityBase: std('#bdb8ab', { roughness: 0.85 }),
     gold: goldMat
   };
   BOUNCE_ALBEDO.copy(C('#8d8a83')).multiplyScalar(0.8);
 
-  var thick = Math.max(0.04, D.purlinDia * scale * 0.5);
-  var rafter = { spacing: 3 * u, r: 0.75 * u, fly: 1.5 * u, flyLen: 7 * u };
 
   var pgRows = document.querySelectorAll('.pg');
   for (var pi = 0; pi < pgRows.length; pi++)
     pgRows[pi].style.display = isPagoda ? 'block' : 'none';
 
-  var info = { type: isPagoda ? 'pagoda' : 'hall', M: Me, mats: mats, lamps: new LampSet(Me) };
+  var info = { type: isPagoda ? 'pagoda' : 'hall', M: Me, mats: mats, lamps: new LampSet(Me),
+               colors: { roof: cRoof, wall: cWall } };
   // what the court's own halls inherit: one family of rank, period and colour
   info.hallP = {
     grade: grade, isDaShi: isDaShi, isSong: isSong, grade3: grade3, caihua: val('caihua') > 0.5,
@@ -331,6 +323,9 @@ function finishBuild(topY, radius, info, siteMats) {
   worldScaleUVs(site);
   siteGroup.add(site);
   MODEL_INFO.obstacles = [];
+  // the city, temple town or country round it all: rebuilt only when the
+  // court changes size or the scheme its colours
+  updateWorld(info, site.userData.court, COURT_BUILD.first);
   var gen = ++COURT_BUILD.gen;
   clearTimeout(COURT_BUILD.timer);
   function furnish(sync) {

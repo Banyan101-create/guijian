@@ -157,7 +157,6 @@ function addTuft(leaf, centre, r, sx, sy, sz, seed, tint) {
   addClump(leaf.core, centre, r * 0.36, sx, sy, sz, seed, tint * 0.9);
   var flat = sy < 0.6;
   var k = r > 1.3 ? 11 : r > 0.95 ? 9 : 7;
-  var C = new THREE.Color();
   for (var i = 0; i < k; i++) {
     var a = rnd() * Math.PI * 2;
     // pine pads lie flat, so their cards mostly face up; cypress sprays stand
@@ -431,7 +430,7 @@ function buildCourt(info, court, mats, siteMats, lamps, g) {
   var merge = new THREE.Group();
   merge.name = 'courtMerge';
   g.add(merge);
-  var obstacles = [], halls = [], keepOut = [], blobs = [];
+  var obstacles = [], keepOut = [], blobs = [];
   function blob(x, z, r) { blobs.push([x, z, r]); }
   var walled = SITE.mode === 'court';
   var isPagoda = info.type === 'pagoda';

@@ -27,131 +27,6 @@ function weatherPlane(geo, w, d, cx, cz, scale, amt, edgeFn) {
   geo.setAttribute('color', new THREE.BufferAttribute(col, 3));
 }
 
-// ---------------------------------------------------------------------------
-//  宫城 the palace city beyond the wall: rows of lesser halls on the same grid,
-//  instanced (three draw calls for all of them) and left to the haze. A court
-//  that opens onto an empty plain reads as a stage set; one that opens onto
-//  more roofs reads as a place.
-// ---------------------------------------------------------------------------
-var _cityGeo = null;
-function cityGeos() {
-  if (_cityGeo) return _cityGeo;
-  // unit 庑殿 roof over [-0.5,0.5]^2 as a height field: the concave 举架
-  // section, a ridge along x, corners lifted -- at distance it is the curve
-  // and the upturn that say "Chinese roof", not the tile count
-  var N = 18, pos = [], idx = [], rr = 0.42;
-  for (var j = 0; j <= N; j++) for (var i = 0; i <= N; i++) {
-    var x = -1 + 2 * i / N, z = -1 + 2 * j / N;
-    var t = Math.max(Math.abs(z), Math.max(0, Math.abs(x) - rr) / (1 - rr));
-    var y = Math.pow(1 - Math.min(1, t), 1.7) + 0.16 * Math.pow(Math.abs(x), 4) * Math.pow(Math.abs(z), 4);
-    pos.push(x * 0.5, y, z * 0.5);
-  }
-  for (var j2 = 0; j2 < N; j2++) for (var i2 = 0; i2 < N; i2++) {
-    var a = j2 * (N + 1) + i2, b = a + 1, c = a + N + 1, d = c + 1;
-    idx.push(a, c, b, b, c, d);
-  }
-  var roof = new THREE.BufferGeometry();
-  roof.setIndex(idx);
-  roof.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
-  roof.computeVertexNormals();
-  var body = new THREE.BoxGeometry(1, 1, 1); body.translate(0, 0.5, 0);
-  var base = new THREE.BoxGeometry(1, 1, 1); base.translate(0, 0.5, 0);
-  return (_cityGeo = { roof: roof, body: body, base: base });
-}
-
-// a row of 槅扇 door leaves, as a hall front reads from across a court:
-// red stiles and rails, the lattice panels warm where light comes through
-var _cityDoors = null;
-function cityDoorTexture() {
-  if (_cityDoors) return _cityDoors;
-  var c = document.createElement('canvas');
-  c.width = 256; c.height = 64;
-  var x = c.getContext('2d');
-  x.fillStyle = '#5a1d14'; x.fillRect(0, 0, 256, 64);
-  var leaves = 12, lw = 256 / leaves;
-  for (var i = 0; i < leaves; i++) {
-    var lx = i * lw;
-    x.fillStyle = '#c99a62'; x.fillRect(lx + 2.5, 6, lw - 5, 34);       // 槅心
-    x.fillStyle = 'rgba(70,24,14,0.55)';
-    for (var k = 0; k < 5; k++) x.fillRect(lx + 2.5, 8 + k * 7, lw - 5, 1.2);
-    for (var k2 = 1; k2 < 3; k2++) x.fillRect(lx + 2.5 + k2 * (lw - 5) / 3, 6, 1.2, 34);
-    x.fillStyle = '#6b2418'; x.fillRect(lx + 3, 44, lw - 6, 15);          // 裙板
-  }
-  _cityDoors = new THREE.CanvasTexture(c);
-  _cityDoors.encoding = THREE.sRGBEncoding;
-  _cityDoors.userData = { cached: true };
-  return _cityDoors;
-}
-
-function buildCity(court, M, mats, g) {
-  var G = cityGeos();
-  var rnd = TEXGEN.rng(1407);
-  var cell = Math.max(court.hx * 0.5, 18 * M);
-  var spots = [];
-  for (var gx = -7; gx <= 7; gx++) {
-    for (var gz = -7; gz <= 7; gz++) {
-      var cx = gx * cell, cz = gz * cell + (court.zf + court.zb) / 2;
-      // keep clear of the court, with a street's width beyond its wall, and of
-      // the axis in front of the gate
-      var gap = cell * 1.2 + 10 * M;
-      if (Math.abs(cx) < court.hx + gap && cz > court.zb - gap && cz < court.zf + gap) continue;
-      if (Math.abs(cx) < cell * 0.8 && cz > court.zf) continue;
-      if (rnd() < 0.3) continue;
-      var w = cell * (0.40 + 0.25 * rnd()), d = cell * (0.22 + 0.10 * rnd());
-      var h = (4.5 + 2.5 * rnd()) * M;
-      spots.push({ x: cx + (rnd() - 0.5) * cell * 0.2, z: cz + (rnd() - 0.5) * cell * 0.2, w: w, d: d, h: h, b: (0.6 + 0.9 * rnd()) * M });
-    }
-  }
-  var n = spots.length;
-  var bodies = new THREE.InstancedMesh(G.body, mats.cityWall, n);
-  var roofs = new THREE.InstancedMesh(G.roof, mats.cityRoof, n);
-  var bases = new THREE.InstancedMesh(G.base, mats.cityBase, n);
-  var eaves = new THREE.InstancedMesh(G.base, mats.cityEave, n);
-  // a ridge along every roof, with a lift at each end where the 吻 sits
-  var ridges = new THREE.InstancedMesh(G.base, mats.cityRoof, n * 3);
-  var m4 = new THREE.Matrix4();
-  spots.forEach(function (s, i) {
-    m4.makeScale(s.w * 1.08, s.b, s.d * 1.25); m4.setPosition(s.x, 0, s.z); bases.setMatrixAt(i, m4);
-    m4.makeScale(s.w, s.h, s.d); m4.setPosition(s.x, s.b, s.z); bodies.setMatrixAt(i, m4);
-    // the band of shade under the eave, which is most of what makes a hall
-    // read as a hall from a distance
-    m4.makeScale(s.w * 1.01, s.h * 0.24, s.d * 1.01); m4.setPosition(s.x, s.b + s.h * 0.76, s.z); eaves.setMatrixAt(i, m4);
-    m4.makeScale(s.w * 1.14, s.d * 0.40, s.d * 1.34); m4.setPosition(s.x, s.b + s.h, s.z); roofs.setMatrixAt(i, m4);
-    var ry = s.b + s.h + s.d * 0.40 * 0.96, rh = Math.max(0.35 * M, s.d * 0.035);
-    m4.makeScale(s.w * 1.14 * 0.42, rh, rh * 1.1); m4.setPosition(s.x, ry - rh * 0.4, s.z); ridges.setMatrixAt(i * 3, m4);
-    [-1, 1].forEach(function (e, k) {
-      m4.makeScale(rh * 1.2, rh * 2.4, rh * 1.3); m4.setPosition(s.x + e * s.w * 1.14 * 0.21, ry - rh * 0.4, s.z); ridges.setMatrixAt(i * 3 + 1 + k, m4);
-    });
-  });
-  // r128 culls an InstancedMesh by its one template's bounds at the origin,
-  // which would drop the whole city whenever the origin left the view
-  [bodies, roofs, bases, eaves, ridges].forEach(function (im) { im.instanceMatrix.needsUpdate = true; im.receiveShadow = true; im.frustumCulled = false; g.add(im); });
-
-  // the 槅扇 front of each hall: a dark band of lattice by day; by night most
-  // of them are lit from within, a few stay dark
-  var win = new THREE.PlaneGeometry(1, 1);
-  win.userData.ownUVs = true;
-  var doors = cityDoorTexture();
-  var litMat = lampMat(new THREE.MeshStandardMaterial({ color: 0xffffff, map: doors, emissiveMap: doors, roughness: 0.7 }), new THREE.Color(1.0, 0.62, 0.30), 0.55);
-  var darkMat = new THREE.MeshStandardMaterial({ color: 0xffffff, map: doors, roughness: 0.7 });
-  var lit = [], dark = [];
-  spots.forEach(function (s) { [1, -1].forEach(function (f) { (rnd() < 0.72 ? lit : dark).push({ s: s, f: f }); }); });
-  [[lit, litMat], [dark, darkMat]].forEach(function (L) {
-    if (!L[0].length) return;
-    var im = new THREE.InstancedMesh(win, L[1], L[0].length);
-    L[0].forEach(function (w, i) {
-      var s = w.s;
-      m4.makeRotationY(w.f > 0 ? 0 : Math.PI);
-      m4.scale(new THREE.Vector3(s.w * 0.80, s.h * 0.46, 1));
-      m4.setPosition(s.x, s.b + s.h * 0.40, s.z + w.f * (s.d / 2 + 0.02 * M));
-      im.setMatrixAt(i, m4);
-    });
-    im.instanceMatrix.needsUpdate = true;
-    im.frustumCulled = false;
-    g.add(im);
-  });
-}
-
 function buildSite(info, mats) {
   var g = new THREE.Group();
   var M = info.M;
@@ -278,7 +153,6 @@ function buildSite(info, mats) {
     g.add(studs);
   }
 
-  if (showWalls) buildCity(court, M, mats, g);
 
   g.userData.court = court;
   return g;

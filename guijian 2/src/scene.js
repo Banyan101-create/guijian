@@ -263,6 +263,7 @@ function applySky() {
 
 function setFogScale(r) {
   FOG_SCALE = Math.max(8, r);
+  if (typeof FOG_BASE !== 'undefined') FOG_BASE = FOG_SCALE;
   applySky();
   requestRender();
 }

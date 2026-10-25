@@ -402,6 +402,55 @@ var TEXGEN = (function () {
       });
       SETS.foliage.size = 1.4;
     })();
+
+    // --------------------------------------------------------------- 水 water
+    // Moat and stream: dark, nearly still water. The albedo hardly matters --
+    // what reads is the sky in it, broken by a fine wind ripple, so the normal
+    // map carries two crossing ripple trains and a slow swell.
+    (function () {
+      var f = new Fbm(401, 8, 3), g = new Fbm(402, 24, 2);
+      SETS.water = buildSet(256, 256, 1.2, function (u, v, x, y, o) {
+        var r1 = Math.sin((u * 7 + v * 3 + f.at(u, v) * 2.5) * Math.PI * 2);
+        var r2 = Math.sin((u * -4 + v * 9 + g.at(u, v) * 2.0) * Math.PI * 2);
+        o.h = 0.5 + 0.18 * r1 + 0.12 * r2 + 0.25 * (f.at(u * 2, v * 2) - 0.5);
+        var t = 0.9 + 0.1 * f.at(u, v);
+        o.r = o.g = o.b = t;
+        o.ro = 0.06;
+      });
+      SETS.water.size = 6.0;
+    })();
+
+    // --------------------------------------------------------------- 草 grass
+    // Hillside and field-margin grass, worn to earth in patches.
+    (function () {
+      var f = new Fbm(501, 4, 4), g = new Fbm(502, 48, 2), w = new Fbm(503, 8, 3);
+      SETS.grass = buildSet(256, 256, 1.6, function (u, v, x, y, o) {
+        var n = f.at(u, v), blade = g.at(u, v), wear = w.at(u, v);
+        var bare = Math.max(0, Math.min(1, (wear - 0.62) * 6));
+        var gr = 0.70 + 0.28 * blade + 0.1 * (n - 0.5);
+        o.r = gr * (0.78 + 0.35 * bare); o.g = gr * (1.0 - 0.12 * bare); o.b = gr * (0.62 + 0.25 * bare);
+        o.h = blade * (1 - bare); o.ro = 0.9;
+      });
+      SETS.grass.size = 2.5;
+    })();
+
+    // ---------------------------------------------------------- 田 farmland
+    // Rows of crop on ploughed earth: the tile is one strip of field, its
+    // colour varied per field by the material and the vertex colour.
+    (function () {
+      var f = new Fbm(601, 8, 3), g = new Fbm(602, 32, 2);
+      SETS.field = buildSet(256, 256, 1.4, function (u, v, x, y, o) {
+        var row = Math.abs(Math.sin(u * Math.PI * 16));
+        var crop = Math.pow(row, 0.5) * (0.75 + 0.25 * g.at(u, v));
+        var n = f.at(u, v);
+        var earth = 0.62 + 0.1 * n, leaf = 0.95 + 0.1 * n;
+        o.r = earth * (1 - crop) * 1.05 + leaf * crop * 0.78;
+        o.g = earth * (1 - crop) * 0.92 + leaf * crop * 1.0;
+        o.b = earth * (1 - crop) * 0.75 + leaf * crop * 0.62;
+        o.h = crop; o.ro = 0.92;
+      });
+      SETS.field.size = 8.0;
+    })();
   }
 
   // ==========================================================================

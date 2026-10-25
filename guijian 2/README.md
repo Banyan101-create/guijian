@@ -123,13 +123,14 @@ src/
   palette.js    the five 正色 and the eight presets
   site.js       courtyard, 御路, palace wall and gate, the palace city beyond (never exported)
   court.js      what stands in the court: 配殿, 钟鼓楼, 廊庑, trees, 吉祥缸, 香炉, 石灯
+  world.js      what lies beyond the wall: palace city, temple town or open country
   app.js        rebuild(), materials, OBJ export with per-part welding
   ui.js         control surface
 ```
 
 Load order matters: `textures → scene → sky → geom → render → lamps →
-constants → roof → pagoda → hall → hallbuild → palette → site → court → app →
-ui`. Three.js r128, its OrbitControls
+constants → roof → pagoda → hall → hallbuild → palette → site → court → world →
+app → ui`. Three.js r128, its OrbitControls
 and its `Sky` come from the CDN.
 
 Bay widths are **unequal** (77 斗口 at the 明间, −11 per bay outward), so
@@ -209,6 +210,22 @@ needle sprays round a dark core, instanced, casting real shadows. Bronze
 吉祥缸 water vats stand before the platform, a 香炉 censer on the axis, and
 石灯 stone lanterns line the way. 陈设 turns it all off. The court is built a
 moment after the last edit, so dragging a slider stays as quick as before.
+
+**The world beyond the wall.** A hall stands in a palace city: walled
+compounds on a grid of lanes, each with its main hall, side halls, gatehouse,
+trees, and here and there a garden with a pond and a pavilion; a forecourt to
+the south with the 金水河 bowed across it under five marble bridges, and a great
+gate on a 城台; a crenellated outer wall with 角楼 corner towers; the moat; 景山 to
+the north with its pavilions; 北海 to the west, the White Dagoba on its island;
+and hutong neighbourhoods of 四合院 fraying into the haze. A pagoda stands in a
+temple town instead -- hutong all round, a market street with 牌楼 running south
+to the city gate, a canal with stone bridges. In 旷野 the court stands among
+villages, a patchwork of fields, poplar windbreaks and a river. Every building
+out there is a real small building -- a curved, upturned roof with eaves,
+soffit, ridges and gables over a columned, latticed front -- made once per kind
+and instanced, about two hundred draw calls for all of it; its windows light
+at night. It is cached, and only rebuilt when the court changes size or the
+scheme's roof or wall colour changes.
 
 **Day and night.** The clock runs the whole 24 hours. After sunset the same
 directional light becomes the full moon (the equinox full moon rises as the
