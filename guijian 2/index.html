@@ -350,11 +350,17 @@
 
         <!-- ================================================= 光照 light -->
         <section class="pane" data-pane="light" role="tabpanel">
-          <div class="sec"><b>时辰</b><span>daylight</span></div>
+          <div class="sec"><b>时辰</b><span>time of day</span></div>
 
           <div class="row" data-ctl="slider">
-            <div class="row-head"><span class="row-label">日照 <em>time of day</em></span><span class="row-val" id="dayOut"></span></div>
-            <input type="range" id="daylight" min="0" max="100" step="1" value="66">
+            <div class="row-head"><span class="row-label">时刻 <em>clock</em></span><span class="row-val" id="dayOut"></span></div>
+            <input type="range" id="clock" min="0" max="1435" step="5" value="840">
+          </div>
+
+          <div class="row row-switch" data-ctl="switch">
+            <span class="row-label">流转 <em>time-lapse</em></span>
+            <span class="row-val" id="tlOut"></span>
+            <input type="range" id="timelapse" min="0" max="1" step="1" value="0">
           </div>
 
           <div class="row" data-ctl="seg">
@@ -366,6 +372,11 @@
             </select>
           </div>
 
+          <div class="row" data-ctl="slider">
+            <div class="row-head"><span class="row-label">云量 <em>cloud cover</em></span><span class="row-val" id="cloudOut"></span></div>
+            <input type="range" id="clouds" min="0" max="100" step="1" value="38">
+          </div>
+
           <div class="sec"><b>场景</b><span>scene</span></div>
 
           <div class="row" data-ctl="seg">
@@ -374,6 +385,12 @@
               <option value="court">宫院 courtyard</option>
               <option value="open">旷野 open</option>
             </select>
+          </div>
+
+          <div class="row row-switch" data-ctl="switch">
+            <span class="row-label">陈设 <em>court furnishings</em></span>
+            <span class="row-val" id="crOut"></span>
+            <input type="range" id="courtOn" min="0" max="1" step="1" value="1">
           </div>
 
           <div class="row row-switch" data-ctl="switch">
@@ -394,7 +411,7 @@
             <input type="range" id="hq" min="0" max="1" step="1" value="1">
           </div>
 
-          <p class="note">The sun follows its real path over Beijing at the equinox: up due east at 06:00, fifty degrees high at noon, down due west at 18:00. Raking light at 卯时 and 酉时 reads the 举架 curve and the corner sweep best; 午时 flattens them. 精细 adds contact shadow to every still frame once the camera stops moving.</p>
+          <p class="note">The sun follows its real path over Beijing at the equinox: up due east at 06:00, fifty degrees high at noon, down due west at 18:00. After dusk the full moon rises in the east, the stars come out, and the palace lights its lanterns and windows. Raking light at 卯时 and 酉时 reads the 举架 curve and the corner sweep best; 午时 flattens them. 精细 adds contact shadow to every still frame once the camera stops moving.</p>
         </section>
 
         <!-- ================================================== 数据 data -->
@@ -449,6 +466,10 @@
     <button type="button" data-view="detail" title="近观 corner eave close-up">近</button>
     <button type="button" id="fitBtn" title="全景 fit to model">全</button>
     <i></i>
+ <button type="button" id="nightBtn" title="昼夜 day / night" aria-pressed="false">
+      <svg class="ic-sun" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="3"/><path d="M8 1.5v1.6M8 12.9v1.6M1.5 8h1.6M12.9 8h1.6M3.4 3.4l1.1 1.1M11.5 11.5l1.1 1.1M3.4 12.6l1.1-1.1M11.5 4.5l1.1-1.1"/></svg>
+      <svg class="ic-moon" viewBox="0 0 16 16" aria-hidden="true"><path d="M12.8 10.4A5.6 5.6 0 0 1 5.6 3.2a5.6 5.6 0 1 0 7.2 7.2z"/></svg>
+    </button>
     <button type="button" id="walkBtn" title="漫游 walk (WASD / arrows, drag to look, Esc to leave)" aria-pressed="false">游</button>
     <button type="button" id="spinBtn" title="转台 turntable" aria-pressed="false">
       <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M13.5 8a5.5 5.5 0 1 1-1.9-4.16"/><path d="M13.6 1.6v2.9h-2.9"/></svg>
@@ -468,14 +489,18 @@
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/objects/Sky.js"></script>
 <script src="src/textures.js"></script>
 <script src="src/scene.js"></script>
+<script src="src/sky.js"></script>
 <script src="src/geom.js"></script>
 <script src="src/render.js"></script>
+<script src="src/lamps.js"></script>
 <script src="src/constants.js"></script>
 <script src="src/roof.js"></script>
 <script src="src/pagoda.js"></script>
 <script src="src/hall.js"></script>
+<script src="src/hallbuild.js"></script>
 <script src="src/palette.js"></script>
 <script src="src/site.js"></script>
+<script src="src/court.js"></script>
 <script src="src/app.js"></script>
 <script src="src/ui.js"></script>
 </body>

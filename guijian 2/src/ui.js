@@ -517,54 +517,116 @@
   })();
 
   /* ------------------------------------------------------------- daylight */
-  // These three drive the scene directly. They deliberately do NOT go through
+  // These drive the scene directly. They deliberately do NOT go through
   // rebuild(): relighting must not regenerate 50k triangles per slider pixel.
   (function () {
-    var day = $('daylight'), sh = $('shadows'), gd = $('groundOn');
+    var day = $('clock'), sh = $('shadows'), gd = $('groundOn');
     var wx = $('weather'), env = $('envMode'), hq = $('hq');
+    var cl = $('clouds'), tl = $('timelapse'), nb = $('nightBtn');
     if (!day) return;
 
-    // 05:00 to 19:00 across the slider, named by the traditional double-hours
-    // real 时辰 boundaries: 卯 5-7, 辰 7-9, 巳 9-11, 午 11-13, 未 13-15, 申 15-17, 酉 17-19
+    // the twelve double-hours, 子时 straddling midnight
     var SHICHEN = [
-      [7,  '卯时 dawn'],      [9,  '辰时 morning'],  [11, '巳时 forenoon'],
-      [13, '午时 noon'],      [15, '未时 afternoon'], [17, '申时 late day'],
-      [99, '酉时 dusk']
+      [1, '子时 midnight'], [3, '丑时 small hours'], [5, '寅时 before dawn'], [7, '卯时 dawn'],
+      [9, '辰时 morning'], [11, '巳时 forenoon'], [13, '午时 noon'], [15, '未时 afternoon'],
+      [17, '申时 late day'], [19, '酉时 dusk'], [21, '戌时 evening'], [23, '亥时 night'], [25, '子时 midnight']
     ];
-    function label(t) {
-      var h = 5 + t * 14;
-      var name = SHICHEN[SHICHEN.length - 1][1];
-      for (var i = 0; i < SHICHEN.length; i++)
-        if (h < SHICHEN[i][0]) { name = SHICHEN[i][1]; break; }
-      var hh = Math.floor(h), mm = Math.round((h - hh) * 60);
-      if (mm === 60) { hh++; mm = 0; }
+    function label(min) {
+      var h = min / 60, name = '';
+      for (var i = 0; i < SHICHEN.length; i++) if (h < SHICHEN[i][0]) { name = SHICHEN[i][1]; break; }
+      var hh = Math.floor(min / 60) % 24, mm = Math.round(min % 60);
+      if (mm === 60) { hh = (hh + 1) % 24; mm = 0; }
       return (hh < 10 ? '0' : '') + hh + ':' + (mm < 10 ? '0' : '') + mm + ' ' + name;
     }
 
-    // relighting is cheap but rebuilding the environment map is not, so each
-    // piece is only touched when its own control actually changed
-    var last = { t: null, w: null };
+    // `minutes` is the clock the scene is lit for. The slider snaps to five
+    // minutes; animation runs between its stops, so it is kept apart.
+    var minutes = +day.value;
+    var last = { m: null, w: null, c: null };
+    function light(m) {
+      minutes = ((m % 1440) + 1440) % 1440;
+      last.m = minutes; last.w = wx.value;
+      applyDaylight(minutes / 1440, wx.value);
+      $('dayOut').textContent = label(minutes);
+      if (nb) nb.setAttribute('aria-pressed', NIGHT.k > 0.5 ? 'true' : 'false');
+    }
+
     syncers.push(function () {
-      var t = (+day.value) / 100, w = wx.value;
-      if (t !== last.t || w !== last.w) { last.t = t; last.w = w; applyDaylight(t, w); }
+      var m = +day.value, w = wx.value;
+      if (!anim && !lapse && (m !== Math.round(last.m) || w !== last.w)) light(m);
+      else if (w !== last.w) light(minutes);
+      var c = (+cl.value) / 100;
+      if (c !== last.c) { last.c = c; setCloudCover(c); }
+      $('cloudOut').textContent = Math.round(c * 100) + '%';
       var shOn = (+sh.value) > 0.5;
       if (sun.castShadow !== shOn) { sun.castShadow = shOn; markShadowsDirty(); }
       var gOn = (+gd.value) > 0.5;
-      if (SITE.visible !== gOn) { SITE.visible = gOn; siteGroup.visible = gOn; requestRender(); }
+      if (SITE.visible !== gOn) { SITE.visible = gOn; siteGroup.visible = gOn; applyNightLights(); requestRender(); }
       var hqOn = (+hq.value) > 0.5;
       if (HQ.enabled !== hqOn) { HQ.enabled = hqOn; requestRender(); }
-      $('dayOut').textContent = label(t);
+      $('dayOut').textContent = label(minutes);
       $('shOut').textContent = shOn ? 'on' : 'off';
       $('gdOut').textContent = gOn ? 'on' : 'off';
       $('hqOut').textContent = hqOn ? (HQ.ok ? 'on' : 'n/a') : 'off';
+      var lOn = (+tl.value) > 0.5;
+      $('tlOut').textContent = lOn ? 'on' : 'off';
+      if (lOn && !lapse) startLapse();
+      if (!lOn && lapse) lapse = null;
     });
 
-    [day, sh, gd, wx, hq].forEach(function (el) {
-      el.addEventListener('input', sync);
+    // dragging the clock takes over from whatever was running it
+    day.addEventListener('input', function () { anim = null; light(+day.value); });
+    [sh, gd, wx, hq, cl, tl].forEach(function (el) { el.addEventListener('input', sync); });
+
+    // ---- 流转 time-lapse: an hour every second and a half
+    var lapse = null;
+    function startLapse() {
+      lapse = { t: performance.now() };
+      (function step() {
+        if (!lapse) return;
+        var now = performance.now(), dt = Math.min(0.1, (now - lapse.t) / 1000);
+        lapse.t = now;
+        if (!anim) {
+          light(minutes + dt * 40);
+          day.value = Math.round(minutes / 5) * 5 % 1440;
+        }
+        requestAnimationFrame(step);
+      })();
+    }
+
+    // ---- 昼夜: run the clock forward to evening or to the next afternoon,
+    // through dusk or dawn, rather than cutting
+    var anim = null;
+    function runTo(target, ms) {
+      var from = minutes, delta = ((target - from) % 1440 + 1440) % 1440;
+      if (delta < 1) return;
+      anim = { t0: performance.now(), ms: ms, from: from, delta: delta };
+      nb.classList.add('busy');
+      (function step() {
+        if (!anim) { nb.classList.remove('busy'); return; }
+        var k = Math.min(1, (performance.now() - anim.t0) / anim.ms);
+        var e = k < 0.5 ? 2 * k * k : 1 - Math.pow(-2 * k + 2, 2) / 2;
+        light(anim.from + anim.delta * e);
+        day.value = Math.round(minutes / 5) * 5 % 1440;
+        if (k < 1) requestAnimationFrame(step);
+        else { anim = null; nb.classList.remove('busy'); light(target); day.value = target; }
+      })();
+    }
+    if (nb) nb.addEventListener('click', function () {
+      if (NIGHT.k > 0.5) runTo(14 * 60, 3600);
+      else runTo(21 * 60 + 30, 3000);
     });
-    // the setting changes what the site builds, so it goes through rebuild()
+
+    // the setting and the furnishings change what the site builds, so they
+    // go through rebuild()
+    var cr = $('courtOn');
     env.addEventListener('input', function () { SITE.mode = env.value; rebuild(); });
-    REBUILD_PRE.push(function () { SITE.mode = env.value; });
+    cr.addEventListener('input', function () { SITE.furnish = (+cr.value) > 0.5; rebuild(); });
+    REBUILD_PRE.push(function () { SITE.mode = env.value; SITE.furnish = (+cr.value) > 0.5; });
+    syncers.push(function () { $('crOut').textContent = (+cr.value) > 0.5 ? 'on' : 'off'; });
+    // 读取 load writes the slider directly; light from it on the next sync
+    REBUILD_PRE.push(function () { if (!anim && !lapse) minutes = +day.value; });
+    light(minutes);
   })();
 
   /* --------------------------------------------------------- view toolbar */

@@ -49,6 +49,8 @@ function buildModel() {
       disposeGroup(stale);
     }
   });
+  resetLamps();
+  pruneAoHidden();
 
   var grade   = parseInt(document.getElementById('doukou').value);
   var bays    = parseInt(document.getElementById('bays').value);
@@ -144,6 +146,8 @@ function buildModel() {
   var frameMat  = dress(std(cLattice), 'lacquer', Me, { normal: 0.5 });
   var goldMat   = std('#d9b24f', { metalness: 1.0, roughness: 0.34 });
   var glassMat  = std(isPagodaMode() ? '#3a2c22' : '#1b1714', { roughness: isPagodaMode() ? 0.5 : 0.09, metalness: 0.0, envMapIntensity: 1.1 });
+  // after dark the 窗户纸 behind the lattice glows with the lamps inside
+  lampMat(glassMat, new THREE.Color(1.0, 0.64, 0.32), isPagodaMode() ? 0.8 : 2.2);
   var baseMat   = dress(std(cBase), 'ashlar', Me, { normal: 1.0 });
   var pavingMat = dress(std('#' + new THREE.Color(cBase).multiplyScalar(0.94).getHexString()), 'slab', Me, { normal: 0.9 });
   var plinthMat = dress(std(cBase), 'stone', Me, { normal: 0.6 });
@@ -176,7 +180,8 @@ function buildModel() {
     dgA: dgA, dgB: dgB, dg: dgA, wall: wallMat, dijian: dijianMat,
     frame: frameMat, grid: gridMat, glass: glassMat, lattice: frameMat,
     base: baseMat, paving: pavingMat, plinth: plinthMat, stone: stoneMat, rail: stoneMat,
-    step: stepMat, relief: reliefMat, wood: lacquer
+    step: stepMat, relief: reliefMat, wood: lacquer, floor: floorMat,
+    tassel: std('#9c1c16', { roughness: 0.9 })
   };
 
   // 墙帽 tiles: the roof texture again, its repeat set from world units since
@@ -212,7 +217,13 @@ function buildModel() {
   for (var pi = 0; pi < pgRows.length; pi++)
     pgRows[pi].style.display = isPagoda ? 'block' : 'none';
 
-  var info = { type: isPagoda ? 'pagoda' : 'hall', M: Me };
+  var info = { type: isPagoda ? 'pagoda' : 'hall', M: Me, mats: mats, lamps: new LampSet(Me) };
+  // what the court's own halls inherit: one family of rank, period and colour
+  info.hallP = {
+    grade: grade, isDaShi: isDaShi, isSong: isSong, grade3: grade3, caihua: val('caihua') > 0.5,
+    cejiao: useCejiao, tuishan: useTuishan, beasts: val('beasts') > 0.5, tileScale: tileScale,
+    colours: { qing: cBeam, lv: cCaihua, red: '#' + new THREE.Color(cWood).lerp(new THREE.Color(cWall), 0.3).getHexString() }
+  };
 
   if (isPagoda) {
     var storeys = parseInt(document.getElementById('storeys').value);
@@ -233,11 +244,17 @@ function buildModel() {
     }, mats, { M: Me, tileP: tileM * Me, courseL: tileM * Me * 0.92, ridgeH: ridgeM * Me });
     pg.position.y = baseH;
     buildingGroup.add(pg);
+    (pg.userData.lamps || []).forEach(function (lp) { info.lamps.hang(lp.x, lp.y + baseH, lp.z, lp.s); });
+    // the doorway's light on the terrace, and the lowest lanterns
+    info.lamps.light(0, baseH + 2.4 * Me, pagodaR * 1.15, 1.3, 16 * Me, 6);
+    info.lamps.light(-pagodaR * 0.9, baseH + D.colH * ps, pagodaR * 0.9, 0.9, 14 * Me, 5);
+    info.lamps.light(pagodaR * 0.9, baseH + D.colH * ps, pagodaR * 0.9, 0.9, 14 * Me, 5);
 
     var pgH = (pg.userData.totalHeight || 10) + baseH;
     info.width = pbase.userData.topHW * 2;
     info.depth = info.width;
     info.frontZ = pbase.userData.topHD + pgSteps.userData.run;
+    info.platformHD = pbase.userData.topHD;
     info.stepsHalfW = pagodaR * 0.38;
     info.stepsFootZ = info.frontZ;
     MODEL_INFO = {
@@ -257,86 +274,23 @@ function buildModel() {
     return;
   }
 
-  // --------------------------------------------------------------- 台基
-  var base = buildBase(hw, hd, baseH, 2, mats, { margin: Math.min(0.75, eaveOut * 0.72), xumi: isDaShi });
-  buildingGroup.add(base);
-
-  var floor = new THREE.Mesh(new THREE.BoxGeometry(hw * 2, 0.02 * M, hd * 2), floorMat);
-  floor.position.y = baseH + 0.01 * M;
-  floor.receiveShadow = true;
-  buildingGroup.add(floor);
-
-  var colR = D.colDia * scale / 2;
+  // --------------------------------------------------------------- the hall
   var colours = { qing: cBeam, lv: cCaihua, red: '#' + new THREE.Color(cWood).lerp(new THREE.Color(cWall), 0.3).getHexString() };
-  var S = { D: D, scale: scale, M: M, u: u };
-  var columns = buildColumns(S, baseH, mats, {
-    shengqi: useShengqi, cejiao: useCejiao, daShi: isDaShi,
-    caihua: val('caihua') > 0.5, grade: grade3, colours: colours
-  });
-  buildingGroup.add(columns);
-  var colTop = columns.userData.colTop, beamBottom = columns.userData.beamBottom;
-  buildingGroup.add(buildWalls(hw, hd, baseH, beamBottom, mats, colR));
-  buildingGroup.add(buildLattice(S, hd, baseH, beamBottom, mats, colR, { rich: grade3 !== 'sushi' }));
-
-  // 踏跺 as wide as the 明间, its top tread flush with the platform edge
-  var stepHalf = (D.bayWidths[(bays - 1) / 2] * scale) / 2 - colR;
-  var steps = buildSteps(stepHalf, baseH, mats, M, { yulu: isDaShi && grade <= 6 });
-  steps.position.z = base.userData.topHD;
-  buildingGroup.add(steps);
-
-  if (val('railing') > 0.5) {
-    var rx = base.userData.topHW - 0.28 * M, rz = base.userData.topHD - 0.28 * M;
-    var gapHalf = stepHalf + 0.42 * M;
-    var rail = buildBalustrade(rx, rz, baseH, mats, M, [-gapHalf, gapHalf]);
-    buildingGroup.add(rail);
-    if (isDaShi) addChishou(buildingGroup, rail.userData.posts, base, rx, rz, plinthMat, M);
-  }
-
-  // -------------------------------------------------- 斗栱 / 檩 and the roof
-  var purlinTop;
-  if (isDaShi) {
-    var dg = buildDougong(S, colTop, mats, dgSteps);
-    buildingGroup.add(dg);
-    purlinTop = dg.userData.top;
-  } else {
-    // 小式: the 檐檩 sits straight on the columns over a 垫板
-    var rp = D.purlinDia * scale / 2;
-    [[0, hd, hw * 2 + rp * 2, true], [0, -hd, hw * 2 + rp * 2, true], [hw, 0, hd * 2 + rp * 2, false], [-hw, 0, hd * 2 + rp * 2, false]].forEach(function (b) {
-      var c = new THREE.Mesh(new THREE.CylinderGeometry(rp, rp, b[2], 16), beamMat);
-      if (b[3]) c.rotation.z = Math.PI / 2; else c.rotation.x = Math.PI / 2;
-      c.position.set(b[0], colTop + rp * 1.4, b[1]);
-      c.castShadow = true; c.receiveShadow = true;
-      buildingGroup.add(c);
-    });
-    purlinTop = colTop + rp * 2.4;
-  }
-
-  var roof = buildRoof({
-    halfWidth: hw + eaveOut, halfDepth: hd + eaveOut, hw: hw, hd: hd, dgOut: isDaShi ? dgOut : D.purlinDia * scale * 0.5,
-    roofHeight: roofRise, upturn: upturn, chong: D.cornerOut * scale * ROOF_CURVE.lift,
-    roofType: roofType, isSong: isSong, tuishan: useTuishan, purlinDia: D.purlinDia * scale,
-    shellThick: thick, tileP: tileM * M, courseL: tileM * M * 0.92, ridgeH: ridgeM * M,
-    beasts: nBeasts, rafter: rafter, M: M, mats: mats, wen: isDaShi
-  });
-  // seat the roof so its boards rest on the rafters, and the rafters on the
-  // 挑檐桁: the eave edge then falls below the purlin, as a real one does
-  var R = roof.userData.R;
-  var tiaoZ = hd + (isDaShi ? dgOut : 0);
-  var rafterDepth = rafter.fly + rafter.r * 2;
-  var roofY = purlinTop + rafterDepth - (R.height(0, tiaoZ) - thick);
-  roof.position.y = roofY;
-  buildingGroup.add(roof);
-
-  // close the band between the bracket tops and the roof boards on the
-  // column line, so no daylight shows through under the eave
-  var soffitAtCol = roofY + R.height(0, hd) - thick;
-  var fh = soffitAtCol - (purlinTop - 2 * u) + 0.02;
-  if (fh > 0) {
-    var ft = u * 1.2, fy = purlinTop - 2 * u + fh / 2;
-    [[0, hd, hw * 2, ft], [0, -hd, hw * 2, ft], [hw, 0, ft, hd * 2], [-hw, 0, ft, hd * 2]].forEach(function (b) {
-      part(new THREE.BoxGeometry(b[2], fh, b[3]), boardMat, b[0], fy, b[1], 0, buildingGroup);
-    });
-  }
+  var HALL_P = {
+    D: D, scale: scale, M: M, isDaShi: isDaShi, isSong: isSong, roofType: roofType,
+    grade: grade, grade3: grade3, caihua: val('caihua') > 0.5, railing: val('railing') > 0.5,
+    shengqi: useShengqi, cejiao: useCejiao, tuishan: useTuishan, nBeasts: nBeasts,
+    colours: colours, tileM: tileM, ridgeM: ridgeM, yulu: isDaShi && grade <= 6
+  };
+  var H = buildHall(HALL_P, mats);
+  buildingGroup.add(H.group);
+  var base = H.base, steps = H.steps, stepHalf = H.stepHalf, roofY = H.roofY, R = H.R;
+  var colTop = H.colTop, colR = H.colR;
+  info.hall = H;
+  H.lamps.forEach(function (lp) { info.lamps.hang(lp.x, lp.y, lp.z, 1.15); });
+  // lamplight from the open doors falls on the terrace and the columns
+  info.lamps.light(-hw * 0.35, baseH + 2.2 * M, hd + 1.6 * M, 2.2, 16 * M, 6);
+  info.lamps.light(hw * 0.35, baseH + 2.2 * M, hd + 1.6 * M, 2.2, 16 * M, 6);
 
   var topY = roofY + R.height(0, 0) + ridgeM * M * 2.4;
   info.width = base.userData.topHW * 2;
@@ -365,6 +319,10 @@ function buildModel() {
 
 function isPagodaMode() { return document.getElementById('buildingType').value === 'pagoda'; }
 
+// The court's own halls, trees and furniture take longer to build than the
+// building itself, so while a slider is being dragged they wait: the court is
+// furnished once the edits pause, and an older pending furnishing is dropped.
+var COURT_BUILD = { gen: 0, timer: 0, first: true, delay: 320 };
 function finishBuild(topY, radius, info, siteMats) {
   worldScaleUVs(buildingGroup);
   mergeStatic(buildingGroup);
@@ -372,9 +330,47 @@ function finishBuild(topY, radius, info, siteMats) {
   var site = buildSite(info, siteMats);
   worldScaleUVs(site);
   siteGroup.add(site);
+  MODEL_INFO.obstacles = [];
+  var gen = ++COURT_BUILD.gen;
+  clearTimeout(COURT_BUILD.timer);
+  function furnish(sync) {
+    if (gen !== COURT_BUILD.gen) return;
+    var cg = null, tasks = [];
+    if (SITE.furnish) {
+      cg = new THREE.Group();
+      cg.name = 'court';
+      site.add(cg);
+      tasks = buildCourt(info, site.userData.court, info.mats, siteMats, info.lamps, cg);
+    }
+    function done() {
+      if (cg) {
+        worldScaleUVs(cg);
+        // the court's small furniture: one mesh per material
+        (cg.userData.mergeRoots || []).forEach(function (r) { mergeStatic(r); });
+        MODEL_INFO.obstacles = cg.userData.obstacles || [];
+      }
+      info.lamps.build(info.mats, site);
+      markShadowsDirty();
+      if (window.onCourtBuilt) window.onCourtBuilt();
+    }
+    (function next() {
+      // a newer edit has replaced this site: drop the rest
+      if (gen !== COURT_BUILD.gen) return;
+      var t = tasks.shift();
+      if (!t) { done(); return; }
+      t();
+      markShadowsDirty();
+      if (sync) next(); else COURT_BUILD.timer = setTimeout(next, 16);
+    })();
+  }
+  // the city's windows are lit already; the court's lamps follow when it lands
+  applyNightLights();
+  if (COURT_BUILD.first || !SITE.furnish) { COURT_BUILD.first = false; furnish(true); }
+  else COURT_BUILD.timer = setTimeout(function () { furnish(false); }, COURT_BUILD.delay);
   siteGroup.visible = SITE.visible;
   MODEL_INFO.court = site.userData.court;
-  fitShadowTo(new THREE.Vector3(0, topY * 0.4, 0), radius);
+  // reach a little past the building so the nearest trees and vats cast too
+  fitShadowTo(new THREE.Vector3(0, topY * 0.35, 0), radius * 1.55);
   setFogScale(frameRadius);
   purgeTextureCache();
   markShadowsDirty();
@@ -639,7 +635,7 @@ document.getElementById('imgBtn').addEventListener('click', function () {
 // ---- design save / load (localStorage) ----
 var CONTROL_IDS = ['buildingType', 'pagodaStyle', 'storeys', 'sides', 'doukou', 'classType', 'period',
   'bays', 'purlins', 'roofType', 'tuishan', 'tileScale', 'shengqi', 'cejiao', 'railing', 'caihua', 'caihuaType', 'beasts', 'preset',
-  'daylight', 'weather', 'envMode', 'hq', 'shadows', 'groundOn',
+  'clock', 'clouds', 'weather', 'envMode', 'courtOn', 'hq', 'shadows', 'groundOn',
   'cTiaoX', 'cTiaoY', 'cAoX', 'cAoY', 'cGaoY',
   'roofColor', 'trimColor', 'woodColor', 'beamColor', 'caihuaColor', 'dgColor', 'wallColor',
   'latticeColor', 'baseColor', 'railColor'];
@@ -650,6 +646,9 @@ function snapshotDesign() {
   return d;
 }
 function applyDesign(d) {
+  // designs saved before the 24-hour clock kept 'daylight', 0..100 over 05:00-19:00
+  if (d.clock === undefined && d.daylight !== undefined)
+    d.clock = String(Math.round((5 + (+d.daylight) / 100 * 14) * 12) * 5);
   CONTROL_IDS.forEach(function (id) {
     var el = document.getElementById(id);
     if (el && d[id] !== undefined) el.value = d[id];
@@ -687,6 +686,7 @@ document.getElementById('loadBtn').addEventListener('click', function () {
 });
 
 applyPreset();
-applyDaylight(val('daylight') / 100, document.getElementById('weather').value);
+applyDaylight(val('clock') / 1440, document.getElementById('weather').value);
+setCloudCover(val('clouds') / 100);
 rebuild();
 startLoop();

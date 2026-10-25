@@ -110,21 +110,26 @@ canvas is cached by grade, length and colours, so a rebuild reuses it.
 ```
 src/
   textures.js   procedural albedo / normal / roughness sets, 菱花 lattice, 彩画 painter
-  scene.js      renderer, Preetham sky, sun path, PMREM environment, fog, camera, texture cache
+  scene.js      renderer, Preetham sky, sun and moon path, PMREM environment, fog, camera, texture cache
+  sky.js        cloud deck, night sky, stars, moon (display-space layers inside the Preetham box)
   geom.js       mergeStatic (draw-call batching), sweepGeometry, frustum + lathe helpers
   render.js     on-demand loop, HQ still (MSAA + SSAO), walk mode, double-click focus, keys
+  lamps.js      宫灯 lanterns, stone lanterns, glow billboards, light pools, night point lights
   constants.js  斗口/材份 tables, 举架 ladders, deriveDimensions()
   roof.js       roof faces (庑殿/歇山 + polygonal), ridges, 吻兽, eave tiles, rafters
   pagoda.js     storey stacking, 塔刹 finial
   hall.js       须弥座, balustrade, steps, columns, 额枋 + 彩画, 斗栱, walls, 槅扇
+  hallbuild.js  buildHall(): one whole hall from 斗口 dimensions (main hall and the court's halls)
   palette.js    the five 正色 and the eight presets
-  site.js       courtyard, 御路, palace wall and gate (never exported)
+  site.js       courtyard, 御路, palace wall and gate, the palace city beyond (never exported)
+  court.js      what stands in the court: 配殿, 钟鼓楼, 廊庑, trees, 吉祥缸, 香炉, 石灯
   app.js        rebuild(), materials, OBJ export with per-part welding
   ui.js         control surface
 ```
 
-Load order matters: `textures → scene → geom → render → constants → roof →
-pagoda → hall → palette → site → app → ui`. Three.js r128, its OrbitControls
+Load order matters: `textures → scene → sky → geom → render → lamps →
+constants → roof → pagoda → hall → hallbuild → palette → site → court → app →
+ui`. Three.js r128, its OrbitControls
 and its `Sky` come from the CDN.
 
 Bay widths are **unequal** (77 斗口 at the 明间, −11 per bay outward), so
@@ -192,6 +197,35 @@ material after each build: a default hall goes from about 5,000 draw calls to
 under 60. Each merged mesh keeps every original part's geometry and matrix in
 `userData.parts`, and `exportOBJ()` exports those, so the OBJ is still one
 closed part per piece.
+
+**The court is furnished.** East and west 配殿 face the axis, built by the same
+`buildHall()` as the main hall at a lower rank, so they have real roofs,
+brackets and lattice. 廊庑 corridors run round the inside of the wall: red
+columns, a painted beam, 倒挂楣子 lattice, 坐凳 benches, a rolled 卷棚 roof.
+A pagoda gets a temple's layout: a 大殿 behind it, a bell tower and a drum tower
+on brick 城台 by the gate. Old 侧柏 cypresses and 油松 pines stand in kerbed
+pits in formal pairs -- bark-textured limbs and foliage cards cut from painted
+needle sprays round a dark core, instanced, casting real shadows. Bronze
+吉祥缸 water vats stand before the platform, a 香炉 censer on the axis, and
+石灯 stone lanterns line the way. 陈设 turns it all off. The court is built a
+moment after the last edit, so dragging a slider stays as quick as before.
+
+**Day and night.** The clock runs the whole 24 hours. After sunset the same
+directional light becomes the full moon (the equinox full moon rises as the
+sun sets and stands 50 degrees up in the south at midnight), the night sky
+fades in with a few thousand stars and a faint Milky Way, and the exposure
+opens like an eye adapting. The palace lights up: the paper behind every
+lattice glows, 宫灯 hang lit under the eaves and at every pagoda corner, the
+stone lanterns and the censer burn, warm light pools on the paving, and six
+real point lights put lamplight on the nearest columns and terrace. The 昼夜
+button in the view bar runs the clock through dusk or dawn to evening or the
+next afternoon; 流转 sets it running continuously.
+
+**A sky with weather in it.** A cloud deck sits overhead, projected onto a
+plane so the clouds crowd and flatten toward the horizon as real ones do.
+Each cloud shades its own side away from the sun, its thin edges blaze when
+the sun is behind it, it takes the sunset's colour, and it dissolves into the
+haze it is seen through. 云量 sets the cover; 阴 closes it over.
 
 ## 视角 — viewing
 
@@ -291,6 +325,9 @@ boundary edges, a sphere 30, a torus 56. The fan-fill pass handles this.
    storey height, so a 13-storey 楼阁式 tower on a grade-1 module is taller than
    any that stood. The ratios match 应县木塔; the absolute size follows the grade.
 4. Not yet built: 攒尖顶 for halls, 重檐 double-eave, interiors (藻井, 天花).
+5. **The furnished court is heavy.** A pagoda's temple court carries five more
+   halls and adds about a million triangles. A phone gets three-bay side halls,
+   no bell or drum tower and fewer trees; 陈设 off removes the court entirely.
 
 ---
 

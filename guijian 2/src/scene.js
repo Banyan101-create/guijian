@@ -17,6 +17,12 @@
 //                and never re-rendered just because the camera moved.
 // ============================================================================
 
+function smoothK(a, b, x) {
+  var t = Math.min(1, Math.max(0, (x - a) / (b - a)));
+  return t * t * (3 - 2 * t);
+}
+var NIGHT = { k: 0, moonDir: new THREE.Vector3(0, -1, 0), moonEl: -90, cover: 0.35 };
+
 var IS_TOUCH = window.matchMedia && window.matchMedia('(pointer: coarse)').matches;
 
 var scene = new THREE.Scene();
@@ -68,11 +74,27 @@ function C(hex) { return new THREE.Color(hex).convertSRGBToLinear(); }
 var RENDER_STATE = { dirty: true, shadowsDirty: true, hqDone: false, lastMotion: 0 };
 function requestRender() { RENDER_STATE.dirty = true; RENDER_STATE.hqDone = false; }
 function markShadowsDirty() { RENDER_STATE.shadowsDirty = true; requestRender(); }
+// objects the HQ normal pass hides (sky layers, glow billboards): they are not
+// surfaces, and occlusion computed against them would smear dark halos
+var AO_HIDDEN = [];
+// run on every daylight change, after the sun and sky are set (night lights)
+var DAYLIGHT_HOOKS = [];
 
 // ============================================================================
 //  SKY + SUN
 // ============================================================================
-var sky = new THREE.Sky();
+// A sky as bright as Preetham makes it, under an exposure set for the
+// building, washes out toward white; a camera with a polariser sees it deep
+// blue. skyGain scales what the visible sky draws (and the haze read back from
+// it), not the light it gives the building.
+function skyWithGain(s) {
+  s.material.uniforms.skyGain = { value: 1.0 };
+  s.material.fragmentShader = s.material.fragmentShader
+    .replace('uniform vec3 up;', 'uniform vec3 up;\nuniform float skyGain;')
+    .replace('vec3 retColor = pow(', 'texColor *= skyGain;\n\t\t\tvec3 retColor = pow(');
+  return s;
+}
+var sky = skyWithGain(new THREE.Sky());
 sky.scale.setScalar(8000);   // the hills at 2600 must sit inside the sky box
 scene.add(sky);
 
@@ -114,31 +136,33 @@ envScene.add(envGround);
 var envSunMask = new THREE.Mesh(new THREE.CircleGeometry(0.9, 24),
   new THREE.MeshBasicMaterial({ color: 0x000000, toneMapped: false, side: THREE.DoubleSide }));
 envScene.add(envSunMask);
+// (Nothing transparent may go in here: r128 renders the PMREM source RGBE-
+// encoded, the exponent in alpha, and blending would read it as opacity. The
+// night sky's dim glow is the hemisphere light instead -- see applyDaylight.)
 
 var pmrem = new THREE.PMREMGenerator(renderer);
 var envRT = null;
 
 var WEATHER = {
-  clear:    { turbidity: 3.2, rayleigh: 1.25, mie: 0.0035, g: 0.80, sun: 1.00, fog: [2.6, 16], hills: 0.30, bounce: 1.0, ev: 1.0 },
-  hazy:     { turbidity: 8.5, rayleigh: 2.2,  mie: 0.0085, g: 0.85, sun: 0.78, fog: [1.8, 9],  hills: 0.14, bounce: 0.9, ev: 1.08 },
-  overcast: { turbidity: 16,  rayleigh: 3.6,  mie: 0.025,  g: 0.70, sun: 0.16, fog: [1.4, 7],  hills: 0.06, bounce: 0.7, ev: 1.3 }
+  clear:    { turbidity: 3.0, rayleigh: 1.0,  mie: 0.0035, g: 0.80, sun: 1.00, fog: [2.6, 16], hills: 0.30, bounce: 1.0, ev: 1.0,  gain: 0.42 },
+  hazy:     { turbidity: 8.5, rayleigh: 2.2,  mie: 0.0085, g: 0.85, sun: 0.78, fog: [1.8, 9],  hills: 0.14, bounce: 0.9, ev: 1.08, gain: 0.75 },
+  overcast: { turbidity: 16,  rayleigh: 3.6,  mie: 0.025,  g: 0.70, sun: 0.16, fog: [1.4, 7],  hills: 0.06, bounce: 0.7, ev: 1.3,  gain: 0.9 }
 };
-var LIGHT = { t: 0.66, weather: 'clear', dir: new THREE.Vector3(0, 1, 0), elev: 45 };
+// t is the time of day as a fraction of 24 hours
+var LIGHT = { t: 14 / 24, weather: 'clear', dir: new THREE.Vector3(0, 1, 0), elev: 45,
+              lightDir: new THREE.Vector3(0, 1, 0) };
 
 // sun path for a building at Beijing's latitude (39.9 N) facing south (+z),
 // at the equinox: sunrise due east at 06:00, 50 degrees at noon, due west at
-// 18:00. The slider runs 05:00 -> 19:00, so both ends sit in twilight.
-function sunDirection(t, out) {
-  var hour = 5 + t * 14;
+// 18:00, and as far under the north horizon at midnight. The true direction is
+// returned (below the horizon at night); the light clamps its own copy.
+function sunDirection(hour, out) {
   var H = (hour - 12) * 15 * Math.PI / 180;            // hour angle
   var phi = 39.9 * Math.PI / 180;
   var sinEl = Math.cos(phi) * Math.cos(H);
   var el = Math.asin(Math.max(-1, Math.min(1, sinEl)));
   var A = Math.atan2(Math.sin(H), Math.sin(phi) * Math.cos(H)); // from south, + west
-  // a sun two degrees under the horizon still lights the sky; keep a floor so
-  // the directional light never flips beneath the ground
-  var elC = Math.max(el, -0.02);
-  out.set(-Math.sin(A) * Math.cos(elC), Math.sin(elC), Math.cos(A) * Math.cos(elC)).normalize();
+  out.set(-Math.sin(A) * Math.cos(el), Math.sin(el), Math.cos(A) * Math.cos(el)).normalize();
   return el * 180 / Math.PI;
 }
 
@@ -161,7 +185,7 @@ function sampleHorizon() {
       _fogRT.texture.encoding = THREE.sRGBEncoding;
       _fogCam = new THREE.PerspectiveCamera(20, 1, 0.1, 100);
       _fogScene = new THREE.Scene();
-      _fogSky = new THREE.Sky();
+      _fogSky = skyWithGain(new THREE.Sky());
       _fogSky.scale.setScalar(50);
       _fogScene.add(_fogSky);
     }
@@ -179,6 +203,10 @@ function sampleHorizon() {
     }
     renderer.setRenderTarget(prev);
     scene.fog.color.setRGB(acc[0] / n / 255, acc[1] / n / 255, acc[2] / n / 255);
+    // after dark the Preetham sky is black; the haze takes the night sky's
+    // horizon instead, so the ground still meets the sky without a seam
+    if (typeof nightHorizon === 'function' && NIGHT.k > 0)
+      scene.fog.color.lerp(nightHorizon(new THREE.Color()), NIGHT.k);
   } catch (e) { /* keep the previous fog colour */ }
 }
 
@@ -189,6 +217,7 @@ function copySkyUniforms(s) {
   });
   dst.sunPosition.value.copy(src.sunPosition.value);
   dst.up.value.set(0, 1, 0);
+  if (dst.skyGain && src.skyGain) dst.skyGain.value = src.skyGain.value;
 }
 
 // paving albedo the bounce light is taken from; site.js sets it from the
@@ -203,8 +232,9 @@ function rebuildEnvironment() {
   envSunMask.lookAt(0, 0, 0);
   // ground radiance ~ albedo x (direct + sky) irradiance, in the same legacy
   // units the materials use (outgoing = albedo * I * NdotL)
-  var direct = sun.intensity * Math.max(0, LIGHT.dir.y);
-  var skyAmb = 0.55 * w.bounce;
+  var direct = sun.intensity * Math.max(0, LIGHT.lightDir.y);
+  var skyAmb = 0.55 * w.bounce * (1 - 0.94 * NIGHT.k);
+  envSunMask.visible = LIGHT.elev > -1;
   envGround.material.color.copy(BOUNCE_ALBEDO).multiplyScalar(direct * 0.55 + skyAmb)
     .multiply(new THREE.Color(1, 0.97, 0.92));
   var next = pmrem.fromScene(envScene, 0, 0.1, 200);
@@ -221,7 +251,11 @@ function applySky() {
   u.rayleigh.value = w.rayleigh;
   u.mieCoefficient.value = w.mie;
   u.mieDirectionalG.value = w.g;
+  // the polariser matters most with the sun high; at dusk the sky is the show
+  u.skyGain.value = w.gain + (1 - w.gain) * smoothK(18, 0, LIGHT.elev);
   u.sunPosition.value.copy(LIGHT.dir).multiplyScalar(1000);
+  // r128's Preetham sky goes to pure black a little under the horizon; below
+  // that the night layers in sky.js take over
   u.up.value.set(0, 1, 0);
   scene.fog.near = w.fog[0] * FOG_SCALE;
   scene.fog.far = w.fog[1] * FOG_SCALE;
@@ -265,34 +299,71 @@ function tintHills() {
   var shade = new THREE.Color(0.30, 0.36, 0.44).lerp(fogC, 0.35);
   var dayK = Math.max(0.15, Math.min(1, (LIGHT.elev + 4) / 20));
   var c = fogC.clone().lerp(shade.multiplyScalar(dayK), w.hills);
+  // at night the hills are a silhouette a shade darker than the sky behind
+  c.lerp(fogC.clone().multiplyScalar(0.62), NIGHT.k);
   // toneMapped off, so convert: the encoder will turn this back into exactly c
   hills.material.color.copy(c).convertSRGBToLinear();
 }
 
 // Called on every slider tick: the cheap parts now, the PMREM + horizon
 // readback at most every 90 ms and once more when the slider settles.
+//
+// Night: the same directional light becomes the moon. The full moon at the
+// equinox is the sun twelve hours on, so it rises as the sun sets; the swap
+// happens with the sun three degrees down, where both are too dim to see it.
+var MOON_COLOUR = new THREE.Color(0.60, 0.70, 1.0);
+var NIGHT_EV = 1.15;
 function applyDaylight(t, weather) {
-  if (t !== undefined && t !== null) LIGHT.t = Math.max(0, Math.min(1, t));
+  if (t !== undefined && t !== null) LIGHT.t = ((t % 1) + 1) % 1;
   if (weather && WEATHER[weather]) LIGHT.weather = weather;
   var w = WEATHER[LIGHT.weather];
-  LIGHT.elev = sunDirection(LIGHT.t, LIGHT.dir);
-  sun.intensity = sunColourIntensity(LIGHT.elev, sun.color) * w.sun;
-  if (LIGHT.weather === 'overcast') sun.color.lerp(new THREE.Color(0.9, 0.93, 1.0), 0.6);
-  hemi.intensity = 0.08;
+  var hour = LIGHT.t * 24;
+  LIGHT.elev = sunDirection(hour, LIGHT.dir);
+  NIGHT.moonEl = sunDirection(hour + 12, NIGHT.moonDir);
+  NIGHT.k = smoothK(-2, -11, LIGHT.elev);
+
+  if (LIGHT.elev > -3) {
+    // the sun; a floor keeps a just-set sun from lighting the ground from below
+    var elC = Math.max(LIGHT.elev, -1) * Math.PI / 180;
+    var h = Math.hypot(LIGHT.dir.x, LIGHT.dir.z) || 1;
+    LIGHT.lightDir.set(LIGHT.dir.x / h * Math.cos(elC), Math.sin(Math.max(elC, 0.02)), LIGHT.dir.z / h * Math.cos(elC)).normalize();
+    sun.intensity = sunColourIntensity(LIGHT.elev, sun.color) * w.sun;
+    if (LIGHT.weather === 'overcast') sun.color.lerp(new THREE.Color(0.9, 0.93, 1.0), 0.6);
+  } else {
+    var mEl = Math.max(NIGHT.moonEl, 4) * Math.PI / 180;
+    var mh = Math.hypot(NIGHT.moonDir.x, NIGHT.moonDir.z) || 1;
+    LIGHT.lightDir.set(NIGHT.moonDir.x / mh * Math.cos(mEl), Math.sin(mEl), NIGHT.moonDir.z / mh * Math.cos(mEl)).normalize();
+    sun.color.copy(MOON_COLOUR);
+    sun.intensity = 0.24 * smoothK(-2, 14, NIGHT.moonEl) * NIGHT.k * (LIGHT.weather === 'overcast' ? 0.15 : LIGHT.weather === 'hazy' ? 0.6 : 1);
+  }
+  // the night sky's own faint glow, blue from above, almost nothing from the
+  // ground: what lights a court on a moonless night
+  var moonUp = smoothK(-3, 12, NIGHT.moonEl);
+  hemi.intensity = 0.08 + NIGHT.k * (0.05 + 0.05 * moonUp) * (LIGHT.weather === 'overcast' ? 0.7 : 1);
+  hemi.color.setRGB(0.87, 0.91, 0.94).lerp(new THREE.Color(0.38, 0.48, 0.80), NIGHT.k);
+  hemi.groundColor.setRGB(0.35, 0.31, 0.28).lerp(new THREE.Color(0.10, 0.10, 0.12), NIGHT.k);
   // a camera opens up at golden hour: lift exposure as the sun drops so dawn
-  // and dusk read as warm light rather than as night
+  // and dusk read as warm light rather than as night; and further at night,
+  // as an eye adapts -- but not so far that night looks like day
   var low = Math.max(0, Math.min(1, (22 - LIGHT.elev) / 24));
-  renderer.toneMappingExposure = 0.62 * w.ev * (1 + 1.5 * low * low);
+  var dayEv = 0.62 * w.ev * (1 + 1.5 * low * low);
+  renderer.toneMappingExposure = dayEv + (NIGHT_EV - dayEv) * NIGHT.k;
   applySky();
   placeSun();
   markShadowsDirty();
+  if (typeof updateSkyLayers === 'function') updateSkyLayers();
+  for (var i = 0; i < DAYLIGHT_HOOKS.length; i++) DAYLIGHT_HOOKS[i]();
   clearTimeout(_envTimer);
   var now = performance.now();
+  function slow() {
+    rebuildEnvironment(); sampleHorizon(); tintHills();
+    if (typeof updateSkyLayers === 'function') updateSkyLayers();
+  }
   if (!applyDaylight._last || now - applyDaylight._last > 90) {
     applyDaylight._last = now;
-    rebuildEnvironment(); sampleHorizon(); tintHills();
+    slow();
   }
-  _envTimer = setTimeout(function () { rebuildEnvironment(); sampleHorizon(); tintHills(); requestRender(); }, 120);
+  _envTimer = setTimeout(function () { slow(); requestRender(); }, 120);
 }
 
 // ---------------------------------------------------------------------------
@@ -309,7 +380,7 @@ function fitShadowTo(center, radius) {
 function placeSun() {
   var c = SHADOW_FIT.center, r = SHADOW_FIT.radius;
   sun.target.position.copy(c);
-  sun.position.copy(c).addScaledVector(LIGHT.dir, r * 3);
+  sun.position.copy(c).addScaledVector(LIGHT.lightDir, r * 3);
   var sc = sun.shadow.camera;
   sc.left = -r; sc.right = r; sc.top = r; sc.bottom = -r;
   sc.near = r * 0.5; sc.far = r * 5.5;

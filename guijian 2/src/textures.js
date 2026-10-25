@@ -369,6 +369,39 @@ var TEXGEN = (function () {
       });
       SETS.earth.size = 6.0;
     })();
+
+    // ------------------------------------------------------------ 树皮 bark
+    // An old cypress's bark runs in long twisted ridges with deep furrows
+    // between; a pine's breaks into plates. One set does for both: long
+    // furrows along v, broken across u.
+    (function () {
+      var f = new Fbm(201, 8, 4), r = new Fbm(202, 4, 3), fine = new Fbm(203, 32, 2);
+      SETS.bark = buildSet(256, 256, 3.0, function (u, v, x, y, o) {
+        var warp = r.at(u, v) * 0.35;
+        var ridge = Math.abs(Math.sin((u * 9 + warp * 6) * Math.PI));
+        var plate = f.at(u * 1.0, v * 0.35);
+        var hgt = Math.pow(ridge, 0.6) * (0.6 + 0.4 * plate) + 0.15 * fine.at(u, v);
+        var t = 0.55 + 0.38 * hgt + 0.06 * (fine.at(u, v) - 0.5);
+        o.r = t; o.g = t * 0.93; o.b = t * 0.86;
+        o.h = hgt; o.ro = 0.88 + 0.08 * (1 - hgt);
+      });
+      SETS.bark.size = 0.9;
+    })();
+
+    // ------------------------------------------------------- 枝叶 foliage
+    // Seen from a few metres, a conifer's crown is not a surface but a mass of
+    // small sprays: bright where a spray faces out, near-black in the gaps.
+    (function () {
+      var f = new Fbm(301, 16, 3), g = new Fbm(302, 48, 2), big = new Fbm(303, 4, 3);
+      SETS.foliage = buildSet(256, 256, 2.4, function (u, v, x, y, o) {
+        var n = f.at(u, v), m = g.at(u, v), b = big.at(u, v);
+        var spray = Math.pow(Math.max(0, n * 0.7 + m * 0.5 - 0.35), 0.8);
+        var t = 0.45 + 0.75 * spray + 0.15 * (b - 0.5);
+        o.r = t * 0.92; o.g = t; o.b = t * 0.86;
+        o.h = spray; o.ro = 0.78 + 0.15 * (1 - spray);
+      });
+      SETS.foliage.size = 1.4;
+    })();
   }
 
   // ==========================================================================

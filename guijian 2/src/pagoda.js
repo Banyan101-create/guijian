@@ -17,18 +17,20 @@ function pagodaScreen(w, h, mats) {
   var fr = Math.min(w, h) * 0.06;
   var leaves = Math.max(2, 2 * Math.round(w / (h * 0.42) / 2));
   var leafW = w / leaves;
+  // everything stands proud of the wall face the group is placed on: the
+  // paper first (it glows at night), the lattice over it, the frame over that
   var gl = new THREE.Mesh(new THREE.PlaneGeometry(w, h), mats.glass);
-  gl.position.z = -fr * 0.4;
+  gl.position.z = fr * 0.12;
   g.add(gl);
   var grid = new THREE.Mesh(new THREE.PlaneGeometry(w, h * 0.82), mats.grid);
-  grid.position.set(0, h * 0.04, fr * 0.2);
+  grid.position.set(0, h * 0.04, fr * 0.7);
   g.add(grid);
   for (var s = 0; s <= leaves; s++)
-    part(new THREE.BoxGeometry(fr, h, fr * 1.4), mats.lattice, -w / 2 + leafW * s, 0, fr * 0.5, 0, g);
+    part(new THREE.BoxGeometry(fr, h, fr * 1.4), mats.lattice, -w / 2 + leafW * s, 0, fr * 1.0, 0, g);
   [-h / 2, h / 2, -h * 0.37].forEach(function (ry) {
-    part(new THREE.BoxGeometry(w, fr, fr * 1.3), mats.lattice, 0, ry, fr * 0.5, 0, g);
+    part(new THREE.BoxGeometry(w, fr, fr * 1.3), mats.lattice, 0, ry, fr * 1.0, 0, g);
   });
-  part(new THREE.BoxGeometry(w, h * 0.13 - fr, fr * 0.6), mats.lattice, 0, -h * 0.435, 0, 0, g);
+  part(new THREE.BoxGeometry(w, h * 0.13 - fr, fr * 0.6), mats.lattice, 0, -h * 0.435, fr * 0.45, 0, g);
   return g;
 }
 
@@ -264,6 +266,7 @@ function buildPagoda(D, scale, opts, mats, env) {
   var rafter = { spacing: 4.5 * u, r: 0.75 * u, fly: 1.5 * u, flyLen: 7 * u * (dense ? 0.5 : 1) };
 
   var y = 0, R = R0, prev = null;
+  var lamps = [];
   for (var i = 0; i < storeys; i++) {
     var isFirst = (i === 0);
     var h = dense ? (isFirst ? storeyH * 5.0 : storeyH * 0.34) : storeyH;
@@ -320,6 +323,18 @@ function buildPagoda(D, scale, opts, mats, env) {
     roof.position.y = roofY;
     g.add(roof);
 
+    // a 宫灯 under every corner of this eave, a little in from the tip
+    var hf = roofProfileFn(tierRise), up = D.cornerRise * scale * ROOF_CURVE.lift, tt = 0.86;
+    var ww = 1 + (4.5 * u / Rr) * Math.pow(tt, 3);
+    for (var lc = 0; lc < n; lc++) {
+      var lth = (lc / n) * Math.PI * 2 + Math.PI / n;
+      lamps.push({
+        x: Math.cos(lth) * Rr * tt * ww, z: Math.sin(lth) * Rr * tt * ww,
+        y: roofY + hf(tt) + up * Math.pow(tt, 2.8) - thick * 2.5,
+        s: dense ? 0.7 : 1.0, storey: i
+      });
+    }
+
     prev = { Rr: Rr, roofY: roofY, rise: tierRise };
     y += h + dgH + tierRise * (dense ? 0.70 : 0.62);
     R = nextR;
@@ -340,6 +355,7 @@ function buildPagoda(D, scale, opts, mats, env) {
   g.add(fin);
 
   g.userData.totalHeight = y + capRise + storeyH * 1.35;
+  g.userData.lamps = lamps;
   g.userData.baseRadius = R0;
   return g;
 }

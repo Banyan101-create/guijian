@@ -412,6 +412,10 @@ function instanced(geo, mat, n) {
   var im = new THREE.InstancedMesh(geo, mat, Math.max(1, n));
   im.count = n;
   im.castShadow = true; im.receiveShadow = true;
+  // r128 culls an InstancedMesh by the template's bounds at the mesh origin,
+  // not by its instances: zoomed in on a corner away from the centre, a whole
+  // roof's tiles would vanish
+  im.frustumCulled = false;
   return im;
 }
 

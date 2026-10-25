@@ -7,7 +7,7 @@
 //  and a half metres, the bricks are half a metre, so the hall is as big as it
 //  is. None of this is exported -- it lives in siteGroup.
 // ============================================================================
-var SITE = { mode: 'court', visible: true, mats: null };
+var SITE = { mode: 'court', visible: true, furnish: true, mats: null };
 
 // A tiled texture repeats; a real court doesn't. Large-scale tone -- where it
 // was re-laid, where water stands, where the dirt drifts against a wall -- is
@@ -59,6 +59,30 @@ function cityGeos() {
   return (_cityGeo = { roof: roof, body: body, base: base });
 }
 
+// a row of 槅扇 door leaves, as a hall front reads from across a court:
+// red stiles and rails, the lattice panels warm where light comes through
+var _cityDoors = null;
+function cityDoorTexture() {
+  if (_cityDoors) return _cityDoors;
+  var c = document.createElement('canvas');
+  c.width = 256; c.height = 64;
+  var x = c.getContext('2d');
+  x.fillStyle = '#5a1d14'; x.fillRect(0, 0, 256, 64);
+  var leaves = 12, lw = 256 / leaves;
+  for (var i = 0; i < leaves; i++) {
+    var lx = i * lw;
+    x.fillStyle = '#c99a62'; x.fillRect(lx + 2.5, 6, lw - 5, 34);       // 槅心
+    x.fillStyle = 'rgba(70,24,14,0.55)';
+    for (var k = 0; k < 5; k++) x.fillRect(lx + 2.5, 8 + k * 7, lw - 5, 1.2);
+    for (var k2 = 1; k2 < 3; k2++) x.fillRect(lx + 2.5 + k2 * (lw - 5) / 3, 6, 1.2, 34);
+    x.fillStyle = '#6b2418'; x.fillRect(lx + 3, 44, lw - 6, 15);          // 裙板
+  }
+  _cityDoors = new THREE.CanvasTexture(c);
+  _cityDoors.encoding = THREE.sRGBEncoding;
+  _cityDoors.userData = { cached: true };
+  return _cityDoors;
+}
+
 function buildCity(court, M, mats, g) {
   var G = cityGeos();
   var rnd = TEXGEN.rng(1407);
@@ -83,6 +107,8 @@ function buildCity(court, M, mats, g) {
   var roofs = new THREE.InstancedMesh(G.roof, mats.cityRoof, n);
   var bases = new THREE.InstancedMesh(G.base, mats.cityBase, n);
   var eaves = new THREE.InstancedMesh(G.base, mats.cityEave, n);
+  // a ridge along every roof, with a lift at each end where the 吻 sits
+  var ridges = new THREE.InstancedMesh(G.base, mats.cityRoof, n * 3);
   var m4 = new THREE.Matrix4();
   spots.forEach(function (s, i) {
     m4.makeScale(s.w * 1.08, s.b, s.d * 1.25); m4.setPosition(s.x, 0, s.z); bases.setMatrixAt(i, m4);
@@ -91,8 +117,39 @@ function buildCity(court, M, mats, g) {
     // read as a hall from a distance
     m4.makeScale(s.w * 1.01, s.h * 0.24, s.d * 1.01); m4.setPosition(s.x, s.b + s.h * 0.76, s.z); eaves.setMatrixAt(i, m4);
     m4.makeScale(s.w * 1.14, s.d * 0.40, s.d * 1.34); m4.setPosition(s.x, s.b + s.h, s.z); roofs.setMatrixAt(i, m4);
+    var ry = s.b + s.h + s.d * 0.40 * 0.96, rh = Math.max(0.35 * M, s.d * 0.035);
+    m4.makeScale(s.w * 1.14 * 0.42, rh, rh * 1.1); m4.setPosition(s.x, ry - rh * 0.4, s.z); ridges.setMatrixAt(i * 3, m4);
+    [-1, 1].forEach(function (e, k) {
+      m4.makeScale(rh * 1.2, rh * 2.4, rh * 1.3); m4.setPosition(s.x + e * s.w * 1.14 * 0.21, ry - rh * 0.4, s.z); ridges.setMatrixAt(i * 3 + 1 + k, m4);
+    });
   });
-  [bodies, roofs, bases, eaves].forEach(function (im) { im.instanceMatrix.needsUpdate = true; im.receiveShadow = true; g.add(im); });
+  // r128 culls an InstancedMesh by its one template's bounds at the origin,
+  // which would drop the whole city whenever the origin left the view
+  [bodies, roofs, bases, eaves, ridges].forEach(function (im) { im.instanceMatrix.needsUpdate = true; im.receiveShadow = true; im.frustumCulled = false; g.add(im); });
+
+  // the 槅扇 front of each hall: a dark band of lattice by day; by night most
+  // of them are lit from within, a few stay dark
+  var win = new THREE.PlaneGeometry(1, 1);
+  win.userData.ownUVs = true;
+  var doors = cityDoorTexture();
+  var litMat = lampMat(new THREE.MeshStandardMaterial({ color: 0xffffff, map: doors, emissiveMap: doors, roughness: 0.7 }), new THREE.Color(1.0, 0.62, 0.30), 0.55);
+  var darkMat = new THREE.MeshStandardMaterial({ color: 0xffffff, map: doors, roughness: 0.7 });
+  var lit = [], dark = [];
+  spots.forEach(function (s) { [1, -1].forEach(function (f) { (rnd() < 0.72 ? lit : dark).push({ s: s, f: f }); }); });
+  [[lit, litMat], [dark, darkMat]].forEach(function (L) {
+    if (!L[0].length) return;
+    var im = new THREE.InstancedMesh(win, L[1], L[0].length);
+    L[0].forEach(function (w, i) {
+      var s = w.s;
+      m4.makeRotationY(w.f > 0 ? 0 : Math.PI);
+      m4.scale(new THREE.Vector3(s.w * 0.80, s.h * 0.46, 1));
+      m4.setPosition(s.x, s.b + s.h * 0.40, s.z + w.f * (s.d / 2 + 0.02 * M));
+      im.setMatrixAt(i, m4);
+    });
+    im.instanceMatrix.needsUpdate = true;
+    im.frustumCulled = false;
+    g.add(im);
+  });
 }
 
 function buildSite(info, mats) {
@@ -101,7 +158,7 @@ function buildSite(info, mats) {
   var W = info.width;                        // building footprint width, scene units
   var court;
   if (info.type === 'pagoda') {
-    var hx = Math.max(W * 3.2, 46 * M);
+    var hx = Math.max(W * 2.4, 42 * M);
     court = { hx: hx, zf: hx, zb: -hx };
   } else {
     court = { hx: Math.max(W * 1.9, 30 * M), zf: info.frontZ + Math.max(W * 1.25, 30 * M), zb: -(info.depth / 2 + Math.max(W * 0.55, 18 * M)) };
@@ -208,6 +265,7 @@ function buildSite(info, mats) {
     });
     var stud = new THREE.SphereGeometry(0.07 * M, 8, 6);
     var studs = new THREE.InstancedMesh(stud, mats.gold, 2 * 81);
+    studs.frustumCulled = false;
     var m4 = new THREE.Matrix4(), k = 0;
     [-1, 1].forEach(function (s) {
       for (var r = 0; r < 9; r++) for (var c = 0; c < 9; c++) {

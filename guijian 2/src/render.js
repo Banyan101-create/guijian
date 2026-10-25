@@ -176,6 +176,7 @@ function hqRender() {
   // 2. view-space normals + depth, sky hidden, no shadow re-render
   var skyVis = sky.visible, fog = scene.fog;
   sky.visible = false; scene.fog = null;
+  var hidden = AO_HIDDEN.map(function (o) { var v = o.visible; o.visible = false; return v; });
   scene.overrideMaterial = q.normalMat;
   var oldClear = renderer.getClearColor(new THREE.Color()), oldAlpha = renderer.getClearAlpha();
   renderer.setClearColor(0x7f7fff, 1);
@@ -184,6 +185,7 @@ function hqRender() {
   renderer.render(scene, camera);
   scene.overrideMaterial = null;
   sky.visible = skyVis; scene.fog = fog;
+  AO_HIDDEN.forEach(function (o, i) { o.visible = hidden[i]; });
   renderer.setClearColor(oldClear, oldAlpha);
 
   // 3. occlusion. Radius is in view-space units: about a metre and a half at
@@ -314,6 +316,18 @@ function walkUpdate(dt) {
     else return false;
   }
   if (I.court) { nx = Math.max(-I.court.hx, Math.min(I.court.hx, nx)); nz = Math.max(I.court.zb, Math.min(I.court.zf, nz)); }
+  // and the court's halls, trees, vats and lanterns
+  if (I.obstacles) {
+    for (var i = 0; i < I.obstacles.length; i++) {
+      var o = I.obstacles[i], pad = 0.3 * I.M;
+      var was = Math.abs(camera.position.x - o.x) < o.hx + pad && Math.abs(camera.position.z - o.z) < o.hz + pad;
+      if (!was && Math.abs(nx - o.x) < o.hx + pad && Math.abs(nz - o.z) < o.hz + pad) {
+        if (Math.abs(camera.position.x - o.x) >= o.hx + pad) nx = camera.position.x;
+        else if (Math.abs(camera.position.z - o.z) >= o.hz + pad) nz = camera.position.z;
+        else return false;
+      }
+    }
+  }
   camera.position.x = nx; camera.position.z = nz;
   camera.position.y = walkGround(nx, nz) + 1.6 * I.M;
   walkApply();

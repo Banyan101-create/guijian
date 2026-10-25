@@ -976,6 +976,16 @@ body.entered #viewbar { animation: rise 0.6s 0.35s var(--ease) both; }
   background: var(--gold-glow);
   box-shadow: inset 0 0 0 1px rgba(220, 184, 119, 0.35);
 }
+/* 昼夜: the sun while it is day, the moon once the lanterns are lit */
+#viewbar #nightBtn .ic-moon { display: none; }
+#viewbar #nightBtn[aria-pressed="true"] .ic-sun { display: none; }
+#viewbar #nightBtn[aria-pressed="true"] .ic-moon { display: block; }
+#viewbar #nightBtn[aria-pressed="true"] {
+  color: #b9c7ef;
+  background: rgba(120, 140, 220, 0.16);
+  box-shadow: inset 0 0 0 1px rgba(150, 170, 235, 0.35);
+}
+#viewbar #nightBtn.busy { pointer-events: none; opacity: 0.6; }
 /* walk mode needs a keyboard */
 @media (pointer: coarse) { #viewbar #walkBtn, #viewbar #walkBtn + i { display: none; } }
 
@@ -1444,11 +1454,17 @@ body.entered #stats { animation: rise 0.6s 0.25s var(--ease) both; }
 
         <!-- ================================================= 光照 light -->
         <section class="pane" data-pane="light" role="tabpanel">
-          <div class="sec"><b>时辰</b><span>daylight</span></div>
+          <div class="sec"><b>时辰</b><span>time of day</span></div>
 
           <div class="row" data-ctl="slider">
-            <div class="row-head"><span class="row-label">日照 <em>time of day</em></span><span class="row-val" id="dayOut"></span></div>
-            <input type="range" id="daylight" min="0" max="100" step="1" value="66">
+            <div class="row-head"><span class="row-label">时刻 <em>clock</em></span><span class="row-val" id="dayOut"></span></div>
+            <input type="range" id="clock" min="0" max="1435" step="5" value="840">
+          </div>
+
+          <div class="row row-switch" data-ctl="switch">
+            <span class="row-label">流转 <em>time-lapse</em></span>
+            <span class="row-val" id="tlOut"></span>
+            <input type="range" id="timelapse" min="0" max="1" step="1" value="0">
           </div>
 
           <div class="row" data-ctl="seg">
@@ -1460,6 +1476,11 @@ body.entered #stats { animation: rise 0.6s 0.25s var(--ease) both; }
             </select>
           </div>
 
+          <div class="row" data-ctl="slider">
+            <div class="row-head"><span class="row-label">云量 <em>cloud cover</em></span><span class="row-val" id="cloudOut"></span></div>
+            <input type="range" id="clouds" min="0" max="100" step="1" value="38">
+          </div>
+
           <div class="sec"><b>场景</b><span>scene</span></div>
 
           <div class="row" data-ctl="seg">
@@ -1468,6 +1489,12 @@ body.entered #stats { animation: rise 0.6s 0.25s var(--ease) both; }
               <option value="court">宫院 courtyard</option>
               <option value="open">旷野 open</option>
             </select>
+          </div>
+
+          <div class="row row-switch" data-ctl="switch">
+            <span class="row-label">陈设 <em>court furnishings</em></span>
+            <span class="row-val" id="crOut"></span>
+            <input type="range" id="courtOn" min="0" max="1" step="1" value="1">
           </div>
 
           <div class="row row-switch" data-ctl="switch">
@@ -1488,7 +1515,7 @@ body.entered #stats { animation: rise 0.6s 0.25s var(--ease) both; }
             <input type="range" id="hq" min="0" max="1" step="1" value="1">
           </div>
 
-          <p class="note">The sun follows its real path over Beijing at the equinox: up due east at 06:00, fifty degrees high at noon, down due west at 18:00. Raking light at 卯时 and 酉时 reads the 举架 curve and the corner sweep best; 午时 flattens them. 精细 adds contact shadow to every still frame once the camera stops moving.</p>
+          <p class="note">The sun follows its real path over Beijing at the equinox: up due east at 06:00, fifty degrees high at noon, down due west at 18:00. After dusk the full moon rises in the east, the stars come out, and the palace lights its lanterns and windows. Raking light at 卯时 and 酉时 reads the 举架 curve and the corner sweep best; 午时 flattens them. 精细 adds contact shadow to every still frame once the camera stops moving.</p>
         </section>
 
         <!-- ================================================== 数据 data -->
@@ -1543,6 +1570,10 @@ body.entered #stats { animation: rise 0.6s 0.25s var(--ease) both; }
     <button type="button" data-view="detail" title="近观 corner eave close-up">近</button>
     <button type="button" id="fitBtn" title="全景 fit to model">全</button>
     <i></i>
+ <button type="button" id="nightBtn" title="昼夜 day / night" aria-pressed="false">
+      <svg class="ic-sun" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="3"/><path d="M8 1.5v1.6M8 12.9v1.6M1.5 8h1.6M12.9 8h1.6M3.4 3.4l1.1 1.1M11.5 11.5l1.1 1.1M3.4 12.6l1.1-1.1M11.5 4.5l1.1-1.1"/></svg>
+      <svg class="ic-moon" viewBox="0 0 16 16" aria-hidden="true"><path d="M12.8 10.4A5.6 5.6 0 0 1 5.6 3.2a5.6 5.6 0 1 0 7.2 7.2z"/></svg>
+    </button>
     <button type="button" id="walkBtn" title="漫游 walk (WASD / arrows, drag to look, Esc to leave)" aria-pressed="false">游</button>
     <button type="button" id="spinBtn" title="转台 turntable" aria-pressed="false">
       <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M13.5 8a5.5 5.5 0 1 1-1.9-4.16"/><path d="M13.6 1.6v2.9h-2.9"/></svg>
@@ -1933,6 +1964,39 @@ var TEXGEN = (function () {
       });
       SETS.earth.size = 6.0;
     })();
+
+    // ------------------------------------------------------------ 树皮 bark
+    // An old cypress's bark runs in long twisted ridges with deep furrows
+    // between; a pine's breaks into plates. One set does for both: long
+    // furrows along v, broken across u.
+    (function () {
+      var f = new Fbm(201, 8, 4), r = new Fbm(202, 4, 3), fine = new Fbm(203, 32, 2);
+      SETS.bark = buildSet(256, 256, 3.0, function (u, v, x, y, o) {
+        var warp = r.at(u, v) * 0.35;
+        var ridge = Math.abs(Math.sin((u * 9 + warp * 6) * Math.PI));
+        var plate = f.at(u * 1.0, v * 0.35);
+        var hgt = Math.pow(ridge, 0.6) * (0.6 + 0.4 * plate) + 0.15 * fine.at(u, v);
+        var t = 0.55 + 0.38 * hgt + 0.06 * (fine.at(u, v) - 0.5);
+        o.r = t; o.g = t * 0.93; o.b = t * 0.86;
+        o.h = hgt; o.ro = 0.88 + 0.08 * (1 - hgt);
+      });
+      SETS.bark.size = 0.9;
+    })();
+
+    // ------------------------------------------------------- 枝叶 foliage
+    // Seen from a few metres, a conifer's crown is not a surface but a mass of
+    // small sprays: bright where a spray faces out, near-black in the gaps.
+    (function () {
+      var f = new Fbm(301, 16, 3), g = new Fbm(302, 48, 2), big = new Fbm(303, 4, 3);
+      SETS.foliage = buildSet(256, 256, 2.4, function (u, v, x, y, o) {
+        var n = f.at(u, v), m = g.at(u, v), b = big.at(u, v);
+        var spray = Math.pow(Math.max(0, n * 0.7 + m * 0.5 - 0.35), 0.8);
+        var t = 0.45 + 0.75 * spray + 0.15 * (b - 0.5);
+        o.r = t * 0.92; o.g = t; o.b = t * 0.86;
+        o.h = spray; o.ro = 0.78 + 0.15 * (1 - spray);
+      });
+      SETS.foliage.size = 1.4;
+    })();
   }
 
   // ==========================================================================
@@ -2292,6 +2356,12 @@ var TEXGEN = (function () {
 //                and never re-rendered just because the camera moved.
 // ============================================================================
 
+function smoothK(a, b, x) {
+  var t = Math.min(1, Math.max(0, (x - a) / (b - a)));
+  return t * t * (3 - 2 * t);
+}
+var NIGHT = { k: 0, moonDir: new THREE.Vector3(0, -1, 0), moonEl: -90, cover: 0.35 };
+
 var IS_TOUCH = window.matchMedia && window.matchMedia('(pointer: coarse)').matches;
 
 var scene = new THREE.Scene();
@@ -2343,11 +2413,27 @@ function C(hex) { return new THREE.Color(hex).convertSRGBToLinear(); }
 var RENDER_STATE = { dirty: true, shadowsDirty: true, hqDone: false, lastMotion: 0 };
 function requestRender() { RENDER_STATE.dirty = true; RENDER_STATE.hqDone = false; }
 function markShadowsDirty() { RENDER_STATE.shadowsDirty = true; requestRender(); }
+// objects the HQ normal pass hides (sky layers, glow billboards): they are not
+// surfaces, and occlusion computed against them would smear dark halos
+var AO_HIDDEN = [];
+// run on every daylight change, after the sun and sky are set (night lights)
+var DAYLIGHT_HOOKS = [];
 
 // ============================================================================
 //  SKY + SUN
 // ============================================================================
-var sky = new THREE.Sky();
+// A sky as bright as Preetham makes it, under an exposure set for the
+// building, washes out toward white; a camera with a polariser sees it deep
+// blue. skyGain scales what the visible sky draws (and the haze read back from
+// it), not the light it gives the building.
+function skyWithGain(s) {
+  s.material.uniforms.skyGain = { value: 1.0 };
+  s.material.fragmentShader = s.material.fragmentShader
+    .replace('uniform vec3 up;', 'uniform vec3 up;\nuniform float skyGain;')
+    .replace('vec3 retColor = pow(', 'texColor *= skyGain;\n\t\t\tvec3 retColor = pow(');
+  return s;
+}
+var sky = skyWithGain(new THREE.Sky());
 sky.scale.setScalar(8000);   // the hills at 2600 must sit inside the sky box
 scene.add(sky);
 
@@ -2389,31 +2475,33 @@ envScene.add(envGround);
 var envSunMask = new THREE.Mesh(new THREE.CircleGeometry(0.9, 24),
   new THREE.MeshBasicMaterial({ color: 0x000000, toneMapped: false, side: THREE.DoubleSide }));
 envScene.add(envSunMask);
+// (Nothing transparent may go in here: r128 renders the PMREM source RGBE-
+// encoded, the exponent in alpha, and blending would read it as opacity. The
+// night sky's dim glow is the hemisphere light instead -- see applyDaylight.)
 
 var pmrem = new THREE.PMREMGenerator(renderer);
 var envRT = null;
 
 var WEATHER = {
-  clear:    { turbidity: 3.2, rayleigh: 1.25, mie: 0.0035, g: 0.80, sun: 1.00, fog: [2.6, 16], hills: 0.30, bounce: 1.0, ev: 1.0 },
-  hazy:     { turbidity: 8.5, rayleigh: 2.2,  mie: 0.0085, g: 0.85, sun: 0.78, fog: [1.8, 9],  hills: 0.14, bounce: 0.9, ev: 1.08 },
-  overcast: { turbidity: 16,  rayleigh: 3.6,  mie: 0.025,  g: 0.70, sun: 0.16, fog: [1.4, 7],  hills: 0.06, bounce: 0.7, ev: 1.3 }
+  clear:    { turbidity: 3.0, rayleigh: 1.0,  mie: 0.0035, g: 0.80, sun: 1.00, fog: [2.6, 16], hills: 0.30, bounce: 1.0, ev: 1.0,  gain: 0.42 },
+  hazy:     { turbidity: 8.5, rayleigh: 2.2,  mie: 0.0085, g: 0.85, sun: 0.78, fog: [1.8, 9],  hills: 0.14, bounce: 0.9, ev: 1.08, gain: 0.75 },
+  overcast: { turbidity: 16,  rayleigh: 3.6,  mie: 0.025,  g: 0.70, sun: 0.16, fog: [1.4, 7],  hills: 0.06, bounce: 0.7, ev: 1.3,  gain: 0.9 }
 };
-var LIGHT = { t: 0.66, weather: 'clear', dir: new THREE.Vector3(0, 1, 0), elev: 45 };
+// t is the time of day as a fraction of 24 hours
+var LIGHT = { t: 14 / 24, weather: 'clear', dir: new THREE.Vector3(0, 1, 0), elev: 45,
+              lightDir: new THREE.Vector3(0, 1, 0) };
 
 // sun path for a building at Beijing's latitude (39.9 N) facing south (+z),
 // at the equinox: sunrise due east at 06:00, 50 degrees at noon, due west at
-// 18:00. The slider runs 05:00 -> 19:00, so both ends sit in twilight.
-function sunDirection(t, out) {
-  var hour = 5 + t * 14;
+// 18:00, and as far under the north horizon at midnight. The true direction is
+// returned (below the horizon at night); the light clamps its own copy.
+function sunDirection(hour, out) {
   var H = (hour - 12) * 15 * Math.PI / 180;            // hour angle
   var phi = 39.9 * Math.PI / 180;
   var sinEl = Math.cos(phi) * Math.cos(H);
   var el = Math.asin(Math.max(-1, Math.min(1, sinEl)));
   var A = Math.atan2(Math.sin(H), Math.sin(phi) * Math.cos(H)); // from south, + west
-  // a sun two degrees under the horizon still lights the sky; keep a floor so
-  // the directional light never flips beneath the ground
-  var elC = Math.max(el, -0.02);
-  out.set(-Math.sin(A) * Math.cos(elC), Math.sin(elC), Math.cos(A) * Math.cos(elC)).normalize();
+  out.set(-Math.sin(A) * Math.cos(el), Math.sin(el), Math.cos(A) * Math.cos(el)).normalize();
   return el * 180 / Math.PI;
 }
 
@@ -2436,7 +2524,7 @@ function sampleHorizon() {
       _fogRT.texture.encoding = THREE.sRGBEncoding;
       _fogCam = new THREE.PerspectiveCamera(20, 1, 0.1, 100);
       _fogScene = new THREE.Scene();
-      _fogSky = new THREE.Sky();
+      _fogSky = skyWithGain(new THREE.Sky());
       _fogSky.scale.setScalar(50);
       _fogScene.add(_fogSky);
     }
@@ -2454,6 +2542,10 @@ function sampleHorizon() {
     }
     renderer.setRenderTarget(prev);
     scene.fog.color.setRGB(acc[0] / n / 255, acc[1] / n / 255, acc[2] / n / 255);
+    // after dark the Preetham sky is black; the haze takes the night sky's
+    // horizon instead, so the ground still meets the sky without a seam
+    if (typeof nightHorizon === 'function' && NIGHT.k > 0)
+      scene.fog.color.lerp(nightHorizon(new THREE.Color()), NIGHT.k);
   } catch (e) { /* keep the previous fog colour */ }
 }
 
@@ -2464,6 +2556,7 @@ function copySkyUniforms(s) {
   });
   dst.sunPosition.value.copy(src.sunPosition.value);
   dst.up.value.set(0, 1, 0);
+  if (dst.skyGain && src.skyGain) dst.skyGain.value = src.skyGain.value;
 }
 
 // paving albedo the bounce light is taken from; site.js sets it from the
@@ -2478,8 +2571,9 @@ function rebuildEnvironment() {
   envSunMask.lookAt(0, 0, 0);
   // ground radiance ~ albedo x (direct + sky) irradiance, in the same legacy
   // units the materials use (outgoing = albedo * I * NdotL)
-  var direct = sun.intensity * Math.max(0, LIGHT.dir.y);
-  var skyAmb = 0.55 * w.bounce;
+  var direct = sun.intensity * Math.max(0, LIGHT.lightDir.y);
+  var skyAmb = 0.55 * w.bounce * (1 - 0.94 * NIGHT.k);
+  envSunMask.visible = LIGHT.elev > -1;
   envGround.material.color.copy(BOUNCE_ALBEDO).multiplyScalar(direct * 0.55 + skyAmb)
     .multiply(new THREE.Color(1, 0.97, 0.92));
   var next = pmrem.fromScene(envScene, 0, 0.1, 200);
@@ -2496,7 +2590,11 @@ function applySky() {
   u.rayleigh.value = w.rayleigh;
   u.mieCoefficient.value = w.mie;
   u.mieDirectionalG.value = w.g;
+  // the polariser matters most with the sun high; at dusk the sky is the show
+  u.skyGain.value = w.gain + (1 - w.gain) * smoothK(18, 0, LIGHT.elev);
   u.sunPosition.value.copy(LIGHT.dir).multiplyScalar(1000);
+  // r128's Preetham sky goes to pure black a little under the horizon; below
+  // that the night layers in sky.js take over
   u.up.value.set(0, 1, 0);
   scene.fog.near = w.fog[0] * FOG_SCALE;
   scene.fog.far = w.fog[1] * FOG_SCALE;
@@ -2540,34 +2638,71 @@ function tintHills() {
   var shade = new THREE.Color(0.30, 0.36, 0.44).lerp(fogC, 0.35);
   var dayK = Math.max(0.15, Math.min(1, (LIGHT.elev + 4) / 20));
   var c = fogC.clone().lerp(shade.multiplyScalar(dayK), w.hills);
+  // at night the hills are a silhouette a shade darker than the sky behind
+  c.lerp(fogC.clone().multiplyScalar(0.62), NIGHT.k);
   // toneMapped off, so convert: the encoder will turn this back into exactly c
   hills.material.color.copy(c).convertSRGBToLinear();
 }
 
 // Called on every slider tick: the cheap parts now, the PMREM + horizon
 // readback at most every 90 ms and once more when the slider settles.
+//
+// Night: the same directional light becomes the moon. The full moon at the
+// equinox is the sun twelve hours on, so it rises as the sun sets; the swap
+// happens with the sun three degrees down, where both are too dim to see it.
+var MOON_COLOUR = new THREE.Color(0.60, 0.70, 1.0);
+var NIGHT_EV = 1.15;
 function applyDaylight(t, weather) {
-  if (t !== undefined && t !== null) LIGHT.t = Math.max(0, Math.min(1, t));
+  if (t !== undefined && t !== null) LIGHT.t = ((t % 1) + 1) % 1;
   if (weather && WEATHER[weather]) LIGHT.weather = weather;
   var w = WEATHER[LIGHT.weather];
-  LIGHT.elev = sunDirection(LIGHT.t, LIGHT.dir);
-  sun.intensity = sunColourIntensity(LIGHT.elev, sun.color) * w.sun;
-  if (LIGHT.weather === 'overcast') sun.color.lerp(new THREE.Color(0.9, 0.93, 1.0), 0.6);
-  hemi.intensity = 0.08;
+  var hour = LIGHT.t * 24;
+  LIGHT.elev = sunDirection(hour, LIGHT.dir);
+  NIGHT.moonEl = sunDirection(hour + 12, NIGHT.moonDir);
+  NIGHT.k = smoothK(-2, -11, LIGHT.elev);
+
+  if (LIGHT.elev > -3) {
+    // the sun; a floor keeps a just-set sun from lighting the ground from below
+    var elC = Math.max(LIGHT.elev, -1) * Math.PI / 180;
+    var h = Math.hypot(LIGHT.dir.x, LIGHT.dir.z) || 1;
+    LIGHT.lightDir.set(LIGHT.dir.x / h * Math.cos(elC), Math.sin(Math.max(elC, 0.02)), LIGHT.dir.z / h * Math.cos(elC)).normalize();
+    sun.intensity = sunColourIntensity(LIGHT.elev, sun.color) * w.sun;
+    if (LIGHT.weather === 'overcast') sun.color.lerp(new THREE.Color(0.9, 0.93, 1.0), 0.6);
+  } else {
+    var mEl = Math.max(NIGHT.moonEl, 4) * Math.PI / 180;
+    var mh = Math.hypot(NIGHT.moonDir.x, NIGHT.moonDir.z) || 1;
+    LIGHT.lightDir.set(NIGHT.moonDir.x / mh * Math.cos(mEl), Math.sin(mEl), NIGHT.moonDir.z / mh * Math.cos(mEl)).normalize();
+    sun.color.copy(MOON_COLOUR);
+    sun.intensity = 0.24 * smoothK(-2, 14, NIGHT.moonEl) * NIGHT.k * (LIGHT.weather === 'overcast' ? 0.15 : LIGHT.weather === 'hazy' ? 0.6 : 1);
+  }
+  // the night sky's own faint glow, blue from above, almost nothing from the
+  // ground: what lights a court on a moonless night
+  var moonUp = smoothK(-3, 12, NIGHT.moonEl);
+  hemi.intensity = 0.08 + NIGHT.k * (0.05 + 0.05 * moonUp) * (LIGHT.weather === 'overcast' ? 0.7 : 1);
+  hemi.color.setRGB(0.87, 0.91, 0.94).lerp(new THREE.Color(0.38, 0.48, 0.80), NIGHT.k);
+  hemi.groundColor.setRGB(0.35, 0.31, 0.28).lerp(new THREE.Color(0.10, 0.10, 0.12), NIGHT.k);
   // a camera opens up at golden hour: lift exposure as the sun drops so dawn
-  // and dusk read as warm light rather than as night
+  // and dusk read as warm light rather than as night; and further at night,
+  // as an eye adapts -- but not so far that night looks like day
   var low = Math.max(0, Math.min(1, (22 - LIGHT.elev) / 24));
-  renderer.toneMappingExposure = 0.62 * w.ev * (1 + 1.5 * low * low);
+  var dayEv = 0.62 * w.ev * (1 + 1.5 * low * low);
+  renderer.toneMappingExposure = dayEv + (NIGHT_EV - dayEv) * NIGHT.k;
   applySky();
   placeSun();
   markShadowsDirty();
+  if (typeof updateSkyLayers === 'function') updateSkyLayers();
+  for (var i = 0; i < DAYLIGHT_HOOKS.length; i++) DAYLIGHT_HOOKS[i]();
   clearTimeout(_envTimer);
   var now = performance.now();
+  function slow() {
+    rebuildEnvironment(); sampleHorizon(); tintHills();
+    if (typeof updateSkyLayers === 'function') updateSkyLayers();
+  }
   if (!applyDaylight._last || now - applyDaylight._last > 90) {
     applyDaylight._last = now;
-    rebuildEnvironment(); sampleHorizon(); tintHills();
+    slow();
   }
-  _envTimer = setTimeout(function () { rebuildEnvironment(); sampleHorizon(); tintHills(); requestRender(); }, 120);
+  _envTimer = setTimeout(function () { slow(); requestRender(); }, 120);
 }
 
 // ---------------------------------------------------------------------------
@@ -2584,7 +2719,7 @@ function fitShadowTo(center, radius) {
 function placeSun() {
   var c = SHADOW_FIT.center, r = SHADOW_FIT.radius;
   sun.target.position.copy(c);
-  sun.position.copy(c).addScaledVector(LIGHT.dir, r * 3);
+  sun.position.copy(c).addScaledVector(LIGHT.lightDir, r * 3);
   var sc = sun.shadow.camera;
   sc.left = -r; sc.right = r; sc.top = r; sc.bottom = -r;
   sc.near = r * 0.5; sc.far = r * 5.5;
@@ -2771,6 +2906,363 @@ function worldScaleUVs(root) {
     uv.needsUpdate = true;
     geo.userData.uvScaled = true;
   });
+}
+</script>
+<script>
+/* ---- src/sky.js ---- */
+// ============================================================================
+//  天 SKY LAYERS — clouds, the night sky, the moon
+//
+//  The Preetham sky in scene.js is a clear, empty atmosphere. A real sky over a
+//  palace has weather in it, and after dusk it has stars. Four layers sit
+//  inside the Preetham box, each a large sphere (or point set) drawn in display
+//  space so it matches the readback-coloured haze exactly:
+//
+//  * night  — the dark-blue sky that takes over as the sun goes down, with a
+//             faint Milky Way across it
+//  * stars  — a few thousand points, faint ones many and bright ones rare,
+//             dimmed toward the horizon by the air they shine through
+//  * moon   — full, opposite the sun (the equinox full moon rises at sunset
+//             and stands fifty degrees up in the south at midnight)
+//  * clouds — a cloud deck projected onto a plane overhead, so it shrinks and
+//             crowds toward the horizon as a real one does; each cloud shades
+//             itself on the side away from the sun, glows at its thin edges
+//             when you look toward the sun, and takes the sunset colour
+//
+//  None of this writes depth, so the hills and the buildings sit in front of
+//  it, and none of it is in the normal pass, so ambient occlusion ignores it.
+// ============================================================================
+
+var SKY_LAYERS = new THREE.Group();
+SKY_LAYERS.name = 'skyLayers';
+scene.add(SKY_LAYERS);
+AO_HIDDEN.push(SKY_LAYERS);
+
+var SKY_R = 3600;
+
+var SKY_VS = [
+  'varying vec3 vDir;',
+  'void main(){',
+  '  vec4 wp = modelMatrix*vec4(position, 1.0);',
+  '  vDir = wp.xyz - cameraPosition;',
+  '  gl_Position = projectionMatrix*viewMatrix*wp;',
+  '}'
+].join('\n');
+
+var NOISE_GLSL = [
+  'float hash12(vec2 p){ vec3 p3 = fract(vec3(p.xyx)*0.1031); p3 += dot(p3, p3.yzx + 33.33); return fract((p3.x + p3.y)*p3.z); }',
+  'float vnoise(vec2 p){ vec2 i = floor(p), f = fract(p); vec2 u = f*f*(3.0 - 2.0*f);',
+  '  return mix(mix(hash12(i), hash12(i + vec2(1.0, 0.0)), u.x), mix(hash12(i + vec2(0.0, 1.0)), hash12(i + vec2(1.0, 1.0)), u.x), u.y); }',
+  'const mat2 ROT = mat2(1.6, 1.2, -1.2, 1.6);',
+  // octaves past `lod` fade to their mean, so a distant cloud is drawn smooth
+  // instead of shimmering with detail finer than a pixel
+  'float fbm(vec2 p, float lod){ float s = 0.0, a = 0.5;',
+  '  for (int i = 0; i < 6; i++) { float w = clamp(lod - float(i), 0.0, 1.0); s += a*mix(0.5, vnoise(p), w); p = ROT*p; a *= 0.5; }',
+  '  return s/0.984375; }',
+  'float hash13(vec3 p3){ p3 = fract(p3*0.1031); p3 += dot(p3, p3.zyx + 31.32); return fract((p3.x + p3.y)*p3.z); }',
+  'float vnoise3(vec3 p){ vec3 i = floor(p), f = fract(p); vec3 u = f*f*(3.0 - 2.0*f);',
+  '  float a = mix(mix(hash13(i), hash13(i + vec3(1,0,0)), u.x), mix(hash13(i + vec3(0,1,0)), hash13(i + vec3(1,1,0)), u.x), u.y);',
+  '  float b = mix(mix(hash13(i + vec3(0,0,1)), hash13(i + vec3(1,0,1)), u.x), mix(hash13(i + vec3(0,1,1)), hash13(i + vec3(1,1,1)), u.x), u.y);',
+  '  return mix(a, b, u.z); }'
+].join('\n');
+
+// ---------------------------------------------------------------- night sky
+var nightDome = new THREE.Mesh(new THREE.SphereGeometry(SKY_R, 48, 24), new THREE.ShaderMaterial({
+  vertexShader: SKY_VS,
+  fragmentShader: [
+    'varying vec3 vDir;',
+    'uniform vec3 uZenith; uniform vec3 uHorizon; uniform float uK; uniform float uMw; uniform vec3 uPole;',
+    NOISE_GLSL,
+    'void main(){',
+    '  vec3 d = normalize(vDir);',
+    '  float h = max(d.y, 0.0);',
+    '  vec3 col = mix(uHorizon, uZenith, pow(h, 0.42));',
+    // the galactic band: a great circle, broken up by dust lanes
+    '  float b = dot(d, uPole);',
+    '  float band = exp(-b*b*30.0);',
+    '  float dust = vnoise3(d*7.0)*0.6 + vnoise3(d*19.0)*0.4;',
+    '  float mw = band*smoothstep(0.25, 0.85, dust)*smoothstep(0.0, 0.35, h);',
+    '  col += vec3(0.060, 0.064, 0.080)*mw*uMw;',
+    '  gl_FragColor = vec4(col, uK);',
+    '}'
+  ].join('\n'),
+  uniforms: {
+    uZenith: { value: new THREE.Color(0.010, 0.016, 0.040) },
+    uHorizon: { value: new THREE.Color(0.060, 0.075, 0.115) },
+    uK: { value: 0 }, uMw: { value: 1 },
+    uPole: { value: new THREE.Vector3(0.45, 0.35, -0.82).normalize() }
+  },
+  side: THREE.BackSide, transparent: true, depthWrite: false, fog: false
+}));
+nightDome.renderOrder = -4;
+nightDome.frustumCulled = false;
+SKY_LAYERS.add(nightDome);
+
+// -------------------------------------------------------------------- stars
+var stars = (function () {
+  var N = 4200, r = TEXGEN.rng(9071);
+  var pos = new Float32Array(N * 3), size = new Float32Array(N), bright = new Float32Array(N), col = new Float32Array(N * 3);
+  for (var i = 0; i < N; i++) {
+    // uniform on the sphere, upper hemisphere and a little below
+    var y = r() * 1.08 - 0.08, a = r() * Math.PI * 2, s = Math.sqrt(Math.max(0, 1 - y * y));
+    pos[i * 3] = Math.cos(a) * s * SKY_R * 0.97;
+    pos[i * 3 + 1] = y * SKY_R * 0.97;
+    pos[i * 3 + 2] = Math.sin(a) * s * SKY_R * 0.97;
+    var m = Math.pow(r(), 5.5);                 // most stars faint, a few bright
+    size[i] = 1.0 + 2.6 * m;
+    bright[i] = 0.18 + 0.82 * Math.pow(r(), 2.2) * (0.35 + 0.65 * m) + 0.6 * m;
+    // colour temperature: most white, some blue, some orange
+    var t = r();
+    var c = t < 0.12 ? [0.78, 0.86, 1.0] : t > 0.85 ? [1.0, 0.86, 0.70] : [1.0, 0.98, 0.95];
+    col[i * 3] = c[0]; col[i * 3 + 1] = c[1]; col[i * 3 + 2] = c[2];
+  }
+  var g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  g.setAttribute('aSize', new THREE.BufferAttribute(size, 1));
+  g.setAttribute('aBright', new THREE.BufferAttribute(bright, 1));
+  g.setAttribute('aColor', new THREE.BufferAttribute(col, 3));
+  var m = new THREE.ShaderMaterial({
+    vertexShader: [
+      'attribute float aSize; attribute float aBright; attribute vec3 aColor;',
+      'uniform float uPx; uniform float uK;',
+      'varying vec3 vC;',
+      'void main(){',
+      '  vec3 d = normalize(position);',
+      // extinction: a star near the horizon shines through forty times the air
+      '  float ext = smoothstep(-0.02, 0.30, d.y);',
+      '  vC = aColor*aBright*ext*uK;',
+      '  vec4 wp = modelMatrix*vec4(position, 1.0);',
+      '  gl_Position = projectionMatrix*viewMatrix*wp;',
+      '  gl_PointSize = aSize*uPx;',
+      '}'
+    ].join('\n'),
+    fragmentShader: [
+      'varying vec3 vC;',
+      'void main(){',
+      '  float r = length(gl_PointCoord - 0.5)*2.0;',
+      '  float a = smoothstep(1.0, 0.15, r);',
+      '  gl_FragColor = vec4(vC*a, 1.0);',
+      '}'
+    ].join('\n'),
+    uniforms: { uPx: { value: renderer.getPixelRatio() }, uK: { value: 0 } },
+    transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, fog: false
+  });
+  var p = new THREE.Points(g, m);
+  p.renderOrder = -3;
+  p.frustumCulled = false;
+  SKY_LAYERS.add(p);
+  return p;
+})();
+
+// --------------------------------------------------------------------- moon
+var moon = (function () {
+  var c = document.createElement('canvas');
+  c.width = c.height = 256;
+  var x = c.getContext('2d');
+  var R = 120, cx = 128;
+  // limb-darkened disc
+  var g = x.createRadialGradient(cx - 10, cx - 12, 4, cx, cx, R);
+  g.addColorStop(0, '#fbf8ee'); g.addColorStop(0.7, '#ebe6d6'); g.addColorStop(1, '#c9c3b2');
+  x.fillStyle = g; x.beginPath(); x.arc(cx, cx, R, 0, Math.PI * 2); x.fill();
+  // maria: the dark seas, soft-edged blotches in their real rough places
+  var rnd = TEXGEN.rng(55);
+  [[-30, -40, 38], [10, -55, 30], [35, -20, 34], [-45, 15, 26], [20, 20, 22], [-10, 45, 18], [50, 30, 16], [-55, -10, 20]].forEach(function (m) {
+    var gg = x.createRadialGradient(cx + m[0], cx + m[1], 1, cx + m[0], cx + m[1], m[2]);
+    gg.addColorStop(0, 'rgba(120,118,112,0.55)'); gg.addColorStop(1, 'rgba(120,118,112,0)');
+    x.fillStyle = gg; x.beginPath(); x.arc(cx + m[0], cx + m[1], m[2], 0, Math.PI * 2); x.fill();
+  });
+  for (var i = 0; i < 70; i++) {
+    var a = rnd() * Math.PI * 2, d = Math.sqrt(rnd()) * R * 0.92, rr = 1 + rnd() * 5;
+    x.fillStyle = 'rgba(90,88,84,' + (0.08 + rnd() * 0.15) + ')';
+    x.beginPath(); x.arc(cx + Math.cos(a) * d, cx + Math.sin(a) * d, rr, 0, Math.PI * 2); x.fill();
+  }
+  // clip to the disc
+  x.globalCompositeOperation = 'destination-in';
+  x.beginPath(); x.arc(cx, cx, R, 0, Math.PI * 2); x.fill();
+  var tex = new THREE.CanvasTexture(c);
+  tex.encoding = THREE.sRGBEncoding;
+
+  var h = document.createElement('canvas');
+  h.width = h.height = 128;
+  var hx = h.getContext('2d');
+  var hg = hx.createRadialGradient(64, 64, 0, 64, 64, 64);
+  hg.addColorStop(0, 'rgba(255,255,255,1)'); hg.addColorStop(0.12, 'rgba(255,255,255,0.45)');
+  hg.addColorStop(0.35, 'rgba(255,255,255,0.10)'); hg.addColorStop(1, 'rgba(255,255,255,0)');
+  hx.fillStyle = hg; hx.fillRect(0, 0, 128, 128);
+  var htex = new THREE.CanvasTexture(h);
+
+  var grp = new THREE.Group();
+  // a little larger than its true half-degree: the eye always sees it so
+  var size = SKY_R * 0.0165;
+  var disc = new THREE.Mesh(new THREE.PlaneGeometry(size, size), new THREE.MeshBasicMaterial({
+    map: tex, transparent: true, depthWrite: false, fog: false, toneMapped: false, color: 0xffffff
+  }));
+  disc.renderOrder = -2;
+  var halo = new THREE.Mesh(new THREE.PlaneGeometry(size * 9, size * 9), new THREE.MeshBasicMaterial({
+    map: htex, transparent: true, depthWrite: false, fog: false, toneMapped: false,
+    blending: THREE.AdditiveBlending, color: new THREE.Color(0.10, 0.12, 0.16)
+  }));
+  halo.renderOrder = -2.5;
+  halo.position.z = -1;
+  grp.add(halo); grp.add(disc);
+  grp.frustumCulled = false;
+  disc.frustumCulled = false; halo.frustumCulled = false;
+  SKY_LAYERS.add(grp);
+  return { group: grp, disc: disc, halo: halo };
+})();
+
+// ------------------------------------------------------------------- clouds
+var clouds = new THREE.Mesh(new THREE.SphereGeometry(SKY_R * 0.94, 64, 32), new THREE.ShaderMaterial({
+  vertexShader: SKY_VS,
+  fragmentShader: [
+    'varying vec3 vDir;',
+    'uniform vec3 uLit; uniform vec3 uShade; uniform vec3 uHaze; uniform vec3 uGlow; uniform vec3 uSunDir;',
+    'uniform float uCover; uniform float uCirrus; uniform vec2 uSeed; uniform float uOpacity;',
+    NOISE_GLSL,
+    'void main(){',
+    '  vec3 d = normalize(vDir);',
+    '  if (d.y <= 0.0) discard;',
+    '  float h = d.y;',
+    // onto a deck overhead; the small constant stands in for the earth's
+    // curvature, so the deck meets the horizon instead of running to infinity
+    '  vec2 p = d.xz/(h + 0.06);',
+    '  float dist = length(p);',
+    '  float lod = clamp(6.5 - log2(1.0 + dist*1.3), 1.5, 6.0);',
+    '  vec2 q = p*1.5 + uSeed;',
+    // the field the clouds stand in: broad, slowly varying, domain-warped so
+    // cells are irregular rather than round
+    '  vec2 w = vec2(fbm(q*0.28 + 3.1, lod - 2.0), fbm(q*0.28 - 1.7, lod - 2.0)) - 0.5;',
+    '  vec2 qq = q + w*2.2;',
+    '  float base = fbm(qq*0.42, lod - 1.5);',
+    // billows: the cauliflower edge of a cumulus
+    '  float bill = fbm(qq*1.35 + 7.3, lod);',
+    '  float n = base*0.68 + bill*0.32;',
+    '  float lo = 1.0 - uCover*0.93 - 0.10;',
+    '  float cov = smoothstep(lo, lo + 0.07 + uCover*0.10, n);',
+    // self-shadow: denser toward the sun means this point is in the cloud's
+    // own shade
+    '  vec2 sdir = uSunDir.xz/max(length(uSunDir.xz), 1e-3);',
+    '  float n1 = fbm((qq + sdir*0.10)*0.42, lod - 1.5)*0.68 + fbm((qq + sdir*0.10)*1.35 + 7.3, lod)*0.32;',
+    '  float n2 = fbm((qq + sdir*0.26)*0.42, lod - 1.5)*0.68 + bill*0.32;',
+    '  float occl = clamp(((n1 - n)*0.55 + (n2 - n)*0.45)*7.0, -0.5, 1.0);',
+    '  float lit = clamp(0.58 - occl, 0.0, 1.0);',
+    // seen from below, a cumulus is grey at its thick base and bright at its
+    // thin, sunlit margins
+    '  float thick = smoothstep(lo + 0.03, lo + 0.30, n);',
+    '  vec3 col = mix(uShade, uLit, clamp(lit*(1.0 - 0.62*thick) + 0.22*(1.0 - thick), 0.0, 1.0));',
+    '  float mu = dot(d, uSunDir);',
+    '  float hg = 0.64/pow(1.36 - 1.2*mu, 1.5);',
+    '  col += uGlow*hg*0.12*(1.0 - thick)*cov;',
+    // cirrus: high, thin, combed out by the wind
+    '  vec2 cq = vec2(q.x*0.25 + q.y*0.08, q.y*1.9 - q.x*0.3)*0.55 + 17.0;',
+    '  float ci = fbm(cq, lod)*0.7 + fbm(cq*3.1, lod)*0.3;',
+    '  float cia = smoothstep(0.55, 0.82, ci)*uCirrus*(1.0 - cov);',
+    '  col = mix(col, uLit*1.02, cia*(1.0 - cov));',
+    '  float a = max(cov, cia*0.55);',
+    // the far deck dissolves into the haze it is seen through
+    '  float haze = smoothstep(0.30, 0.0, h);',
+    '  col = mix(col, uHaze, haze*0.8);',
+    '  a *= smoothstep(0.015, 0.12, h)*uOpacity;',
+    '  gl_FragColor = vec4(col, a);',
+    '}'
+  ].join('\n'),
+  uniforms: {
+    uLit: { value: new THREE.Color(1, 1, 1) }, uShade: { value: new THREE.Color(0.6, 0.64, 0.7) },
+    uHaze: { value: new THREE.Color(0.8, 0.84, 0.88) }, uGlow: { value: new THREE.Color(1, 0.95, 0.85) },
+    uSunDir: { value: new THREE.Vector3(0, 1, 0) },
+    uCover: { value: 0.35 }, uCirrus: { value: 0.6 }, uSeed: { value: new THREE.Vector2(3.7, 1.9) },
+    uOpacity: { value: 1 }
+  },
+  side: THREE.BackSide, transparent: true, depthWrite: false, fog: false
+}));
+clouds.renderOrder = -1;
+clouds.frustumCulled = false;
+SKY_LAYERS.add(clouds);
+
+// ---------------------------------------------------------------------------
+//  Colours are set in display space from the sun's height, the weather, and
+//  the horizon colour that scene.js has just read back. Called on every
+//  daylight tick (uniforms only, nothing allocated).
+// ---------------------------------------------------------------------------
+var _c1 = new THREE.Color(), _c2 = new THREE.Color(), _c3 = new THREE.Color();
+function mixC(out, a, b, k) { return out.copy(a).lerp(b, k); }
+var SKYCOL = {
+  litDay: new THREE.Color(0.97, 0.965, 0.95), shadeDay: new THREE.Color(0.66, 0.70, 0.76),
+  litGold: new THREE.Color(1.00, 0.70, 0.46), shadeGold: new THREE.Color(0.52, 0.42, 0.46),
+  litGlow: new THREE.Color(0.86, 0.46, 0.52), shadeGlow: new THREE.Color(0.24, 0.20, 0.28),
+  litNight: new THREE.Color(0.13, 0.145, 0.185), shadeNight: new THREE.Color(0.030, 0.036, 0.052),
+  overLit: new THREE.Color(0.80, 0.82, 0.85), overShade: new THREE.Color(0.48, 0.50, 0.54)
+};
+
+function updateSkyLayers() {
+  var w = LIGHT.weather, el = LIGHT.elev;
+  var day = smoothK(-7, 8, el);
+  var gold = smoothK(24, 3, el) * smoothK(-2, 1, el);       // sun low but up
+  var glow = smoothK(1, -2, el) * smoothK(-9, -3, el);      // afterglow, sun just under
+  var night = NIGHT.k;
+
+  var cover = NIGHT.cover;
+  if (w === 'overcast') cover = Math.max(cover, 0.94);
+  if (w === 'hazy') cover = cover * 0.8;
+  var u = clouds.material.uniforms;
+  u.uCover.value = cover;
+  u.uCirrus.value = w === 'overcast' ? 0 : w === 'hazy' ? 0.9 : 0.55;
+  u.uSunDir.value.copy(el > -4 ? LIGHT.dir : NIGHT.moonDir);
+
+  // lit side and shade side, through the day
+  var lit = mixC(_c1, SKYCOL.litDay, SKYCOL.litGold, gold);
+  lit.lerp(SKYCOL.litGlow, glow);
+  var shade = mixC(_c2, SKYCOL.shadeDay, SKYCOL.shadeGold, gold);
+  shade.lerp(SKYCOL.shadeGlow, glow);
+  if (w === 'overcast') { lit.lerp(SKYCOL.overLit, 0.75 * day); shade.lerp(SKYCOL.overShade, 0.75 * day); }
+  if (w === 'hazy') { lit.lerp(scene.fog.color, 0.25); shade.lerp(scene.fog.color, 0.35); }
+  // by night, lit by the moon if it's up and by the sky glow if not
+  var moonUp = smoothK(-3, 12, NIGHT.moonEl);
+  _c3.copy(SKYCOL.litNight).multiplyScalar(0.45 + 0.55 * moonUp);
+  lit.lerp(_c3, 1 - day);
+  shade.lerp(SKYCOL.shadeNight, 1 - day);
+  u.uLit.value.copy(lit);
+  u.uShade.value.copy(shade);
+  u.uHaze.value.copy(scene.fog.color);
+  u.uGlow.value.copy(sun.color).multiplyScalar(day * (w === 'overcast' ? 0.2 : 1));
+
+  // night sky
+  var nu = nightDome.material.uniforms;
+  nu.uK.value = night;
+  nu.uMw.value = (1 - 0.8 * moonUp) * (w === 'clear' ? 1 : w === 'hazy' ? 0.4 : 0);
+  // moonlight brightens the night sky toward a deep blue
+  nu.uZenith.value.setRGB(0.010 + 0.016 * moonUp, 0.016 + 0.026 * moonUp, 0.040 + 0.055 * moonUp);
+  nu.uHorizon.value.setRGB(0.050 + 0.030 * moonUp, 0.064 + 0.040 * moonUp, 0.100 + 0.055 * moonUp);
+  if (w === 'overcast') { nu.uZenith.value.multiplyScalar(0.7); nu.uHorizon.value.multiplyScalar(0.8); }
+
+  var starK = night * (w === 'clear' ? 1 : w === 'hazy' ? 0.45 : 0) * (1 - 0.45 * moonUp);
+  stars.material.uniforms.uK.value = starK;
+  stars.material.uniforms.uPx.value = renderer.getPixelRatio();
+  stars.visible = starK > 0.003;
+
+  // the moon
+  var md = NIGHT.moonDir;
+  moon.group.position.copy(md).multiplyScalar(SKY_R * 0.95);
+  moon.group.lookAt(0, 0, 0);
+  var mvis = smoothK(-1.5, 1.5, NIGHT.moonEl) * (0.25 + 0.75 * night) * (w === 'overcast' ? 0.15 : 1);
+  moon.disc.material.opacity = mvis;
+  moon.halo.material.opacity = mvis * (w === 'hazy' ? 1.6 : 1);
+  // low in the sky it is yellowed by the same air that reddens the sun
+  var low = smoothK(25, 2, NIGHT.moonEl);
+  moon.disc.material.color.setRGB(1, 1 - 0.12 * low, 1 - 0.30 * low);
+  moon.group.visible = mvis > 0.003;
+}
+
+function setCloudCover(c) {
+  NIGHT.cover = Math.max(0, Math.min(1, c));
+  updateSkyLayers();
+  requestRender();
+}
+
+// colour the haze takes at night (display space)
+function nightHorizon(out) {
+  var moonUp = smoothK(-3, 12, NIGHT.moonEl);
+  return out.setRGB(0.050 + 0.030 * moonUp, 0.064 + 0.040 * moonUp, 0.100 + 0.055 * moonUp);
 }
 </script>
 <script>
@@ -3183,6 +3675,7 @@ function hqRender() {
   // 2. view-space normals + depth, sky hidden, no shadow re-render
   var skyVis = sky.visible, fog = scene.fog;
   sky.visible = false; scene.fog = null;
+  var hidden = AO_HIDDEN.map(function (o) { var v = o.visible; o.visible = false; return v; });
   scene.overrideMaterial = q.normalMat;
   var oldClear = renderer.getClearColor(new THREE.Color()), oldAlpha = renderer.getClearAlpha();
   renderer.setClearColor(0x7f7fff, 1);
@@ -3191,6 +3684,7 @@ function hqRender() {
   renderer.render(scene, camera);
   scene.overrideMaterial = null;
   sky.visible = skyVis; scene.fog = fog;
+  AO_HIDDEN.forEach(function (o, i) { o.visible = hidden[i]; });
   renderer.setClearColor(oldClear, oldAlpha);
 
   // 3. occlusion. Radius is in view-space units: about a metre and a half at
@@ -3321,6 +3815,18 @@ function walkUpdate(dt) {
     else return false;
   }
   if (I.court) { nx = Math.max(-I.court.hx, Math.min(I.court.hx, nx)); nz = Math.max(I.court.zb, Math.min(I.court.zf, nz)); }
+  // and the court's halls, trees, vats and lanterns
+  if (I.obstacles) {
+    for (var i = 0; i < I.obstacles.length; i++) {
+      var o = I.obstacles[i], pad = 0.3 * I.M;
+      var was = Math.abs(camera.position.x - o.x) < o.hx + pad && Math.abs(camera.position.z - o.z) < o.hz + pad;
+      if (!was && Math.abs(nx - o.x) < o.hx + pad && Math.abs(nz - o.z) < o.hz + pad) {
+        if (Math.abs(camera.position.x - o.x) >= o.hx + pad) nx = camera.position.x;
+        else if (Math.abs(camera.position.z - o.z) >= o.hz + pad) nz = camera.position.z;
+        else return false;
+      }
+    }
+  }
   camera.position.x = nx; camera.position.z = nz;
   camera.position.y = walkGround(nx, nz) + 1.6 * I.M;
   walkApply();
@@ -3440,6 +3946,290 @@ function startLoop() {
       renderFrame(true);
     }
   })();
+}
+</script>
+<script>
+/* ---- src/lamps.js ---- */
+// ============================================================================
+//  灯 LAMPS — what the palace lights after dark
+//
+//  * 宫灯 lanterns: red silk on a gilt frame, hung under the eaves, at the
+//    corners of every pagoda storey, along the corridors. Instanced: one draw
+//    call per material however many hang.
+//  * 石灯 stone lanterns standing in the court, their windows lit.
+//  * windows: the paper behind every lattice glows (the glass material's
+//    emissive is driven from here), so a hall at night reads as lit within.
+//  * glow: a soft billboard round every flame, so a lantern seen across the
+//    court has the bloom the eye gives it; a pool of warm light on the paving
+//    under each standing lantern; and a handful of real point lights at the
+//    lanterns nearest the building, so its columns and terrace catch the light.
+//
+//  Everything here is driven by one number: how lit the lamps are, which rises
+//  through dusk and falls through dawn (DAYLIGHT_HOOKS -> applyNightLights).
+// ============================================================================
+
+var LAMPS = { mats: [], lights: [], uniforms: [], k: 0 };
+var LAMP_COLOUR = new THREE.Color(1.0, 0.62, 0.30);
+var POINT_LIGHTS = 6;
+
+// The point lights are made once and live in the scene for good: the number of
+// lights is baked into every shader, so adding or removing one -- on a rebuild,
+// at dusk -- would recompile every material. They are only moved and dimmed.
+var LAMP_POOL = [];
+for (var _pl = 0; _pl < POINT_LIGHTS; _pl++) {
+  var _l = new THREE.PointLight(LAMP_COLOUR.getHex(), 0, 1, 2);
+  _l.position.set(0, -1000, 0);
+  _l.castShadow = false;
+  scene.add(_l);
+  LAMP_POOL.push(_l);
+}
+
+// called at the start of every rebuild: the old lamps went with the old groups
+function resetLamps() {
+  LAMPS.mats = []; LAMPS.lights = []; LAMPS.uniforms = [];
+  LAMP_POOL.forEach(function (l) { l.intensity = 0; l.position.set(0, -1000, 0); });
+}
+
+// a material that glows at night: its emissive colour and full intensity
+function lampMat(mat, colour, intensity) {
+  mat.emissive = (colour || LAMP_COLOUR).clone();
+  mat.emissiveIntensity = 0;
+  LAMPS.mats.push({ m: mat, base: intensity });
+  return mat;
+}
+
+function applyNightLights() {
+  // lamps are lit as the sun goes down, a little before full dark
+  var k = smoothK(1, -7, LIGHT.elev);
+  LAMPS.k = k;
+  for (var i = 0; i < LAMPS.mats.length; i++) LAMPS.mats[i].m.emissiveIntensity = LAMPS.mats[i].base * k;
+  // the lights live outside the site group; they go out with it when 地面 is off
+  var on = siteGroup.visible ? 1 : 0;
+  for (var j = 0; j < LAMPS.lights.length; j++) LAMPS.lights[j].l.intensity = LAMPS.lights[j].base * k * on;
+  for (var q = 0; q < LAMPS.uniforms.length; q++) LAMPS.uniforms[q].value = k;
+  requestRender();
+}
+DAYLIGHT_HOOKS.push(applyNightLights);
+
+// ---------------------------------------------------------------------------
+//  the 宫灯 template, in metres: a silk drum on twelve ribs between gilt caps,
+//  a red tassel below, hung on a short rod
+// ---------------------------------------------------------------------------
+var _lanternTex = null;
+function lanternTexture() {
+  if (_lanternTex) return _lanternTex;
+  var c = document.createElement('canvas');
+  c.width = 256; c.height = 128;
+  var x = c.getContext('2d');
+  var g = x.createLinearGradient(0, 0, 0, 128);
+  g.addColorStop(0, '#a8261a'); g.addColorStop(0.5, '#e0442a'); g.addColorStop(1, '#a8261a');
+  x.fillStyle = g; x.fillRect(0, 0, 256, 128);
+  // ribs
+  x.strokeStyle = 'rgba(60,10,6,0.85)'; x.lineWidth = 3;
+  for (var i = 0; i < 12; i++) { x.beginPath(); x.moveTo(i * 256 / 12, 0); x.lineTo(i * 256 / 12, 128); x.stroke(); }
+  // gilt bands near top and bottom
+  x.fillStyle = '#d9a83c';
+  x.fillRect(0, 10, 256, 5); x.fillRect(0, 113, 256, 5);
+  // a 福 roundel either side, as dark ink on the silk
+  x.fillStyle = 'rgba(40,6,4,0.55)';
+  [64, 192].forEach(function (cx) { x.beginPath(); x.arc(cx, 64, 20, 0, Math.PI * 2); x.fill(); });
+  x.fillStyle = 'rgba(232,90,50,0.9)';
+  [64, 192].forEach(function (cx) { x.beginPath(); x.arc(cx, 64, 15, 0, Math.PI * 2); x.fill(); });
+  var t = new THREE.CanvasTexture(c);
+  t.encoding = THREE.sRGBEncoding;
+  t.userData = { cached: true };      // shared across rebuilds: disposeGroup leaves it
+  return (_lanternTex = t);
+}
+
+function lanternTemplate(mats) {
+  var tpl = new THREE.Group();
+  var prof = [[0.0001, 0], [0.13, 0.015], [0.26, 0.09], [0.33, 0.22], [0.345, 0.34], [0.33, 0.46], [0.26, 0.59], [0.13, 0.665], [0.0001, 0.68]];
+  var body = new THREE.LatheGeometry(prof.map(function (p) { return new THREE.Vector2(p[0], p[1]); }), 24);
+  body.userData.ownUVs = true;
+  var silk = lampMat(new THREE.MeshStandardMaterial({
+    color: 0xffffff, map: lanternTexture(), emissiveMap: lanternTexture(), roughness: 0.75, metalness: 0
+  }), new THREE.Color(1.0, 0.55, 0.32), 3.6);
+  part(body, silk, 0, -0.68 - 0.06, 0, 0, tpl);
+  var cap = new THREE.CylinderGeometry(0.15, 0.17, 0.07, 16);
+  part(cap, mats.gold, 0, -0.06 + 0.0, 0, 0, tpl);
+  part(cap, mats.gold, 0, -0.74 - 0.03, 0, 0, tpl);
+  part(new THREE.CylinderGeometry(0.012, 0.012, 0.5, 6), mats.gold, 0, 0.22, 0, 0, tpl);
+  var tassel = new THREE.ConeGeometry(0.07, 0.36, 10, 1, true);
+  tassel.rotateX(Math.PI);
+  part(tassel, mats.tassel || mats.gold, 0, -0.80 - 0.18, 0, 0, tpl);
+  tpl.userData.centreY = -0.40;       // body centre below the attach point, metres
+  return tpl;
+}
+
+// ---------------------------------------------------------------------------
+//  glow billboards and light pools: one instanced quad each, additive,
+//  faced to the camera in the vertex shader
+// ---------------------------------------------------------------------------
+var HALO_VS = [
+  'uniform float uPull;',
+  'varying vec2 vUv;',
+  'void main(){',
+  '  vUv = uv;',
+  '  vec4 c = modelViewMatrix*instanceMatrix*vec4(0.0, 0.0, 0.0, 1.0);',
+  '  float s = length(instanceMatrix[0].xyz);',
+  // pulled toward the eye, so the lantern itself doesn't cut its own glow
+  '  c.xyz += normalize(-c.xyz)*s*uPull;',
+  '  c.xy += position.xy*s;',
+  '  gl_Position = projectionMatrix*c;',
+  '}'
+].join('\n');
+var HALO_FS = [
+  'uniform float uK; uniform vec3 uColor; uniform float uGain;',
+  'varying vec2 vUv;',
+  'void main(){',
+  '  float r = length(vUv - 0.5)*2.0;',
+  '  float g = exp(-r*r*7.0)*0.55 + exp(-r*16.0)*0.9;',
+  '  g *= 1.0 - smoothstep(0.85, 1.0, r);',
+  '  gl_FragColor = vec4(uColor*g*uK*uGain, 1.0);',
+  '}'
+].join('\n');
+var POOL_VS = [
+  'varying vec2 vUv;',
+  'void main(){ vUv = uv; gl_Position = projectionMatrix*modelViewMatrix*instanceMatrix*vec4(position, 1.0); }'
+].join('\n');
+var POOL_FS = [
+  'uniform float uK; uniform vec3 uColor; uniform float uGain;',
+  'varying vec2 vUv;',
+  'void main(){',
+  '  float r = length(vUv - 0.5)*2.0;',
+  '  float g = pow(max(0.0, 1.0 - r), 2.2);',
+  '  gl_FragColor = vec4(uColor*g*uK*uGain, 1.0);',
+  '}'
+].join('\n');
+
+function glowMaterial(vs, fs, gain, colour, pull) {
+  var uK = { value: LAMPS.k };
+  LAMPS.uniforms.push(uK);
+  return new THREE.ShaderMaterial({
+    vertexShader: vs, fragmentShader: fs,
+    uniforms: { uK: uK, uColor: { value: (colour || new THREE.Color(1.0, 0.66, 0.36)).clone() },
+                uGain: { value: gain }, uPull: { value: pull || 0.35 } },
+    transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, fog: false,
+    polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2
+  });
+}
+
+// ---------------------------------------------------------------------------
+//  LampSet: collect lamps while a scene is built, then make the instanced
+//  meshes, glows, pools and point lights in one go.
+//    hang(x, y, z, sizeM)   a 宫灯 whose rod is fixed at (x, y, z)
+//    glow(x, y, z, r)       a bare glow (a stone lantern's window, a doorway)
+//    pool(x, y, z, r)       light on the ground
+//    light(x, y, z, I, d, priority)  a candidate point light
+// ---------------------------------------------------------------------------
+function LampSet(M) {
+  this.M = M; this.hung = []; this.glows = []; this.pools = []; this.cands = [];
+}
+LampSet.prototype.hang = function (x, y, z, size) {
+  var s = (size || 1) * this.M;
+  this.hung.push({ x: x, y: y, z: z, s: s });
+  // the glow sits on the silk drum
+  this.glows.push({ x: x, y: y - 0.40 * s, z: z, r: 1.5 * s });
+};
+LampSet.prototype.glow = function (x, y, z, r) { this.glows.push({ x: x, y: y, z: z, r: r }); };
+LampSet.prototype.pool = function (x, y, z, r) { this.pools.push({ x: x, y: y, z: z, r: r }); };
+LampSet.prototype.light = function (x, y, z, I, d, pri) {
+  this.cands.push({ p: new THREE.Vector3(x, y, z), I: I, d: d, pri: pri || 0 });
+};
+LampSet.prototype.build = function (mats, parent) {
+  var g = new THREE.Group();
+  g.name = 'lamps';
+  var m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), sc = new THREE.Vector3(), ps = new THREE.Vector3(), up = new THREE.Vector3(0, 1, 0);
+  var rnd = TEXGEN.rng(4411);
+
+  if (this.hung.length) {
+    var tpl = lanternTemplate(mats);
+    mergeStatic(tpl);
+    var hung = this.hung;
+    tpl.children.slice().forEach(function (src) {
+      var im = new THREE.InstancedMesh(src.geometry, src.material, hung.length);
+      hung.forEach(function (h, i) {
+        q.setFromAxisAngle(up, rnd() * Math.PI * 2);
+        m4.compose(ps.set(h.x, h.y, h.z), q, sc.set(h.s, h.s, h.s));
+        im.setMatrixAt(i, m4);
+      });
+      im.instanceMatrix.needsUpdate = true;
+      im.castShadow = false; im.receiveShadow = true;
+      im.frustumCulled = false;
+      g.add(im);
+    });
+  }
+
+  function quads(list, mat, flat, y0) {
+    if (!list.length) return null;
+    var geo = new THREE.PlaneGeometry(1, 1);
+    if (flat) geo.rotateX(-Math.PI / 2);
+    var im = new THREE.InstancedMesh(geo, mat, list.length);
+    list.forEach(function (o, i) {
+      m4.makeScale(o.r * 2, o.r * 2, o.r * 2);
+      m4.setPosition(o.x, o.y + (y0 || 0), o.z);
+      im.setMatrixAt(i, m4);
+    });
+    im.instanceMatrix.needsUpdate = true;
+    im.frustumCulled = false;
+    im.castShadow = false; im.receiveShadow = false;
+    im.renderOrder = 2;
+    return im;
+  }
+  var halos = quads(this.glows, glowMaterial(HALO_VS, HALO_FS, 1.1, null, 0.35), false);
+  if (halos) { g.add(halos); AO_HIDDEN.push(halos); halos.userData.aoHidden = true; }
+  var pools = quads(this.pools, glowMaterial(POOL_VS, POOL_FS, 0.30, new THREE.Color(1.0, 0.60, 0.30)), true, 0.012 * this.M);
+  if (pools) { g.add(pools); AO_HIDDEN.push(pools); pools.userData.aoHidden = true; }
+
+  // point lights: always the same number in the scene, so a rebuild or the
+  // time of day never changes the light count and recompiles every shader
+  var cands = this.cands.slice().sort(function (a, b) { return b.pri - a.pri; });
+  LAMPS.lights = [];
+  for (var i = 0; i < POINT_LIGHTS; i++) {
+    var c = cands[i], pl = LAMP_POOL[i];
+    pl.distance = c ? c.d : 1;
+    if (c) pl.position.copy(c.p); else pl.position.set(0, -1000, 0);
+    LAMPS.lights.push({ l: pl, base: c ? c.I : 0 });
+  }
+  parent.add(g);
+  applyNightLights();
+  return g;
+};
+
+// AO_HIDDEN keeps references to glow meshes from earlier builds; drop them
+// when their group is disposed
+function pruneAoHidden() {
+  for (var i = AO_HIDDEN.length - 1; i >= 0; i--) {
+    var o = AO_HIDDEN[i], root = o;
+    while (root.parent) root = root.parent;
+    if (root !== scene) AO_HIDDEN.splice(i, 1);
+  }
+}
+
+// ---------------------------------------------------------------------------
+//  石灯 a standing stone lantern, metres: base, shaft, the 火室 fire box with
+//  four lit openings, a hipped stone cap and a 宝珠 on top. Instanced too.
+// ---------------------------------------------------------------------------
+function stoneLanternTemplate(mats, glowMat) {
+  var t = new THREE.Group();
+  var st = mats.stone;
+  part(new THREE.BoxGeometry(0.80, 0.18, 0.80), st, 0, 0.09, 0, 0, t);
+  part(new THREE.CylinderGeometry(0.30, 0.36, 0.22, 8), st, 0, 0.29, 0, 0, t);
+  part(latheGeo([[0.13, 0], [0.11, 0.25], [0.10, 0.8], [0.12, 1.05], [0.16, 1.12]], 12), st, 0, 0.40, 0, 0, t);
+  part(new THREE.CylinderGeometry(0.40, 0.30, 0.14, 6), st, 0, 1.58, 0, 0, t);      // 中台
+  // the fire box: four posts round a lit core
+  part(new THREE.BoxGeometry(0.40, 0.42, 0.40), glowMat, 0, 1.86, 0, 0, t);
+  [[1, 1], [1, -1], [-1, 1], [-1, -1]].forEach(function (c) {
+    part(new THREE.BoxGeometry(0.09, 0.44, 0.09), st, c[0] * 0.22, 1.86, c[1] * 0.22, 0, t);
+  });
+  part(new THREE.BoxGeometry(0.52, 0.05, 0.52), st, 0, 1.64, 0, 0, t);
+  // 笠 the cap: a low stone pyramid with a thick eave
+  var cap = new THREE.CylinderGeometry(0.06, 0.56, 0.30, 4, 1);
+  cap.rotateY(Math.PI / 4);
+  part(cap, st, 0, 2.24, 0, 0, t);
+  part(new THREE.BoxGeometry(0.80, 0.07, 0.80), st, 0, 2.10, 0, 0, t);
+  part(new THREE.SphereGeometry(0.09, 12, 8), st, 0, 2.44, 0, 0, t);
+  return t;
 }
 </script>
 <script>
@@ -3966,6 +4756,10 @@ function instanced(geo, mat, n) {
   var im = new THREE.InstancedMesh(geo, mat, Math.max(1, n));
   im.count = n;
   im.castShadow = true; im.receiveShadow = true;
+  // r128 culls an InstancedMesh by the template's bounds at the mesh origin,
+  // not by its instances: zoomed in on a corner away from the centre, a whole
+  // roof's tiles would vanish
+  im.frustumCulled = false;
   return im;
 }
 
@@ -4501,18 +5295,20 @@ function pagodaScreen(w, h, mats) {
   var fr = Math.min(w, h) * 0.06;
   var leaves = Math.max(2, 2 * Math.round(w / (h * 0.42) / 2));
   var leafW = w / leaves;
+  // everything stands proud of the wall face the group is placed on: the
+  // paper first (it glows at night), the lattice over it, the frame over that
   var gl = new THREE.Mesh(new THREE.PlaneGeometry(w, h), mats.glass);
-  gl.position.z = -fr * 0.4;
+  gl.position.z = fr * 0.12;
   g.add(gl);
   var grid = new THREE.Mesh(new THREE.PlaneGeometry(w, h * 0.82), mats.grid);
-  grid.position.set(0, h * 0.04, fr * 0.2);
+  grid.position.set(0, h * 0.04, fr * 0.7);
   g.add(grid);
   for (var s = 0; s <= leaves; s++)
-    part(new THREE.BoxGeometry(fr, h, fr * 1.4), mats.lattice, -w / 2 + leafW * s, 0, fr * 0.5, 0, g);
+    part(new THREE.BoxGeometry(fr, h, fr * 1.4), mats.lattice, -w / 2 + leafW * s, 0, fr * 1.0, 0, g);
   [-h / 2, h / 2, -h * 0.37].forEach(function (ry) {
-    part(new THREE.BoxGeometry(w, fr, fr * 1.3), mats.lattice, 0, ry, fr * 0.5, 0, g);
+    part(new THREE.BoxGeometry(w, fr, fr * 1.3), mats.lattice, 0, ry, fr * 1.0, 0, g);
   });
-  part(new THREE.BoxGeometry(w, h * 0.13 - fr, fr * 0.6), mats.lattice, 0, -h * 0.435, 0, 0, g);
+  part(new THREE.BoxGeometry(w, h * 0.13 - fr, fr * 0.6), mats.lattice, 0, -h * 0.435, fr * 0.45, 0, g);
   return g;
 }
 
@@ -4748,6 +5544,7 @@ function buildPagoda(D, scale, opts, mats, env) {
   var rafter = { spacing: 4.5 * u, r: 0.75 * u, fly: 1.5 * u, flyLen: 7 * u * (dense ? 0.5 : 1) };
 
   var y = 0, R = R0, prev = null;
+  var lamps = [];
   for (var i = 0; i < storeys; i++) {
     var isFirst = (i === 0);
     var h = dense ? (isFirst ? storeyH * 5.0 : storeyH * 0.34) : storeyH;
@@ -4804,6 +5601,18 @@ function buildPagoda(D, scale, opts, mats, env) {
     roof.position.y = roofY;
     g.add(roof);
 
+    // a 宫灯 under every corner of this eave, a little in from the tip
+    var hf = roofProfileFn(tierRise), up = D.cornerRise * scale * ROOF_CURVE.lift, tt = 0.86;
+    var ww = 1 + (4.5 * u / Rr) * Math.pow(tt, 3);
+    for (var lc = 0; lc < n; lc++) {
+      var lth = (lc / n) * Math.PI * 2 + Math.PI / n;
+      lamps.push({
+        x: Math.cos(lth) * Rr * tt * ww, z: Math.sin(lth) * Rr * tt * ww,
+        y: roofY + hf(tt) + up * Math.pow(tt, 2.8) - thick * 2.5,
+        s: dense ? 0.7 : 1.0, storey: i
+      });
+    }
+
     prev = { Rr: Rr, roofY: roofY, rise: tierRise };
     y += h + dgH + tierRise * (dense ? 0.70 : 0.62);
     R = nextR;
@@ -4824,6 +5633,7 @@ function buildPagoda(D, scale, opts, mats, env) {
   g.add(fin);
 
   g.userData.totalHeight = y + capRise + storeyH * 1.35;
+  g.userData.lamps = lamps;
   g.userData.baseRadius = R0;
   return g;
 }
@@ -5559,6 +6369,132 @@ function buildLattice(S, hd, baseH, topY, mats, colR, opts) {
 }
 </script>
 <script>
+/* ---- src/hallbuild.js ---- */
+// ============================================================================
+//  殿 ONE HALL — platform, columns, walls, lattice, steps, balustrade,
+//  brackets and roof, from a set of 斗口-derived dimensions. The main hall is
+//  built by this, and so are the courtyard's side halls, so a 配殿 is a real
+//  building at its own rank rather than a box with a roof on it.
+//
+//  P: { D, scale, M, isDaShi, isSong, roofType, grade, grade3, caihua, railing,
+//       shengqi, cejiao, tuishan, nBeasts, colours, tileM, ridgeM, yulu }
+// ============================================================================
+function buildHall(P, mats) {
+  var g = new THREE.Group();
+  var D = P.D, scale = P.scale, M = P.M, u = scale;
+  var isDaShi = P.isDaShi, isSong = P.isSong, grade = P.grade, grade3 = P.grade3;
+  var hw = (D.totalWidth * scale) / 2;
+  var hd = (D.totalDepth * scale) / 2;
+  var baseH = D.baseH * scale;
+  var dgSteps = isDaShi ? (grade <= 3 ? 4 : grade <= 7 ? 3 : 2) : 0;
+  var dgOut = 3 * u * dgSteps;
+  var eaveOut = D.eaveOut * scale * ROOF_CURVE.eave + dgOut;
+  var roofRise = D.roofRise * scale * ROOF_CURVE.rise;
+  var upturn = D.cornerRise * scale * ROOF_CURVE.lift;
+  var tileM = P.tileM, ridgeM = P.ridgeM, nBeasts = P.nBeasts;
+  var roofType = P.roofType;
+  var useShengqi = P.shengqi, useCejiao = P.cejiao, useTuishan = P.tuishan;
+  var thick = Math.max(0.04, D.purlinDia * scale * 0.5);
+  var rafter = { spacing: 3 * u, r: 0.75 * u, fly: 1.5 * u, flyLen: 7 * u };
+
+  // --------------------------------------------------------------- 台基
+  var base = buildBase(hw, hd, baseH, 2, mats, { margin: Math.min(0.75, eaveOut * 0.72), xumi: isDaShi });
+  g.add(base);
+
+  var floor = new THREE.Mesh(new THREE.BoxGeometry(hw * 2, 0.02 * M, hd * 2), mats.floor);
+  floor.position.y = baseH + 0.01 * M;
+  floor.receiveShadow = true;
+  g.add(floor);
+
+  var colR = D.colDia * scale / 2;
+  var S = { D: D, scale: scale, M: M, u: u };
+  var columns = buildColumns(S, baseH, mats, {
+    shengqi: useShengqi, cejiao: useCejiao, daShi: isDaShi,
+    caihua: P.caihua, grade: grade3, colours: P.colours
+  });
+  g.add(columns);
+  var colTop = columns.userData.colTop, beamBottom = columns.userData.beamBottom;
+  g.add(buildWalls(hw, hd, baseH, beamBottom, mats, colR));
+  g.add(buildLattice(S, hd, baseH, beamBottom, mats, colR, { rich: grade3 !== 'sushi' }));
+
+  // 踏跺 as wide as the 明间, its top tread flush with the platform edge
+  var bays = D.bayWidths.length;
+  var stepHalf = (D.bayWidths[(bays - 1) / 2] * scale) / 2 - colR;
+  var steps = buildSteps(stepHalf, baseH, mats, M, { yulu: P.yulu });
+  steps.position.z = base.userData.topHD;
+  g.add(steps);
+
+  var rail = null;
+  if (P.railing) {
+    var rx = base.userData.topHW - 0.28 * M, rz = base.userData.topHD - 0.28 * M;
+    var gapHalf = stepHalf + 0.42 * M;
+    rail = buildBalustrade(rx, rz, baseH, mats, M, [-gapHalf, gapHalf]);
+    g.add(rail);
+    if (isDaShi) addChishou(g, rail.userData.posts, base, rx, rz, mats.plinth, M);
+  }
+
+  // -------------------------------------------------- 斗栱 / 檩 and the roof
+  var purlinTop;
+  if (isDaShi) {
+    var dg = buildDougong(S, colTop, mats, dgSteps);
+    g.add(dg);
+    purlinTop = dg.userData.top;
+  } else {
+    // 小式: the 檐檩 sits straight on the columns over a 垫板
+    var rp = D.purlinDia * scale / 2;
+    [[0, hd, hw * 2 + rp * 2, true], [0, -hd, hw * 2 + rp * 2, true], [hw, 0, hd * 2 + rp * 2, false], [-hw, 0, hd * 2 + rp * 2, false]].forEach(function (b) {
+      var c = new THREE.Mesh(new THREE.CylinderGeometry(rp, rp, b[2], 16), mats.beam);
+      if (b[3]) c.rotation.z = Math.PI / 2; else c.rotation.x = Math.PI / 2;
+      c.position.set(b[0], colTop + rp * 1.4, b[1]);
+      c.castShadow = true; c.receiveShadow = true;
+      g.add(c);
+    });
+    purlinTop = colTop + rp * 2.4;
+  }
+
+  var roof = buildRoof({
+    halfWidth: hw + eaveOut, halfDepth: hd + eaveOut, hw: hw, hd: hd, dgOut: isDaShi ? dgOut : D.purlinDia * scale * 0.5,
+    roofHeight: roofRise, upturn: upturn, chong: D.cornerOut * scale * ROOF_CURVE.lift,
+    roofType: roofType, isSong: isSong, tuishan: useTuishan, purlinDia: D.purlinDia * scale,
+    shellThick: thick, tileP: tileM * M, courseL: tileM * M * 0.92, ridgeH: ridgeM * M,
+    beasts: nBeasts, rafter: rafter, M: M, mats: mats, wen: isDaShi
+  });
+  // seat the roof so its boards rest on the rafters, and the rafters on the
+  // 挑檐桁: the eave edge then falls below the purlin, as a real one does
+  var R = roof.userData.R;
+  var tiaoZ = hd + (isDaShi ? dgOut : 0);
+  var rafterDepth = rafter.fly + rafter.r * 2;
+  var roofY = purlinTop + rafterDepth - (R.height(0, tiaoZ) - thick);
+  roof.position.y = roofY;
+  g.add(roof);
+
+  // close the band between the bracket tops and the roof boards on the
+  // column line, so no daylight shows through under the eave
+  var soffitAtCol = roofY + R.height(0, hd) - thick;
+  var fh = soffitAtCol - (purlinTop - 2 * u) + 0.02;
+  if (fh > 0) {
+    var ft = u * 1.2, fy = purlinTop - 2 * u + fh / 2;
+    [[0, hd, hw * 2, ft], [0, -hd, hw * 2, ft], [hw, 0, ft, hd * 2], [-hw, 0, ft, hd * 2]].forEach(function (b) {
+      part(new THREE.BoxGeometry(b[2], fh, b[3]), mats.board, b[0], fy, b[1], 0, g);
+    });
+  }
+
+
+  var topY = roofY + R.height(0, 0) + ridgeM * M * 2.4;
+  // where lanterns hang: under the front eave, one at every front column,
+  // halfway out to the eave edge, from the underside of the roof
+  var xs = bayAxes(D, scale), lampZ = hd + eaveOut * 0.42, lamps = [];
+  xs.forEach(function (x) {
+    lamps.push({ x: x, z: lampZ, y: roofY + R.height(x, lampZ) - thick * 1.5 });
+  });
+  return {
+    group: g, hw: hw, hd: hd, baseH: baseH, base: base, steps: steps, stepHalf: stepHalf, rail: rail,
+    colTop: colTop, colR: colR, roofY: roofY, R: R, topY: topY, eaveOut: eaveOut, thick: thick,
+    lamps: lamps, beamBottom: beamBottom
+  };
+}
+</script>
+<script>
 /* ---- src/palette.js ---- */
 // ============================================================================
 //  色彩 — THE FIVE 正色
@@ -5644,7 +6580,7 @@ function val(id) { return parseFloat(document.getElementById(id).value); }
 //  and a half metres, the bricks are half a metre, so the hall is as big as it
 //  is. None of this is exported -- it lives in siteGroup.
 // ============================================================================
-var SITE = { mode: 'court', visible: true, mats: null };
+var SITE = { mode: 'court', visible: true, furnish: true, mats: null };
 
 // A tiled texture repeats; a real court doesn't. Large-scale tone -- where it
 // was re-laid, where water stands, where the dirt drifts against a wall -- is
@@ -5696,6 +6632,30 @@ function cityGeos() {
   return (_cityGeo = { roof: roof, body: body, base: base });
 }
 
+// a row of 槅扇 door leaves, as a hall front reads from across a court:
+// red stiles and rails, the lattice panels warm where light comes through
+var _cityDoors = null;
+function cityDoorTexture() {
+  if (_cityDoors) return _cityDoors;
+  var c = document.createElement('canvas');
+  c.width = 256; c.height = 64;
+  var x = c.getContext('2d');
+  x.fillStyle = '#5a1d14'; x.fillRect(0, 0, 256, 64);
+  var leaves = 12, lw = 256 / leaves;
+  for (var i = 0; i < leaves; i++) {
+    var lx = i * lw;
+    x.fillStyle = '#c99a62'; x.fillRect(lx + 2.5, 6, lw - 5, 34);       // 槅心
+    x.fillStyle = 'rgba(70,24,14,0.55)';
+    for (var k = 0; k < 5; k++) x.fillRect(lx + 2.5, 8 + k * 7, lw - 5, 1.2);
+    for (var k2 = 1; k2 < 3; k2++) x.fillRect(lx + 2.5 + k2 * (lw - 5) / 3, 6, 1.2, 34);
+    x.fillStyle = '#6b2418'; x.fillRect(lx + 3, 44, lw - 6, 15);          // 裙板
+  }
+  _cityDoors = new THREE.CanvasTexture(c);
+  _cityDoors.encoding = THREE.sRGBEncoding;
+  _cityDoors.userData = { cached: true };
+  return _cityDoors;
+}
+
 function buildCity(court, M, mats, g) {
   var G = cityGeos();
   var rnd = TEXGEN.rng(1407);
@@ -5720,6 +6680,8 @@ function buildCity(court, M, mats, g) {
   var roofs = new THREE.InstancedMesh(G.roof, mats.cityRoof, n);
   var bases = new THREE.InstancedMesh(G.base, mats.cityBase, n);
   var eaves = new THREE.InstancedMesh(G.base, mats.cityEave, n);
+  // a ridge along every roof, with a lift at each end where the 吻 sits
+  var ridges = new THREE.InstancedMesh(G.base, mats.cityRoof, n * 3);
   var m4 = new THREE.Matrix4();
   spots.forEach(function (s, i) {
     m4.makeScale(s.w * 1.08, s.b, s.d * 1.25); m4.setPosition(s.x, 0, s.z); bases.setMatrixAt(i, m4);
@@ -5728,8 +6690,39 @@ function buildCity(court, M, mats, g) {
     // read as a hall from a distance
     m4.makeScale(s.w * 1.01, s.h * 0.24, s.d * 1.01); m4.setPosition(s.x, s.b + s.h * 0.76, s.z); eaves.setMatrixAt(i, m4);
     m4.makeScale(s.w * 1.14, s.d * 0.40, s.d * 1.34); m4.setPosition(s.x, s.b + s.h, s.z); roofs.setMatrixAt(i, m4);
+    var ry = s.b + s.h + s.d * 0.40 * 0.96, rh = Math.max(0.35 * M, s.d * 0.035);
+    m4.makeScale(s.w * 1.14 * 0.42, rh, rh * 1.1); m4.setPosition(s.x, ry - rh * 0.4, s.z); ridges.setMatrixAt(i * 3, m4);
+    [-1, 1].forEach(function (e, k) {
+      m4.makeScale(rh * 1.2, rh * 2.4, rh * 1.3); m4.setPosition(s.x + e * s.w * 1.14 * 0.21, ry - rh * 0.4, s.z); ridges.setMatrixAt(i * 3 + 1 + k, m4);
+    });
   });
-  [bodies, roofs, bases, eaves].forEach(function (im) { im.instanceMatrix.needsUpdate = true; im.receiveShadow = true; g.add(im); });
+  // r128 culls an InstancedMesh by its one template's bounds at the origin,
+  // which would drop the whole city whenever the origin left the view
+  [bodies, roofs, bases, eaves, ridges].forEach(function (im) { im.instanceMatrix.needsUpdate = true; im.receiveShadow = true; im.frustumCulled = false; g.add(im); });
+
+  // the 槅扇 front of each hall: a dark band of lattice by day; by night most
+  // of them are lit from within, a few stay dark
+  var win = new THREE.PlaneGeometry(1, 1);
+  win.userData.ownUVs = true;
+  var doors = cityDoorTexture();
+  var litMat = lampMat(new THREE.MeshStandardMaterial({ color: 0xffffff, map: doors, emissiveMap: doors, roughness: 0.7 }), new THREE.Color(1.0, 0.62, 0.30), 0.55);
+  var darkMat = new THREE.MeshStandardMaterial({ color: 0xffffff, map: doors, roughness: 0.7 });
+  var lit = [], dark = [];
+  spots.forEach(function (s) { [1, -1].forEach(function (f) { (rnd() < 0.72 ? lit : dark).push({ s: s, f: f }); }); });
+  [[lit, litMat], [dark, darkMat]].forEach(function (L) {
+    if (!L[0].length) return;
+    var im = new THREE.InstancedMesh(win, L[1], L[0].length);
+    L[0].forEach(function (w, i) {
+      var s = w.s;
+      m4.makeRotationY(w.f > 0 ? 0 : Math.PI);
+      m4.scale(new THREE.Vector3(s.w * 0.80, s.h * 0.46, 1));
+      m4.setPosition(s.x, s.b + s.h * 0.40, s.z + w.f * (s.d / 2 + 0.02 * M));
+      im.setMatrixAt(i, m4);
+    });
+    im.instanceMatrix.needsUpdate = true;
+    im.frustumCulled = false;
+    g.add(im);
+  });
 }
 
 function buildSite(info, mats) {
@@ -5738,7 +6731,7 @@ function buildSite(info, mats) {
   var W = info.width;                        // building footprint width, scene units
   var court;
   if (info.type === 'pagoda') {
-    var hx = Math.max(W * 3.2, 46 * M);
+    var hx = Math.max(W * 2.4, 42 * M);
     court = { hx: hx, zf: hx, zb: -hx };
   } else {
     court = { hx: Math.max(W * 1.9, 30 * M), zf: info.frontZ + Math.max(W * 1.25, 30 * M), zb: -(info.depth / 2 + Math.max(W * 0.55, 18 * M)) };
@@ -5845,6 +6838,7 @@ function buildSite(info, mats) {
     });
     var stud = new THREE.SphereGeometry(0.07 * M, 8, 6);
     var studs = new THREE.InstancedMesh(stud, mats.gold, 2 * 81);
+    studs.frustumCulled = false;
     var m4 = new THREE.Matrix4(), k = 0;
     [-1, 1].forEach(function (s) {
       for (var r = 0; r < 9; r++) for (var c = 0; c < 9; c++) {
@@ -5861,6 +6855,945 @@ function buildSite(info, mats) {
 
   g.userData.court = court;
   return g;
+}
+</script>
+<script>
+/* ---- src/court.js ---- */
+// ============================================================================
+//  庭 THE COURT — what stands in it
+//
+//  A palace or temple court is not an empty square. Around this one:
+//
+//  * 配殿 side halls, east and west, facing the axis -- built by the same code
+//    as the main hall, one rank lower, so they have real roofs, brackets and
+//    lattice; for a pagoda, a 大殿 behind it as well, as in a temple
+//  * 廊庑 corridors along the inside of the walls: red columns, a painted
+//    beam, hanging 楣子 lattice, a 坐凳 bench, a rolled 卷棚 roof
+//  * old trees in stone-kerbed pits: 侧柏 cypresses and 油松 pines, gnarled
+//    and asymmetric, planted in formal pairs either side of the axis
+//  * 吉祥缸 bronze water vats before the platform, a bronze 香炉 censer on the
+//    axis, 石灯 stone lanterns lining the way
+//
+//  It all lives in the site group (never exported). Small parts are merged per
+//  material and trees are instanced, so the whole court costs a few dozen draw
+//  calls however much is in it.
+// ============================================================================
+
+// ---------------------------------------------------------------------------
+//  geometry accumulator: transformed triangles, with colour and metre UVs
+// ---------------------------------------------------------------------------
+function GeoAcc() { this.p = []; this.n = []; this.uv = []; this.c = []; }
+GeoAcc.prototype.add = function (geo, m4, col, uvFn) {
+  var g = geo.index ? geo.toNonIndexed() : geo;
+  var pos = g.attributes.position, nor = g.attributes.normal, uv = g.attributes.uv;
+  var nm = new THREE.Matrix3().getNormalMatrix(m4);
+  var v = new THREE.Vector3(), lv = new THREE.Vector3(), nn = new THREE.Vector3();
+  for (var i = 0; i < pos.count; i++) {
+    lv.fromBufferAttribute(pos, i);
+    v.copy(lv).applyMatrix4(m4);
+    nn.fromBufferAttribute(nor, i).applyMatrix3(nm).normalize();
+    this.p.push(v.x, v.y, v.z); this.n.push(nn.x, nn.y, nn.z);
+    var t = uvFn ? uvFn(i, lv, uv) : (uv ? [uv.getX(i), uv.getY(i)] : [0, 0]);
+    this.uv.push(t[0], t[1]);
+    var cc = typeof col === 'function' ? col(lv, nn, v) : col;
+    this.c.push(cc.r, cc.g, cc.b);
+  }
+  if (g !== geo) g.dispose();
+};
+// one quad, both faces, sharing the given normals (so a foliage card is lit the
+// same from either side): corners p[4], normals n[4], uvs uv[4], colour c[4]
+GeoAcc.prototype.quad2 = function (p, n, uv, c) {
+  var self = this;
+  [[0, 1, 2, 0, 2, 3], [0, 2, 1, 0, 3, 2]].forEach(function (ix) {
+    ix.forEach(function (k) {
+      self.p.push(p[k].x, p[k].y, p[k].z); self.n.push(n[k].x, n[k].y, n[k].z);
+      self.uv.push(uv[k][0], uv[k][1]); self.c.push(c[k].r, c[k].g, c[k].b);
+    });
+  });
+};
+GeoAcc.prototype.geometry = function () {
+  var g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(this.p, 3));
+  g.setAttribute('normal', new THREE.Float32BufferAttribute(this.n, 3));
+  g.setAttribute('uv', new THREE.Float32BufferAttribute(this.uv, 2));
+  g.setAttribute('color', new THREE.Float32BufferAttribute(this.c, 3));
+  g.computeBoundingSphere();
+  g.userData.ownUVs = true;
+  return g;
+};
+
+// small 3-D value noise for shaping crowns
+function hash3(x, y, z) {
+  var h = (x * 374761393 + y * 668265263 + z * 1274126177) | 0;
+  h = Math.imul(h ^ (h >>> 13), 1274126177);
+  return ((h ^ (h >>> 16)) >>> 0) / 4294967296;
+}
+function noise3(x, y, z) {
+  var xi = Math.floor(x), yi = Math.floor(y), zi = Math.floor(z);
+  var fx = x - xi, fy = y - yi, fz = z - zi;
+  fx = fx * fx * (3 - 2 * fx); fy = fy * fy * (3 - 2 * fy); fz = fz * fz * (3 - 2 * fz);
+  function L(a, b, t) { return a + (b - a) * t; }
+  return L(L(L(hash3(xi, yi, zi), hash3(xi + 1, yi, zi), fx), L(hash3(xi, yi + 1, zi), hash3(xi + 1, yi + 1, zi), fx), fy),
+           L(L(hash3(xi, yi, zi + 1), hash3(xi + 1, yi, zi + 1), fx), L(hash3(xi, yi + 1, zi + 1), hash3(xi + 1, yi + 1, zi + 1), fx), fy), fz);
+}
+
+// ============================================================================
+//  TREES, in metres. A limb is a chain of tapered segments with a knuckle at
+//  every joint; foliage is a mass of displaced clumps, darker underneath and
+//  inside, the way a crown shades itself.
+// ============================================================================
+var _Y = new THREE.Vector3(0, 1, 0);
+function limbChain(start, dir, len, n, wobble, rnd, upBias) {
+  var pts = [start.clone()], d = dir.clone().normalize(), p = start.clone();
+  for (var i = 0; i < n; i++) {
+    d.x += (rnd() - 0.5) * wobble; d.z += (rnd() - 0.5) * wobble; d.y += (rnd() - 0.5) * wobble * 0.5 + (upBias || 0);
+    d.normalize();
+    p = p.clone().addScaledVector(d, len / n);
+    pts.push(p);
+  }
+  return pts;
+}
+function addLimb(acc, pts, r0, r1, col) {
+  var total = 0, seg = [];
+  for (var i = 1; i < pts.length; i++) { var l = pts[i].distanceTo(pts[i - 1]); seg.push(l); total += l; }
+  var run = 0, m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), s1 = new THREE.Vector3(1, 1, 1), mid = new THREE.Vector3();
+  for (var k = 1; k < pts.length; k++) {
+    var a = pts[k - 1], b = pts[k], len = seg[k - 1];
+    var ra = r0 + (r1 - r0) * (run / total), rb = r0 + (r1 - r0) * ((run + len) / total);
+    var geo = new THREE.CylinderGeometry(rb, ra, len, 9, 1, true);
+    var dir = new THREE.Vector3().subVectors(b, a).normalize();
+    q.setFromUnitVectors(_Y, dir);
+    m4.compose(mid.addVectors(a, b).multiplyScalar(0.5), q, s1);
+    var v0 = run;
+    acc.add(geo, m4, col, function (i, lv, uv) { return [uv.getX(i) * Math.PI * 2 * (ra + rb) * 0.5, v0 + uv.getY(i) * len]; });
+    geo.dispose();
+    if (k < pts.length - 1) {
+      var kn = new THREE.IcosahedronGeometry(rb * 1.04, 1);
+      m4.makeTranslation(b.x, b.y, b.z);
+      acc.add(kn, m4, col, function (i, lv) { return [lv.x * 3, lv.y * 3]; });
+      kn.dispose();
+    }
+    run += len;
+  }
+}
+// a clump of foliage: an icosphere pushed in and out by noise, so its outline
+// is ragged; normals stay radial, which is what makes a mass of needles read
+// soft rather than faceted
+function addClump(acc, centre, r, sx, sy, sz, seed, tint) {
+  var g = new THREE.IcosahedronGeometry(1, 1);
+  var pos = g.attributes.position, nor = g.attributes.normal;
+  var ox = seed * 7.13, oy = seed * 3.71, oz = seed * 5.37;
+  for (var i = 0; i < pos.count; i++) {
+    var x = pos.getX(i), y = pos.getY(i), z = pos.getZ(i);
+    var k = 0.70 + 0.55 * noise3(x * 1.9 + ox, y * 1.9 + oy, z * 1.9 + oz) + 0.22 * noise3(x * 4.7 + oy, y * 4.7 + oz, z * 4.7 + ox);
+    // a clump sags: flatter beneath than on top
+    var yy = y < 0 ? y * 0.7 : y;
+    pos.setXYZ(i, x * k * r * sx, yy * k * r * sy, z * k * r * sz);
+    nor.setXYZ(i, x * 0.8 / sx, (y * 0.8 + 0.2) / sy, z * 0.8 / sz);
+  }
+  g.normalizeNormals();
+  var m4 = new THREE.Matrix4().makeTranslation(centre.x, centre.y, centre.z);
+  var C = new THREE.Color();
+  acc.add(g, m4, function (lv, nn, wv) {
+    // lit tops, dark undersides, and darker toward the tree's own axis
+    var up = nn.y * 0.5 + 0.5;
+    var outward = Math.min(1, Math.hypot(wv.x, wv.z) / 4.0);
+    var k = (0.42 + 0.58 * up) * (0.62 + 0.38 * outward) * tint;
+    return C.setRGB(k, k, k);
+  }, function (i, lv) {
+    var d = Math.hypot(lv.x, lv.y, lv.z) || 1;
+    return [Math.atan2(lv.z, lv.x) * r * 1.2, Math.acos(Math.max(-1, Math.min(1, lv.y / d))) * r * 1.2];
+  });
+  g.dispose();
+}
+
+// a tuft: a dark core for volume, and around it a spray of foliage cards --
+// quads carrying a painted, cut-out spray of needles, turned every way. This is
+// how trees are drawn in real-time work: the cards give the ragged, see-through
+// edge of a real crown, the core keeps it from looking hollow. Card normals are
+// bent out from the tuft's centre, so the whole tuft shades as one round mass.
+var _cardN = new THREE.Vector3(), _cu = new THREE.Vector3(), _cv = new THREE.Vector3();
+function addTuft(leaf, centre, r, sx, sy, sz, seed, tint) {
+  var rnd = TEXGEN.rng(seed * 7 + 3);
+  addClump(leaf.core, centre, r * 0.36, sx, sy, sz, seed, tint * 0.9);
+  var flat = sy < 0.6;
+  var k = r > 1.3 ? 11 : r > 0.95 ? 9 : 7;
+  var C = new THREE.Color();
+  for (var i = 0; i < k; i++) {
+    var a = rnd() * Math.PI * 2;
+    // pine pads lie flat, so their cards mostly face up; cypress sprays stand
+    // in vertical fans
+    if (flat) _cardN.set((rnd() - 0.5) * 0.9, 1, (rnd() - 0.5) * 0.9).normalize();
+    else _cardN.set(Math.cos(a), (rnd() - 0.5) * 0.7, Math.sin(a)).normalize();
+    var helper = Math.abs(_cardN.y) < 0.9 ? _Y : new THREE.Vector3(1, 0, 0);
+    _cu.crossVectors(helper, _cardN).normalize();
+    _cv.crossVectors(_cardN, _cu).normalize();
+    var rot = rnd() * Math.PI * 2, cr = Math.cos(rot), sr = Math.sin(rot);
+    var U = _cu.clone().multiplyScalar(cr).addScaledVector(_cv, sr);
+    var V = _cu.clone().multiplyScalar(-sr).addScaledVector(_cv, cr);
+    var w = r * (1.25 + 0.6 * rnd());
+    var off = new THREE.Vector3((rnd() - 0.5) * r * 0.8 * sx, (rnd() - 0.5) * r * 0.8 * sy, (rnd() - 0.5) * r * 0.8 * sz);
+    var cc = centre.clone().add(off);
+    var P = [cc.clone().addScaledVector(U, -w / 2).addScaledVector(V, -w / 2), cc.clone().addScaledVector(U, w / 2).addScaledVector(V, -w / 2),
+             cc.clone().addScaledVector(U, w / 2).addScaledVector(V, w / 2), cc.clone().addScaledVector(U, -w / 2).addScaledVector(V, w / 2)];
+    var q = Math.floor(rnd() * 4), u0 = (q % 2) * 0.5, v0 = Math.floor(q / 2) * 0.5;
+    var UV = [[u0, v0], [u0 + 0.5, v0], [u0 + 0.5, v0 + 0.5], [u0, v0 + 0.5]];
+    var N = [], Cs = [];
+    for (var j = 0; j < 4; j++) {
+      var d = P[j].clone().sub(centre).normalize();
+      N.push(d.multiplyScalar(0.75).addScaledVector(_cardN, 0.25 * Math.sign(_cardN.dot(d) || 1)).normalize());
+      var up = N[j].y * 0.5 + 0.5;
+      var outward = Math.min(1, Math.hypot(P[j].x, P[j].z) / 4.0);
+      var kk = (0.50 + 0.50 * up) * (0.68 + 0.32 * outward) * tint * (0.9 + 0.2 * rnd());
+      Cs.push(new THREE.Color(kk, kk, kk));
+    }
+    leaf.cards.quad2(P, N, UV, Cs);
+  }
+}
+
+// foliage sprays painted into a 2 x 2 atlas: four different sprays per species
+var _sprayTex = {};
+function sprayAtlas(kind) {
+  if (_sprayTex[kind]) return _sprayTex[kind];
+  var S = 512, c = document.createElement('canvas');
+  c.width = c.height = S;
+  var x = c.getContext('2d');
+  var rnd = TEXGEN.rng(kind === 'pine' ? 909 : 707);
+  var greens = kind === 'pine'
+    ? ['#263d22', '#30492a', '#3b5632', '#48633a', '#58744a']
+    : ['#2c4224', '#384f2c', '#465f34', '#557040', '#68834c'];
+  function shade(i) { return greens[Math.max(0, Math.min(greens.length - 1, i))]; }
+  for (var q = 0; q < 4; q++) {
+    var ox = (q % 2) * 256, oy = (q >> 1) * 256;
+    x.save();
+    x.beginPath(); x.rect(ox + 2, oy + 2, 252, 252); x.clip();
+    if (kind === 'pine') {
+      // a twig with three or four rosettes of long needles
+      var nros = 3 + Math.floor(rnd() * 2);
+      for (var r = 0; r < nros; r++) {
+        var px = ox + 128 + (rnd() - 0.5) * 120, py = oy + 128 + (rnd() - 0.5) * 120;
+        var nn = 70 + Math.floor(rnd() * 40);
+        for (var pass = 0; pass < 2; pass++) {
+          for (var n = 0; n < nn; n++) {
+            var ang = rnd() * Math.PI * 2, len = 35 + rnd() * 55;
+            x.strokeStyle = shade(pass * 2 + Math.floor(rnd() * 3));
+            x.lineWidth = 2.2 + rnd() * 1.2;
+            x.beginPath(); x.moveTo(px, py);
+            x.quadraticCurveTo(px + Math.cos(ang) * len * 0.5, py + Math.sin(ang) * len * 0.5 - 6,
+                               px + Math.cos(ang) * len, py + Math.sin(ang) * len);
+            x.stroke();
+          }
+        }
+        x.fillStyle = '#4a3a2a'; x.beginPath(); x.arc(px, py, 3, 0, 6.28); x.fill();
+      }
+    } else {
+      // a flat fan of scale-leaf branchlets either side of a stem: each
+      // branchlet a tapering ribbon of overlapping scales, solid enough to
+      // read as foliage, ragged at every edge
+      var sx0 = ox + 128 + (rnd() - 0.5) * 30, sy0 = oy + 250;
+      var tipX = ox + 128 + (rnd() - 0.5) * 60, tipY = oy + 14;
+      var steps = 18;
+      function ribbon(x0, y0, ang, len, w0, tone) {
+        var n = Math.max(4, Math.round(len / 5));
+        for (var i = 0; i < n; i++) {
+          var g = i / n, w = w0 * (1 - 0.7 * g);
+          var ex = x0 + Math.cos(ang) * len * g + (rnd() - 0.5) * 2, ey = y0 + Math.sin(ang) * len * g + (rnd() - 0.5) * 2;
+          x.fillStyle = shade(tone + Math.floor(rnd() * 2) - (rnd() < 0.2 ? 1 : 0));
+          x.beginPath(); x.ellipse(ex, ey, w, w * 0.62, ang + (rnd() - 0.5) * 0.8, 0, 6.28); x.fill();
+        }
+      }
+      for (var st = 0; st < steps; st++) {
+        var f = st / steps;
+        var bx = sx0 + (tipX - sx0) * f, by = sy0 + (tipY - sy0) * f;
+        var side = st % 2 ? 1 : -1;
+        var blen = (105 - 65 * f) * (0.8 + 0.4 * rnd());
+        var bang = -Math.PI / 2 + side * (0.8 + 0.35 * rnd());
+        ribbon(bx, by, bang, blen, 10, 0);
+        for (var sb = 1; sb <= 3; sb++) {
+          var sf = sb / 4, sa = bang + (sb % 2 ? 0.7 : -0.7);
+          ribbon(bx + Math.cos(bang) * blen * sf, by + Math.sin(bang) * blen * sf, sa, blen * 0.35 * (1 - sf * 0.5), 7, 1);
+        }
+        // highlights along the upper edge of the branchlet
+        ribbon(bx + Math.cos(bang - side * 0.08) * 4, by - 3, bang, blen * 0.85, 4, 3);
+      }
+    }
+    x.restore();
+  }
+  var t = new THREE.CanvasTexture(c);
+  t.encoding = THREE.sRGBEncoding;
+  t.anisotropy = 4;
+  t.userData = { cached: true };
+  return (_sprayTex[kind] = t);
+}
+
+// 侧柏: an old temple cypress. A short massive trunk, twisted, splitting into
+// several leaders that climb and lean; the crown a broad irregular column of
+// tufts. 10-14 m.
+function buildCypress(seed) {
+  var rnd = TEXGEN.rng(seed), bark = new GeoAcc(), leaf = { core: new GeoAcc(), cards: new GeoAcc() };
+  var WOOD = new THREE.Color(1, 1, 1);
+  var H = 10 + rnd() * 4;
+  var lean = new THREE.Vector3((rnd() - 0.5) * 0.3, 1, (rnd() - 0.5) * 0.3);
+  var trunkH = 2.2 + rnd() * 1.6;
+  var trunk = limbChain(new THREE.Vector3(0, -0.2, 0), lean, trunkH, 4, 0.22, rnd, 0.05);
+  addLimb(bark, trunk, 0.62, 0.42, WOOD);
+  // a buttress flare at the foot
+  addLimb(bark, [new THREE.Vector3(0, -0.2, 0), new THREE.Vector3(0, 0.5, 0)], 0.85, 0.6, WOOD);
+  var top = trunk[trunk.length - 1];
+  var nL = 3 + Math.floor(rnd() * 3), a0 = rnd() * 6.28;
+  for (var l = 0; l < nL; l++) {
+    var a = a0 + l / nL * Math.PI * 2 + (rnd() - 0.5) * 0.6;
+    var spread = 0.22 + rnd() * 0.45;
+    var dir = new THREE.Vector3(Math.cos(a) * spread, 1, Math.sin(a) * spread);
+    var len = (H - trunkH) * (0.62 + rnd() * 0.38);
+    var pts = limbChain(top, dir, len, 5, 0.32, rnd, 0.06);
+    addLimb(bark, pts, 0.30, 0.06, WOOD);
+    var nc = 6 + Math.floor(rnd() * 4);
+    for (var c = 0; c < nc; c++) {
+      var f = 0.25 + 0.75 * c / (nc - 1);
+      var idx = Math.min(pts.length - 2, Math.floor(f * (pts.length - 1)));
+      var t = f * (pts.length - 1) - idx;
+      var p = pts[idx].clone().lerp(pts[idx + 1], t);
+      var oa = rnd() * 6.28, od = 0.5 + rnd() * 1.3 * (1.1 - f * 0.5);
+      p.x += Math.cos(oa) * od; p.z += Math.sin(oa) * od; p.y += (rnd() - 0.3) * 0.6;
+      var r = (0.95 + rnd() * 0.75) * (1.05 - 0.35 * f);
+      addTuft(leaf, p, r, 1.0, 0.95 + rnd() * 0.3, 1.0, seed * 31 + l * 7 + c, 0.82 + rnd() * 0.3);
+    }
+  }
+  // side tufts low on the trunk -- old cypresses keep a few
+  for (var s = 0; s < 3; s++) {
+    var sa = rnd() * 6.28, sp = top.clone();
+    sp.y -= rnd() * 0.8; sp.x += Math.cos(sa) * 1.4; sp.z += Math.sin(sa) * 1.4;
+    addLimb(bark, [top.clone().setY(top.y - 0.5), sp], 0.16, 0.05, WOOD);
+    addTuft(leaf, sp, 0.9 + rnd() * 0.4, 1.1, 0.8, 1.1, seed * 13 + s, 0.85);
+  }
+  return { bark: bark.geometry(), core: leaf.core.geometry(), cards: leaf.cards.geometry(), crown: 3.6, height: H };
+}
+
+// 油松: Chinese pine. A leaning trunk, limbs reaching out almost level, each
+// ending in a flat pad of needles; an umbrella crown with sky between the
+// tiers. 9-13 m.
+function buildPine(seed) {
+  var rnd = TEXGEN.rng(seed), bark = new GeoAcc(), leaf = { core: new GeoAcc(), cards: new GeoAcc() };
+  var WOOD = new THREE.Color(1, 1, 1);
+  var H = 8 + rnd() * 4;
+  var la = rnd() * 6.28, lk = 0.15 + rnd() * 0.25;
+  var trunk = limbChain(new THREE.Vector3(0, -0.2, 0), new THREE.Vector3(Math.cos(la) * lk, 1, Math.sin(la) * lk), H, 7, 0.22, rnd, 0.02);
+  addLimb(bark, trunk, 0.42, 0.12, WOOD);
+  addLimb(bark, [new THREE.Vector3(0, -0.2, 0), new THREE.Vector3(0, 0.45, 0)], 0.58, 0.42, WOOD);
+  var nB = 7 + Math.floor(rnd() * 4), ga = rnd() * 6.28;
+  for (var b = 0; b < nB; b++) {
+    var f = 0.42 + 0.55 * b / (nB - 1);
+    var idx = Math.min(trunk.length - 2, Math.floor(f * (trunk.length - 1)));
+    var base = trunk[idx].clone().lerp(trunk[idx + 1], f * (trunk.length - 1) - idx);
+    var a = ga + b * 2.39996;
+    var el = 0.10 + rnd() * 0.35;
+    var dir = new THREE.Vector3(Math.cos(a), el, Math.sin(a));
+    var len = (2.0 + rnd() * 2.4) * (1.15 - 0.55 * f);
+    var pts = limbChain(base, dir, len, 4, 0.30, rnd, -0.03);
+    addLimb(bark, pts, 0.16 * (1.2 - 0.6 * f), 0.04, WOOD);
+    var tip = pts[pts.length - 1];
+    var pr = 1.2 + rnd() * 0.8;
+    addTuft(leaf, tip.clone().add(new THREE.Vector3(0, 0.25, 0)), pr, 1.25, 0.42, 1.25, seed * 17 + b, 0.85 + rnd() * 0.25);
+    if (rnd() < 0.6) {
+      var mid = pts[2].clone().add(new THREE.Vector3(0, 0.3, 0));
+      addTuft(leaf, mid, pr * 0.7, 1.2, 0.45, 1.2, seed * 19 + b, 0.8);
+    }
+  }
+  var crown = trunk[trunk.length - 1];
+  for (var t = 0; t < 3; t++) {
+    var ta = rnd() * 6.28;
+    addTuft(leaf, crown.clone().add(new THREE.Vector3(Math.cos(ta) * 0.9, 0.2 + rnd() * 0.3, Math.sin(ta) * 0.9)), 1.4 + rnd() * 0.5, 1.3, 0.45, 1.3, seed * 23 + t, 0.95);
+  }
+  return { bark: bark.geometry(), core: leaf.core.geometry(), cards: leaf.cards.geometry(), crown: 4.2, height: H };
+}
+
+var _treeCache = null;
+function treeTemplates() {
+  if (_treeCache) return _treeCache;
+  _treeCache = {
+    cypress: [buildCypress(11), buildCypress(23), buildCypress(37)],
+    pine: [buildPine(41), buildPine(53)]
+  };
+  return _treeCache;
+}
+
+// ---------------------------------------------------------------------------
+//  shared canvas textures (kept across rebuilds)
+// ---------------------------------------------------------------------------
+var _blobTex = null;
+function blobTexture() {
+  if (_blobTex) return _blobTex;
+  var c = document.createElement('canvas');
+  c.width = c.height = 128;
+  var x = c.getContext('2d');
+  var g = x.createRadialGradient(64, 64, 0, 64, 64, 64);
+  g.addColorStop(0, 'rgba(255,255,255,1)'); g.addColorStop(0.45, 'rgba(255,255,255,0.65)');
+  g.addColorStop(1, 'rgba(255,255,255,0)');
+  x.fillStyle = g; x.fillRect(0, 0, 128, 128);
+  _blobTex = new THREE.CanvasTexture(c);
+  _blobTex.userData = { cached: true };
+  return _blobTex;
+}
+
+// ============================================================================
+//  the court builder
+// ============================================================================
+function courtMaterials(M) {
+  function cards(tex) {
+    return new THREE.MeshStandardMaterial({ map: tex, alphaTest: 0.38, vertexColors: true, roughness: 0.88, metalness: 0,
+                                            color: 0xffffff });
+  }
+  function std(hex, o) {
+    var m = new THREE.MeshStandardMaterial({ color: C(hex), roughness: 0.8, metalness: 0 });
+    if (o) Object.keys(o).forEach(function (k) { m[k] = o[k]; });
+    return m;
+  }
+  return {
+    bark: dress(std('#7a6a5c', { vertexColors: true }), 'bark', 1, { normal: 1.2 }),
+    pineBark: dress(std('#7c6050', { vertexColors: true }), 'bark', 1, { normal: 1.2 }),
+    cypressCore: dress(std('#3a4c32', { vertexColors: true }), 'foliage', 1, { normal: 1.0 }),
+    pineCore: dress(std('#35462f', { vertexColors: true }), 'foliage', 1, { normal: 1.0 }),
+    cypress: cards(sprayAtlas('cypress')),
+    pine: cards(sprayAtlas('pine')),
+    bronze: dress(std('#6f5a3a', { metalness: 0.75 }), 'stone', M, { size: 0.8, normal: 0.35, roughMul: 0.62 }),
+    water: std('#0f1418', { roughness: 0.04, metalness: 0.0, envMapIntensity: 1.4 }),
+    soil: dress(std('#4a3d30'), 'earth', M, { size: 1.5, normal: 0.8 }),
+    granite: dress(std('#a19d94'), 'stone', M, { size: 1.0, normal: 0.9, roughMul: 1.0 }),
+    ash: std('#3a3530', { roughness: 0.95 }),
+    blob: new THREE.MeshBasicMaterial({ map: blobTexture(), color: 0x000000, transparent: true, opacity: 0.42,
+                                        depthWrite: false, toneMapped: false, polygonOffset: true,
+                                        polygonOffsetFactor: -1, polygonOffsetUnits: -1 })
+  };
+}
+
+// side and rear halls: one rank down from the main building, real metres
+function courtHall(Pm, M, bays, gradeShift, mats) {
+  var grade = Math.min(11, Pm.grade + gradeShift);
+  var D = deriveDimensions(grade, bays, 7, Pm.isDaShi, Pm.isSong);
+  var mPerDk = D.doukouCun * 3.2 / 100;
+  var scale = M * mPerDk;
+  var tileM = (0.18 + 0.05 * D.doukouCun) * Pm.tileScale;
+  var H = buildHall({
+    D: D, scale: scale, M: M, isDaShi: Pm.isDaShi, isSong: Pm.isSong, roofType: 'xieshan',
+    grade: grade, grade3: Pm.grade3, caihua: Pm.caihua, railing: false,
+    shengqi: false, cejiao: Pm.cejiao, tuishan: Pm.tuishan,
+    nBeasts: Pm.beasts && Pm.isDaShi ? Math.max(1, beastCount(grade) - 2) : 0,
+    colours: Pm.colours, tileM: tileM, ridgeM: 0.55 + 0.12 * D.doukouCun, yulu: false
+  }, mats);
+  H.frontRun = H.base.userData.topHD + H.steps.userData.run;
+  return H;
+}
+
+function buildCourt(info, court, mats, siteMats, lamps, g) {
+  var M = info.M, CM = courtMaterials(M);
+  // a phone gets the same court, lighter: three-bay side halls, fewer trees
+  var lite = IS_TOUCH;
+  var merge = new THREE.Group();
+  merge.name = 'courtMerge';
+  g.add(merge);
+  var obstacles = [], halls = [], keepOut = [], blobs = [];
+  function blob(x, z, r) { blobs.push([x, z, r]); }
+  var walled = SITE.mode === 'court';
+  var isPagoda = info.type === 'pagoda';
+  var W = info.width, Dp = info.depth;
+  var pathHalf = (info.stepsHalfW || 2 * M) * 0.86 + 0.3 * M;
+  var d = walled ? 4.6 * M : 0;              // corridor depth
+  var X0 = court.hx - d, Zf = court.zf - d, Zb = court.zb + (walled ? d : 0);
+  var m4 = new THREE.Matrix4();
+
+  function rect(x0, x1, z0, z1) { return { x0: Math.min(x0, x1), x1: Math.max(x0, x1), z0: Math.min(z0, z1), z1: Math.max(z0, z1) }; }
+  function blocked(x, z, r) {
+    for (var i = 0; i < keepOut.length; i++) {
+      var k = keepOut[i];
+      if (x > k.x0 - r && x < k.x1 + r && z > k.z0 - r && z < k.z1 + r) return true;
+    }
+    return false;
+  }
+  function obstacle(x, z, hx, hz) { obstacles.push({ x: x, z: z, hx: hx, hz: hz }); }
+  // the court is built as a list of steps, run one per frame by the caller, so
+  // the page never stalls for the whole of it; a hall is merged as it lands
+  var tasks = [];
+  function step(fn) { tasks.push(fn); }
+  function landHall(hg) { worldScaleUVs(hg); mergeStatic(hg); }
+
+  // the main building and its steps stay clear
+  keepOut.push(rect(-W / 2 - 2.5 * M, W / 2 + 2.5 * M, -Dp / 2 - 2.5 * M, info.frontZ + 1.5 * M));
+  // the axis path, front and back
+  keepOut.push(rect(-pathHalf - 1.5 * M, pathHalf + 1.5 * M, info.frontZ, court.zf));
+
+  // ----------------------------------------------------------- 配殿 halls
+  var sideHalls = [], Pm = info.hallP, H = null, bays, Ls, Ds, xc, zc, fits = false;
+  function placeSide(side, hg) {
+    hg.position.set(side * xc, 0, zc);
+    hg.rotation.y = side > 0 ? -Math.PI / 2 : Math.PI / 2;     // front toward the axis
+    g.add(hg);
+    hg.updateMatrixWorld(true);
+    landHall(hg);
+    sideHalls.push({ side: side, x: side * xc, z: zc, front: side * (xc - H.frontRun), group: hg });
+    keepOut.push(rect(side * (xc + Ds / 2 + M), side * (xc - H.frontRun - 2.5 * M), zc - Ls / 2 - 2 * M, zc + Ls / 2 + 2 * M));
+    obstacle(side * xc, zc, Ds / 2 + 0.3 * M, Ls / 2 + 0.3 * M);
+    // lanterns under its front eave
+    H.lamps.forEach(function (lp) {
+      var v = new THREE.Vector3(lp.x, lp.y, lp.z).applyMatrix4(hg.matrixWorld);
+      lamps.hang(v.x, v.y, v.z, 1.0);
+    });
+  }
+  if (walled && Pm) step(function () {
+    bays = lite ? 3 : 5; H = courtHall(Pm, M, bays, isPagoda ? 1 : 2, mats);
+    Ls = H.base.userData.topHW * 2;              // along the court, once turned
+    Ds = H.base.userData.topHD * 2;              // across
+    var zMin = isPagoda ? -Ls / 2 : info.frontZ + 3 * M, zMax = Zf - 3 * M;
+    if (zMax - zMin < Ls) {
+      // too tight for five bays: three
+      H.group.traverse(function (o) { if (o.isMesh) o.geometry.dispose(); });
+      bays = 3; H = courtHall(Pm, M, bays, isPagoda ? 1 : 2, mats);
+      Ls = H.base.userData.topHW * 2; Ds = H.base.userData.topHD * 2;
+    }
+    fits = zMax - zMin >= Ls && X0 - Ds - 2 * M > W / 2 + 8 * M;
+    if (fits) {
+      zc = isPagoda ? 0 : Math.max(zMin + Ls / 2, Math.min(zMax - Ls / 2, (info.frontZ + Zf) / 2));
+      xc = X0 - Ds / 2 - 0.6 * M;
+      info.sideHallSize = { L: Ls, D: Ds, run: H.frontRun };
+      placeSide(-1, H.group);
+    } else {
+      H.group.traverse(function (o) { if (o.isMesh) o.geometry.dispose(); });
+    }
+  });
+  if (walled && Pm) step(function () {
+    if (fits) placeSide(1, courtHall(Pm, M, bays, isPagoda ? 1 : 2, mats).group);
+  });
+
+  // a pagoda stands before its temple's main hall
+  if (walled && Pm && isPagoda) step(function () {
+    {
+      var R = courtHall(Pm, M, 5, 0, mats);
+      var Lr = R.base.userData.topHW * 2, Dr = R.base.userData.topHD * 2;
+      var zr = Zb + Dr / 2 + 1.5 * M;
+      if (zr + Dr / 2 + R.steps.userData.run + 6 * M < -Dp / 2) {
+        R.group.position.set(0, 0, zr);
+        g.add(R.group);
+        R.group.updateMatrixWorld(true);
+        landHall(R.group);
+        keepOut.push(rect(-Lr / 2 - 2 * M, Lr / 2 + 2 * M, zr - Dr / 2 - M, zr + Dr / 2 + R.steps.userData.run + 2 * M));
+        obstacle(0, zr, Lr / 2 + 0.3 * M, Dr / 2 + 0.3 * M);
+        R.lamps.forEach(function (lp) {
+          var v = new THREE.Vector3(lp.x, lp.y, lp.z).applyMatrix4(R.group.matrixWorld);
+          lamps.hang(v.x, v.y, v.z, 1.1);
+        });
+        // the way back to it, past the pagoda
+        var z0 = zr + Dr / 2 + R.steps.userData.run, z1 = -Dp / 2;
+        pathStrip(0, (z0 + z1) / 2, pathHalf * 2, z1 - z0, false);
+        keepOut.push(rect(-pathHalf - 1.5 * M, pathHalf + 1.5 * M, z0, z1));
+      } else {
+        R.group.traverse(function (o) { if (o.isMesh) o.geometry.dispose(); });
+      }
+    }
+  });
+
+  // ------------------------------------------- 钟鼓楼 bell and drum towers
+  // In a temple court the bell tower stands east of the way in and the drum
+  // tower west: a timber pavilion with a balcony on a tall brick 城台 pierced
+  // by an arched passage.
+  if (walled && isPagoda && info.hallP && !lite) {
+    var Pt = info.hallP;
+    var Dt = deriveDimensions(Math.min(11, Pt.grade + 2), 3, 7, Pt.isDaShi, Pt.isSong);
+    var tScale = M * Dt.doukouCun * 3.2 / 100;
+    var tw = Dt.totalWidth * tScale, td = Dt.totalDepth * tScale;
+    var podH = 5.2 * M, podW = Math.max(tw, td) + 3.2 * M;
+    var tz = Zf - podW / 2 - 6 * M, tx = pathHalf + podW / 2 + 9 * M;
+    if (tz - podW / 2 > info.frontZ + 6 * M && tx + podW / 2 < X0 - 4 * M) {
+      [-1, 1].forEach(function (side) { step(function () {
+        var tg = new THREE.Group();
+        var TH = buildHall({
+          D: Dt, scale: tScale, M: M, isDaShi: Pt.isDaShi, isSong: Pt.isSong, roofType: 'xieshan',
+          grade: Math.min(11, Pt.grade + 2), grade3: Pt.grade3, caihua: Pt.caihua, railing: true,
+          shengqi: false, cejiao: Pt.cejiao, tuishan: Pt.tuishan, nBeasts: 0,
+          colours: Pt.colours, tileM: (0.18 + 0.05 * Dt.doukouCun) * Pt.tileScale, ridgeM: 0.55 + 0.12 * Dt.doukouCun, yulu: false
+        }, mats);
+        // the pavilion's own steps would hang in the air: the 城台 is its stair
+        TH.steps.visible = false;
+        TH.group.remove(TH.steps);
+        TH.group.position.y = podH;
+        tg.add(TH.group);
+        // 城台: brick, battered a little, a stone coping, an arched way through
+        var pod = new THREE.Mesh(new THREE.BoxGeometry(podW, podH, podW), siteMats.brick);
+        pod.position.y = podH / 2; pod.castShadow = true; pod.receiveShadow = true;
+        tg.add(pod);
+        part(new THREE.BoxGeometry(podW + 0.3 * M, 0.25 * M, podW + 0.3 * M), mats.stone, 0, podH + 0.12 * M, 0, 0, tg);
+        var archW = 2.6 * M, archH = 3.4 * M;
+        [[0, 1], [0, -1]].forEach(function (f) {
+          var ar = new THREE.Mesh(new THREE.BoxGeometry(archW, archH, 0.6 * M), CM.ash);
+          ar.position.set(0, archH / 2, f[1] * (podW / 2 - 0.2 * M));
+          tg.add(ar);
+          var top = new THREE.Mesh(new THREE.CylinderGeometry(archW / 2, archW / 2, 0.6 * M, 16, 1, false, 0, Math.PI), CM.ash);
+          top.rotation.x = Math.PI / 2; top.rotation.z = Math.PI / 2;
+          top.position.set(0, archH, f[1] * (podW / 2 - 0.2 * M));
+          tg.add(top);
+        });
+        tg.position.set(side * tx, 0, tz);
+        tg.rotation.y = side > 0 ? -Math.PI / 2 : Math.PI / 2;
+        g.add(tg);
+        tg.updateMatrixWorld(true);
+        landHall(tg);
+        TH.lamps.forEach(function (lp) {
+          var v = new THREE.Vector3(lp.x, lp.y + podH, lp.z).applyMatrix4(tg.matrixWorld);
+          lamps.hang(v.x, v.y, v.z, 0.9);
+        });
+        keepOut.push(rect(side * tx - podW / 2 - 2.5 * M, side * tx + podW / 2 + 2.5 * M, tz - podW / 2 - 2.5 * M, tz + podW / 2 + 2.5 * M));
+        obstacle(side * tx, tz, podW / 2, podW / 2);
+        blob(side * tx, tz, podW * 0.75);
+      }); });
+    }
+  }
+
+  // ------------------------------------------------------------ paths
+  function pathStrip(x, z, w, l, alongX) {
+    if (l <= 0 || w <= 0) return;
+    var sx = alongX ? l : w, sz = alongX ? w : l;
+    part(new THREE.BoxGeometry(sx, 0.06 * M, sz), siteMats.path, x, 0.03 * M, z, 0, merge);
+    [-1, 1].forEach(function (s) {
+      part(new THREE.BoxGeometry(alongX ? l : 0.28 * M, 0.1 * M, alongX ? 0.28 * M : l), siteMats.path,
+           x + (alongX ? 0 : s * (w / 2 + 0.14 * M)), 0.05 * M, z + (alongX ? s * (w / 2 + 0.14 * M) : 0), 0, merge);
+    });
+  }
+  step(function () {
+  // a pagoda court gets the axis way the hall court already has
+  if (isPagoda) {
+    var pz0 = info.frontZ, pz1 = court.zf - 0.2 * M;
+    pathStrip(0, (pz0 + pz1) / 2, pathHalf * 2, pz1 - pz0, false);
+  }
+  // cross paths from the axis to each side hall's steps
+  sideHalls.forEach(function (sh) {
+    var xa = sh.side * (pathHalf + 0.3 * M), xb = sh.front;
+    pathStrip((xa + xb) / 2, sh.z, pathHalf * 1.4, Math.abs(xb - xa), true);
+    keepOut.push(rect(xa, xb, sh.z - pathHalf * 0.7 - 1.5 * M, sh.z + pathHalf * 0.7 + 1.5 * M));
+  });
+
+  // ------------------------------------------------------- 廊庑 corridors
+  if (walled) {
+    var gateHalf = Math.max(5.5 * M, (info.stepsHalfW || 2 * M) * 2.4) / 2 + 1.2 * M;
+    var segs = [];
+    function sideRun(xs, inward) {
+      // along a side wall, broken where a side hall stands against it
+      var breaks = sideHalls.filter(function (s) { return s.side === Math.sign(xs); })
+        .map(function (s) { return [s.z - info.sideHallSize.L / 2 - 0.5 * M, s.z + info.sideHallSize.L / 2 + 0.5 * M]; });
+      var z = court.zb, runs = [];
+      breaks.sort(function (a, b) { return a[0] - b[0]; }).forEach(function (b) { runs.push([z, b[0]]); z = b[1]; });
+      runs.push([z, court.zf]);
+      runs.forEach(function (r) { if (r[1] - r[0] > 6 * M) segs.push({ a: new THREE.Vector3(xs, 0, r[0]), b: new THREE.Vector3(xs, 0, r[1]), inward: inward }); });
+    }
+    sideRun(court.hx, new THREE.Vector3(-1, 0, 0));
+    sideRun(-court.hx, new THREE.Vector3(1, 0, 0));
+    // front wall, either side of the gate; back wall whole
+    var xe = court.hx - d;
+    segs.push({ a: new THREE.Vector3(-xe, 0, court.zf), b: new THREE.Vector3(-gateHalf, 0, court.zf), inward: new THREE.Vector3(0, 0, -1) });
+    segs.push({ a: new THREE.Vector3(gateHalf, 0, court.zf), b: new THREE.Vector3(xe, 0, court.zf), inward: new THREE.Vector3(0, 0, -1) });
+    if (Zb + 4 * M < -Dp / 2) segs.push({ a: new THREE.Vector3(-xe, 0, court.zb), b: new THREE.Vector3(xe, 0, court.zb), inward: new THREE.Vector3(0, 0, 1) });
+    segs.forEach(function (s) { buildCorridor(s.a, s.b, s.inward, d, M, mats, siteMats, lamps, merge); });
+  }
+  });
+
+  // ---------------------------------------------------- the axis furniture
+  step(function () {
+  var furnZ0 = info.frontZ + 4 * M, furnZ1 = Zf - 5 * M;
+  // 香炉 on the axis, a third of the way to the gate
+  var censerZ = info.frontZ + Math.max(9 * M, (furnZ1 - info.frontZ) * 0.3);
+  var censerS = M * (isPagoda ? 1.1 : 1.25);
+  if (censerZ < furnZ1) {
+    buildCenser(merge, 0, censerZ, censerS, mats, CM);
+    lamps.glow(0, 1.75 * censerS, censerZ, 0.9 * censerS);
+    lamps.light(0, 2.4 * censerS, censerZ, 0.9, 10 * M, 3);
+    obstacle(0, censerZ, 1.5 * censerS, 1.5 * censerS);
+    blob(0, censerZ, 2.2 * censerS);
+  }
+  // 吉祥缸 before the platform's front corners
+  var vatS = M * (info.hallP && info.hallP.isDaShi ? 1.0 : 0.85);
+  var vatX = Math.min(W / 2 - 1.6 * M, Math.max(pathHalf + 4 * M, W * 0.32));
+  var vatZ = (isPagoda ? info.platformHD : Dp / 2) + 2.6 * M;
+  if (vatX > pathHalf + 2.5 * M) {
+    [-1, 1].forEach(function (s) {
+      buildVat(merge, s * vatX, vatZ, vatS, mats, CM);
+      obstacle(s * vatX, vatZ, 1.1 * vatS, 1.1 * vatS);
+      blob(s * vatX, vatZ, 1.5 * vatS);
+      keepOut.push(rect(s * vatX - 2 * M, s * vatX + 2 * M, vatZ - 2 * M, vatZ + 2 * M));
+    });
+  }
+  // 石灯 in pairs along the way
+  var lanternS = M * 1.0, lx = pathHalf + 2.0 * M;
+  var lanternTpl = stoneLanternTemplate({ stone: CM.granite }, lampMat(new THREE.MeshStandardMaterial({ color: C('#efd6a2'), roughness: 0.6 }), new THREE.Color(1.0, 0.70, 0.38), 2.2));
+  var lanternSpots = [];
+  for (var lz = furnZ0 + 2 * M; lz < furnZ1; lz += 11 * M) {
+    if (Math.abs(lz - censerZ) < 5 * M) continue;
+    lanternSpots.push([-lx, lz], [lx, lz]);
+  }
+  sideHalls.forEach(function (sh) {
+    var fx = sh.front - sh.side * 2.2 * M;
+    lanternSpots.push([fx, sh.z - pathHalf * 0.7 - 1.6 * M], [fx, sh.z + pathHalf * 0.7 + 1.6 * M]);
+  });
+  lanternSpots.forEach(function (p, i) {
+    var t = lanternTpl.clone();
+    t.scale.setScalar(lanternS);
+    t.position.set(p[0], 0, p[1]);
+    merge.add(t);
+    var fy = 1.86 * lanternS;
+    lamps.glow(p[0], fy, p[1], 0.75 * lanternS);
+    lamps.pool(p[0], 0, p[1], 3.2 * lanternS);
+    // the lanterns nearest the building get the real lights
+    lamps.light(p[0], fy + 0.6 * lanternS, p[1], 1.1, 10 * M, 2 - Math.abs(p[1] - info.frontZ) / (50 * M) - (Math.abs(p[0]) > lx * 1.5 ? 1 : 0));
+    obstacle(p[0], p[1], 0.45 * lanternS, 0.45 * lanternS);
+    blob(p[0], p[1], 0.9 * lanternS);
+    keepOut.push(rect(p[0] - 1.5 * M, p[0] + 1.5 * M, p[1] - 1.5 * M, p[1] + 1.5 * M));
+  });
+  });
+
+  // ------------------------------------------------------------ trees
+  step(function () {
+  var T = treeTemplates(), spots = [];
+  var xMax = (walled ? X0 : court.hx) - 4 * M, zLo = Zb + 4 * M, zHi = Zf - 4 * M;
+  var rows = [], step = 15 * M;
+  for (var rx = pathHalf + 9 * M; rx < xMax; rx += 15 * M) rows.push(rx);
+  rows.forEach(function (x, ri) {
+    for (var z = zHi; z > zLo; z -= step) {
+      if (blocked(x, z, 3.2 * M)) continue;
+      // formal pairs: cypress on the inner rows, pines further out
+      var kind = (ri === 0 || (ri + Math.round(z / step)) % 3) ? 'cypress' : 'pine';
+      spots.push({ x: x, z: z, kind: kind, v: (ri * 7 + Math.round(z / step) * 3) & 0xff });
+    }
+  });
+  // a row behind the main hall shows above its roof from the front
+  if (!isPagoda && court.zb + d + 3 * M < -Dp / 2 - 4 * M) {
+    var zr2 = (Zb - Dp / 2) / 2;
+    for (var bx = 6 * M; bx < Math.min(xMax, W * 0.75); bx += 12 * M) {
+      if (!blocked(bx, zr2, 2.5 * M)) spots.push({ x: bx, z: zr2, kind: 'cypress', v: Math.round(bx) & 0xff });
+    }
+  }
+  // open country: a looser grove either side instead
+  if (!walled) {
+    spots = spots.filter(function (s) { return Math.abs(s.x) < W * 1.6 && Math.abs(s.z) < W * 1.6; });
+  }
+  // more places than trees: thin them evenly, so every row keeps some
+  var cap = lite ? 6 : 12;
+  if (spots.length > cap) {
+    var stride = spots.length / cap, kept = [];
+    for (var si = 0; si < cap; si++) kept.push(spots[Math.floor(si * stride)]);
+    spots = kept;
+  }
+  var mir = [];
+  spots.forEach(function (s) { mir.push(s, { x: -s.x, z: s.z, kind: s.kind, v: s.v + 1 }); });
+  plantTrees(mir, T, CM, M, g, merge, siteMats, obstacles, blob);
+  });
+
+  // ---------------------------------------------------- contact shadows
+  step(function () {
+  if (blobs.length) {
+    var bg = new THREE.PlaneGeometry(1, 1); bg.rotateX(-Math.PI / 2);
+    var bi = new THREE.InstancedMesh(bg, CM.blob, blobs.length);
+    blobs.forEach(function (b, i) { m4.makeScale(b[2] * 2, 1, b[2] * 2); m4.setPosition(b[0], 0.02 * M, b[1]); bi.setMatrixAt(i, m4); });
+    bi.instanceMatrix.needsUpdate = true;
+    bi.frustumCulled = false; bi.renderOrder = 1;
+    g.add(bi);
+    AO_HIDDEN.push(bi);
+  }
+
+  });
+
+  g.userData.obstacles = obstacles;
+  g.userData.mergeRoots = [merge];
+  return tasks;
+}
+
+// ---------------------------------------------------------------------------
+function plantTrees(spots, T, CM, M, g, merge, siteMats, obstacles, blob) {
+  if (!spots.length) return;
+  var groups = {};
+  spots.forEach(function (s) {
+    var list = T[s.kind], vi = s.v % list.length;
+    var key = s.kind + vi;
+    (groups[key] = groups[key] || { tpl: list[vi], kind: s.kind, at: [] }).at.push(s);
+  });
+  var m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), ps = new THREE.Vector3(), sc = new THREE.Vector3();
+  Object.keys(groups).forEach(function (k) {
+    var G = groups[k], n = G.at.length;
+    var bark = new THREE.InstancedMesh(G.tpl.bark, G.kind === 'pine' ? CM.pineBark : CM.bark, n);
+    var core = new THREE.InstancedMesh(G.tpl.core, G.kind === 'pine' ? CM.pineCore : CM.cypressCore, n);
+    var leaf = new THREE.InstancedMesh(G.tpl.cards, G.kind === 'pine' ? CM.pine : CM.cypress, n);
+    G.at.forEach(function (s, i) {
+      var r = TEXGEN.rng(Math.round(s.x * 13 + s.z * 7) | 0);
+      var sz = M * (0.85 + 0.3 * r());
+      q.setFromAxisAngle(_Y, r() * Math.PI * 2);
+      m4.compose(ps.set(s.x, 0, s.z), q, sc.set(sz, sz, sz));
+      bark.setMatrixAt(i, m4); core.setMatrixAt(i, m4); leaf.setMatrixAt(i, m4);
+      obstacles.push({ x: s.x, z: s.z, hx: 0.7 * sz, hz: 0.7 * sz });
+      blob(s.x, s.z, G.tpl.crown * sz * 0.9);
+      // 树池: a square stone kerb round dark soil
+      var pit = 1.5 * M;
+      part(new THREE.BoxGeometry(pit * 2, 0.04 * M, pit * 2), CM.soil, s.x, 0.02 * M, s.z, 0, merge);
+      [[0, 1], [0, -1], [1, 0], [-1, 0]].forEach(function (e) {
+        part(new THREE.BoxGeometry(e[0] ? 0.26 * M : pit * 2 + 0.26 * M, 0.18 * M, e[0] ? pit * 2 : 0.26 * M), siteMats.path,
+             s.x + e[0] * (pit + 0.13 * M), 0.09 * M, s.z + e[1] * (pit + 0.13 * M), 0, merge);
+      });
+    });
+    [bark, core, leaf].forEach(function (im) {
+      im.instanceMatrix.needsUpdate = true;
+      im.castShadow = true; im.receiveShadow = true;
+      im.frustumCulled = false;
+      g.add(im);
+    });
+    // the occlusion pass draws with one override material and no alpha test,
+    // so a card would occlude as a solid square: leave the cards out of it
+    AO_HIDDEN.push(leaf);
+  });
+}
+
+// ---------------------------------------------------------------------------
+//  吉祥缸: a bronze water vat on a carved stone stand, ring handles on masks
+// ---------------------------------------------------------------------------
+function buildVat(parent, x, z, s, mats, CM) {
+  var t = new THREE.Group();
+  part(new THREE.BoxGeometry(2.0, 0.22, 2.0), mats.stone, 0, 0.11, 0, 0, t);
+  part(new THREE.CylinderGeometry(0.92, 0.98, 0.26, 8), mats.stone, 0, 0.35, 0, 0, t);
+  part(latheGeo([[0.0001, 0], [0.55, 0], [0.64, 0.04], [0.78, 0.20], [0.86, 0.44], [0.88, 0.68], [0.85, 0.90],
+                 [0.88, 0.99], [0.91, 1.05], [0.86, 1.08], [0.82, 1.0], [0.0001, 0.97]], 28), CM.bronze, 0, 0.48, 0, 0, t);
+  var water = new THREE.Mesh(new THREE.CircleGeometry(0.82, 28), CM.water);
+  water.rotation.x = -Math.PI / 2; water.position.y = 0.48 + 0.975;
+  t.add(water);
+  [-1, 1].forEach(function (sd) {
+    part(new THREE.SphereGeometry(0.13, 12, 8), CM.bronze, sd * 0.87, 0.48 + 0.72, 0, 0, t);
+    var ring = new THREE.Mesh(new THREE.TorusGeometry(0.12, 0.025, 8, 18), CM.bronze);
+    ring.position.set(sd * 0.93, 0.48 + 0.60, 0);
+    ring.rotation.y = Math.PI / 2;
+    ring.castShadow = true;
+    t.add(ring);
+  });
+  t.scale.setScalar(s);
+  t.position.set(x, 0, z);
+  t.rotation.y = x < 0 ? Math.PI : 0;
+  parent.add(t);
+}
+
+// ---------------------------------------------------------------------------
+//  香炉: a three-legged bronze censer with upright ears and a domed lid, on a
+//  stone plinth
+// ---------------------------------------------------------------------------
+function buildCenser(parent, x, z, s, mats, CM) {
+  var t = new THREE.Group();
+  part(new THREE.BoxGeometry(2.6, 0.18, 2.6), mats.stone, 0, 0.09, 0, 0, t);
+  part(new THREE.BoxGeometry(2.1, 0.42, 2.1), mats.stone, 0, 0.39, 0, 0, t);
+  part(new THREE.BoxGeometry(2.4, 0.12, 2.4), mats.stone, 0, 0.66, 0, 0, t);
+  var y0 = 0.72;
+  part(latheGeo([[0.0001, 0.55], [0.40, 0.56], [0.62, 0.70], [0.74, 0.92], [0.72, 1.14], [0.62, 1.26], [0.66, 1.32], [0.60, 1.36], [0.0001, 1.33]], 28), CM.bronze, 0, y0, 0, 0, t);
+  for (var i = 0; i < 3; i++) {
+    var a = i / 3 * Math.PI * 2 + Math.PI / 2;
+    var top = new THREE.Vector3(Math.cos(a) * 0.40, y0 + 0.62, Math.sin(a) * 0.40);
+    var bot = new THREE.Vector3(Math.cos(a) * 0.56, y0, Math.sin(a) * 0.56);
+    var len = top.distanceTo(bot);
+    var leg = new THREE.Mesh(new THREE.CylinderGeometry(0.075, 0.11, len, 10), CM.bronze);
+    leg.position.copy(top).add(bot).multiplyScalar(0.5);
+    leg.quaternion.setFromUnitVectors(_Y, top.clone().sub(bot).normalize());
+    leg.castShadow = true; leg.receiveShadow = true;
+    t.add(leg);
+    part(new THREE.SphereGeometry(0.12, 10, 8), CM.bronze, bot.x, y0 + 0.06, bot.z, 0, t);
+  }
+  [-1, 1].forEach(function (sd) {
+    var ear = new THREE.Mesh(new THREE.TorusGeometry(0.17, 0.045, 8, 16, Math.PI), CM.bronze);
+    ear.position.set(sd * 0.56, y0 + 1.34, 0);
+    ear.rotation.y = Math.PI / 2;
+    ear.castShadow = true;
+    t.add(ear);
+  });
+  // the lid, pierced in life so the smoke comes through; a 宝珠 on top
+  part(latheGeo([[0.0001, 0], [0.60, 0], [0.56, 0.10], [0.40, 0.24], [0.18, 0.32], [0.13, 0.42], [0.18, 0.48], [0.0001, 0.50]], 24), CM.bronze, 0, y0 + 1.40, 0, 0, t);
+  part(new THREE.SphereGeometry(0.11, 12, 10), CM.bronze, 0, y0 + 1.98, 0, 0, t);
+  t.scale.setScalar(s);
+  t.position.set(x, 0, z);
+  parent.add(t);
+}
+
+// ---------------------------------------------------------------------------
+//  廊庑: a corridor along the inside of a wall. a, b: its run along the wall
+//  face (y = 0); inward: toward the court; d: its depth.
+// ---------------------------------------------------------------------------
+function buildCorridor(a, b, inward, d, M, mats, siteMats, lamps, parent) {
+  var along = new THREE.Vector3().subVectors(b, a);
+  var L = along.length();
+  if (L < 4 * M) return;
+  along.normalize();
+  var th = Math.atan2(-along.z, along.x);
+  // local z must point inward: if the rotation sends it the other way, run b -> a
+  var lz = new THREE.Vector3(Math.sin(th), 0, Math.cos(th));
+  if (lz.dot(inward) < 0) { var t0 = a; a = b; b = t0; along.negate(); th = Math.atan2(-along.z, along.x); }
+  var g = new THREE.Group();
+  g.position.copy(a);
+  g.rotation.y = th;
+
+  var plat = 0.42 * M, Hc = 3.1 * M, r = 0.15 * M;
+  var nb = Math.max(1, Math.round(L / (3.6 * M))), bay = L / nb;
+  var zF = d - 0.65 * M, zB = 0.45 * M;
+  // 台明
+  part(new THREE.BoxGeometry(L, plat, d + 0.2 * M), mats.base, L / 2, plat / 2, d / 2, 0, g);
+  // columns
+  var colGeo = new THREE.CylinderGeometry(r * 0.92, r, Hc, 12);
+  for (var i = 0; i <= nb; i++) {
+    var x = i * bay;
+    part(colGeo, mats.column, x, plat + Hc / 2, zF, 0, g);
+    part(colGeo, mats.column, x, plat + Hc / 2, zB, 0, g);
+    // 穿插枋 tying the two rows
+    part(new THREE.BoxGeometry(0.16 * M, 0.26 * M, zF - zB), mats.beam, x, plat + Hc - 0.15 * M, (zF + zB) / 2, 0, g);
+  }
+  // 檐枋 along both rows, the 彩画 band
+  part(new THREE.BoxGeometry(L + 0.3 * M, 0.34 * M, 0.22 * M), mats.beam, L / 2, plat + Hc - 0.17 * M, zF, 0, g);
+  part(new THREE.BoxGeometry(L + 0.3 * M, 0.34 * M, 0.22 * M), mats.beam, L / 2, plat + Hc - 0.17 * M, zB, 0, g);
+  // 天花 ceiling boards
+  part(new THREE.BoxGeometry(L, 0.06 * M, zF - zB + 0.3 * M), mats.board, L / 2, plat + Hc + 0.05 * M, (zF + zB) / 2, 0, g);
+  // per bay: 倒挂楣子 lattice under the beam, 坐凳 bench with its lattice below
+  var lat = mats.railGrid || mats.grid;
+  for (var j = 0; j < nb; j++) {
+    var cx = (j + 0.5) * bay, w = bay - 2 * r;
+    var my = plat + Hc - 0.34 * M - 0.24 * M;
+    var top = new THREE.Mesh(new THREE.PlaneGeometry(w, 0.44 * M), lat);
+    top.position.set(cx, my, zF);
+    g.add(top);
+    part(new THREE.BoxGeometry(w, 0.06 * M, 0.08 * M), mats.frame || mats.column, cx, my - 0.24 * M, zF, 0, g);
+    part(new THREE.BoxGeometry(w, 0.08 * M, 0.42 * M), mats.frame || mats.column, cx, plat + 0.50 * M, zF - 0.1 * M, 0, g);
+    var low = new THREE.Mesh(new THREE.PlaneGeometry(w, 0.40 * M), lat);
+    low.position.set(cx, plat + 0.25 * M, zF);
+    g.add(low);
+    if (j % 2 === 1 || nb === 1) {
+      var v = new THREE.Vector3(cx, plat + Hc + 0.02 * M, d + 0.25 * M);
+      g.updateMatrixWorld(true);
+      v.applyMatrix4(g.matrixWorld);
+      lamps.hang(v.x, v.y, v.z, 0.75);
+    }
+  }
+  // 卷棚 roof: two concave slopes over a rounded crown, swept along the run
+  var e = d / 2 + 0.85 * M, y0 = plat + Hc + 0.12 * M, rise = d * 0.36, tk = 0.16 * M;
+  var sec = [];
+  var N = 6;
+  for (var k = 0; k <= N; k++) {               // court-side slope, eave up to crown
+    var f = k / N, lat0 = -e + (e - 0.35 * M) * f;
+    sec.push([lat0, y0 + tk + (rise - tk) * Math.pow(f, 1.6)]);
+  }
+  sec.push([0, y0 + rise + 0.10 * M]);
+  for (var k2 = N; k2 >= 0; k2--) {
+    var f2 = k2 / N, lat1 = e - (e - 0.35 * M) * f2;
+    sec.push([lat1, y0 + tk + (rise - tk) * Math.pow(f2, 1.6)]);
+  }
+  sec.push([e, y0]);
+  for (var k3 = N - 1; k3 >= 1; k3--) {        // the underside, a shallow arch
+    var f3 = k3 / N, lat2 = -e + 2 * e * f3;
+    sec.push([lat2, y0 + (rise * 0.55) * (1 - Math.pow(2 * f3 - 1, 2))]);
+  }
+  sec.push([-e, y0]);
+  // the section's lateral axis is the path's horizontal normal; sweep along
+  // the centre line so either sign is the same roof
+  var p0 = new THREE.Vector3(-0.45 * M, 0, d / 2), p1 = new THREE.Vector3(L + 0.45 * M, 0, d / 2);
+  var roof = new THREE.Mesh(sweepGeometry([p0, p1], sec), siteMats.capTile);
+  roof.castShadow = true; roof.receiveShadow = true;
+  g.add(roof);
+  // 连檐 fascia along the eave, painted
+  part(new THREE.BoxGeometry(L + 0.9 * M, 0.2 * M, 0.08 * M), mats.fascia, L / 2, y0 + 0.02 * M, d / 2 + e, 0, g);
+  parent.add(g);
 }
 </script>
 <script>
@@ -5916,6 +7849,8 @@ function buildModel() {
       disposeGroup(stale);
     }
   });
+  resetLamps();
+  pruneAoHidden();
 
   var grade   = parseInt(document.getElementById('doukou').value);
   var bays    = parseInt(document.getElementById('bays').value);
@@ -6011,6 +7946,8 @@ function buildModel() {
   var frameMat  = dress(std(cLattice), 'lacquer', Me, { normal: 0.5 });
   var goldMat   = std('#d9b24f', { metalness: 1.0, roughness: 0.34 });
   var glassMat  = std(isPagodaMode() ? '#3a2c22' : '#1b1714', { roughness: isPagodaMode() ? 0.5 : 0.09, metalness: 0.0, envMapIntensity: 1.1 });
+  // after dark the 窗户纸 behind the lattice glows with the lamps inside
+  lampMat(glassMat, new THREE.Color(1.0, 0.64, 0.32), isPagodaMode() ? 0.8 : 2.2);
   var baseMat   = dress(std(cBase), 'ashlar', Me, { normal: 1.0 });
   var pavingMat = dress(std('#' + new THREE.Color(cBase).multiplyScalar(0.94).getHexString()), 'slab', Me, { normal: 0.9 });
   var plinthMat = dress(std(cBase), 'stone', Me, { normal: 0.6 });
@@ -6043,7 +7980,8 @@ function buildModel() {
     dgA: dgA, dgB: dgB, dg: dgA, wall: wallMat, dijian: dijianMat,
     frame: frameMat, grid: gridMat, glass: glassMat, lattice: frameMat,
     base: baseMat, paving: pavingMat, plinth: plinthMat, stone: stoneMat, rail: stoneMat,
-    step: stepMat, relief: reliefMat, wood: lacquer
+    step: stepMat, relief: reliefMat, wood: lacquer, floor: floorMat,
+    tassel: std('#9c1c16', { roughness: 0.9 })
   };
 
   // 墙帽 tiles: the roof texture again, its repeat set from world units since
@@ -6079,7 +8017,13 @@ function buildModel() {
   for (var pi = 0; pi < pgRows.length; pi++)
     pgRows[pi].style.display = isPagoda ? 'block' : 'none';
 
-  var info = { type: isPagoda ? 'pagoda' : 'hall', M: Me };
+  var info = { type: isPagoda ? 'pagoda' : 'hall', M: Me, mats: mats, lamps: new LampSet(Me) };
+  // what the court's own halls inherit: one family of rank, period and colour
+  info.hallP = {
+    grade: grade, isDaShi: isDaShi, isSong: isSong, grade3: grade3, caihua: val('caihua') > 0.5,
+    cejiao: useCejiao, tuishan: useTuishan, beasts: val('beasts') > 0.5, tileScale: tileScale,
+    colours: { qing: cBeam, lv: cCaihua, red: '#' + new THREE.Color(cWood).lerp(new THREE.Color(cWall), 0.3).getHexString() }
+  };
 
   if (isPagoda) {
     var storeys = parseInt(document.getElementById('storeys').value);
@@ -6100,11 +8044,17 @@ function buildModel() {
     }, mats, { M: Me, tileP: tileM * Me, courseL: tileM * Me * 0.92, ridgeH: ridgeM * Me });
     pg.position.y = baseH;
     buildingGroup.add(pg);
+    (pg.userData.lamps || []).forEach(function (lp) { info.lamps.hang(lp.x, lp.y + baseH, lp.z, lp.s); });
+    // the doorway's light on the terrace, and the lowest lanterns
+    info.lamps.light(0, baseH + 2.4 * Me, pagodaR * 1.15, 1.3, 16 * Me, 6);
+    info.lamps.light(-pagodaR * 0.9, baseH + D.colH * ps, pagodaR * 0.9, 0.9, 14 * Me, 5);
+    info.lamps.light(pagodaR * 0.9, baseH + D.colH * ps, pagodaR * 0.9, 0.9, 14 * Me, 5);
 
     var pgH = (pg.userData.totalHeight || 10) + baseH;
     info.width = pbase.userData.topHW * 2;
     info.depth = info.width;
     info.frontZ = pbase.userData.topHD + pgSteps.userData.run;
+    info.platformHD = pbase.userData.topHD;
     info.stepsHalfW = pagodaR * 0.38;
     info.stepsFootZ = info.frontZ;
     MODEL_INFO = {
@@ -6124,86 +8074,23 @@ function buildModel() {
     return;
   }
 
-  // --------------------------------------------------------------- 台基
-  var base = buildBase(hw, hd, baseH, 2, mats, { margin: Math.min(0.75, eaveOut * 0.72), xumi: isDaShi });
-  buildingGroup.add(base);
-
-  var floor = new THREE.Mesh(new THREE.BoxGeometry(hw * 2, 0.02 * M, hd * 2), floorMat);
-  floor.position.y = baseH + 0.01 * M;
-  floor.receiveShadow = true;
-  buildingGroup.add(floor);
-
-  var colR = D.colDia * scale / 2;
+  // --------------------------------------------------------------- the hall
   var colours = { qing: cBeam, lv: cCaihua, red: '#' + new THREE.Color(cWood).lerp(new THREE.Color(cWall), 0.3).getHexString() };
-  var S = { D: D, scale: scale, M: M, u: u };
-  var columns = buildColumns(S, baseH, mats, {
-    shengqi: useShengqi, cejiao: useCejiao, daShi: isDaShi,
-    caihua: val('caihua') > 0.5, grade: grade3, colours: colours
-  });
-  buildingGroup.add(columns);
-  var colTop = columns.userData.colTop, beamBottom = columns.userData.beamBottom;
-  buildingGroup.add(buildWalls(hw, hd, baseH, beamBottom, mats, colR));
-  buildingGroup.add(buildLattice(S, hd, baseH, beamBottom, mats, colR, { rich: grade3 !== 'sushi' }));
-
-  // 踏跺 as wide as the 明间, its top tread flush with the platform edge
-  var stepHalf = (D.bayWidths[(bays - 1) / 2] * scale) / 2 - colR;
-  var steps = buildSteps(stepHalf, baseH, mats, M, { yulu: isDaShi && grade <= 6 });
-  steps.position.z = base.userData.topHD;
-  buildingGroup.add(steps);
-
-  if (val('railing') > 0.5) {
-    var rx = base.userData.topHW - 0.28 * M, rz = base.userData.topHD - 0.28 * M;
-    var gapHalf = stepHalf + 0.42 * M;
-    var rail = buildBalustrade(rx, rz, baseH, mats, M, [-gapHalf, gapHalf]);
-    buildingGroup.add(rail);
-    if (isDaShi) addChishou(buildingGroup, rail.userData.posts, base, rx, rz, plinthMat, M);
-  }
-
-  // -------------------------------------------------- 斗栱 / 檩 and the roof
-  var purlinTop;
-  if (isDaShi) {
-    var dg = buildDougong(S, colTop, mats, dgSteps);
-    buildingGroup.add(dg);
-    purlinTop = dg.userData.top;
-  } else {
-    // 小式: the 檐檩 sits straight on the columns over a 垫板
-    var rp = D.purlinDia * scale / 2;
-    [[0, hd, hw * 2 + rp * 2, true], [0, -hd, hw * 2 + rp * 2, true], [hw, 0, hd * 2 + rp * 2, false], [-hw, 0, hd * 2 + rp * 2, false]].forEach(function (b) {
-      var c = new THREE.Mesh(new THREE.CylinderGeometry(rp, rp, b[2], 16), beamMat);
-      if (b[3]) c.rotation.z = Math.PI / 2; else c.rotation.x = Math.PI / 2;
-      c.position.set(b[0], colTop + rp * 1.4, b[1]);
-      c.castShadow = true; c.receiveShadow = true;
-      buildingGroup.add(c);
-    });
-    purlinTop = colTop + rp * 2.4;
-  }
-
-  var roof = buildRoof({
-    halfWidth: hw + eaveOut, halfDepth: hd + eaveOut, hw: hw, hd: hd, dgOut: isDaShi ? dgOut : D.purlinDia * scale * 0.5,
-    roofHeight: roofRise, upturn: upturn, chong: D.cornerOut * scale * ROOF_CURVE.lift,
-    roofType: roofType, isSong: isSong, tuishan: useTuishan, purlinDia: D.purlinDia * scale,
-    shellThick: thick, tileP: tileM * M, courseL: tileM * M * 0.92, ridgeH: ridgeM * M,
-    beasts: nBeasts, rafter: rafter, M: M, mats: mats, wen: isDaShi
-  });
-  // seat the roof so its boards rest on the rafters, and the rafters on the
-  // 挑檐桁: the eave edge then falls below the purlin, as a real one does
-  var R = roof.userData.R;
-  var tiaoZ = hd + (isDaShi ? dgOut : 0);
-  var rafterDepth = rafter.fly + rafter.r * 2;
-  var roofY = purlinTop + rafterDepth - (R.height(0, tiaoZ) - thick);
-  roof.position.y = roofY;
-  buildingGroup.add(roof);
-
-  // close the band between the bracket tops and the roof boards on the
-  // column line, so no daylight shows through under the eave
-  var soffitAtCol = roofY + R.height(0, hd) - thick;
-  var fh = soffitAtCol - (purlinTop - 2 * u) + 0.02;
-  if (fh > 0) {
-    var ft = u * 1.2, fy = purlinTop - 2 * u + fh / 2;
-    [[0, hd, hw * 2, ft], [0, -hd, hw * 2, ft], [hw, 0, ft, hd * 2], [-hw, 0, ft, hd * 2]].forEach(function (b) {
-      part(new THREE.BoxGeometry(b[2], fh, b[3]), boardMat, b[0], fy, b[1], 0, buildingGroup);
-    });
-  }
+  var HALL_P = {
+    D: D, scale: scale, M: M, isDaShi: isDaShi, isSong: isSong, roofType: roofType,
+    grade: grade, grade3: grade3, caihua: val('caihua') > 0.5, railing: val('railing') > 0.5,
+    shengqi: useShengqi, cejiao: useCejiao, tuishan: useTuishan, nBeasts: nBeasts,
+    colours: colours, tileM: tileM, ridgeM: ridgeM, yulu: isDaShi && grade <= 6
+  };
+  var H = buildHall(HALL_P, mats);
+  buildingGroup.add(H.group);
+  var base = H.base, steps = H.steps, stepHalf = H.stepHalf, roofY = H.roofY, R = H.R;
+  var colTop = H.colTop, colR = H.colR;
+  info.hall = H;
+  H.lamps.forEach(function (lp) { info.lamps.hang(lp.x, lp.y, lp.z, 1.15); });
+  // lamplight from the open doors falls on the terrace and the columns
+  info.lamps.light(-hw * 0.35, baseH + 2.2 * M, hd + 1.6 * M, 2.2, 16 * M, 6);
+  info.lamps.light(hw * 0.35, baseH + 2.2 * M, hd + 1.6 * M, 2.2, 16 * M, 6);
 
   var topY = roofY + R.height(0, 0) + ridgeM * M * 2.4;
   info.width = base.userData.topHW * 2;
@@ -6232,6 +8119,10 @@ function buildModel() {
 
 function isPagodaMode() { return document.getElementById('buildingType').value === 'pagoda'; }
 
+// The court's own halls, trees and furniture take longer to build than the
+// building itself, so while a slider is being dragged they wait: the court is
+// furnished once the edits pause, and an older pending furnishing is dropped.
+var COURT_BUILD = { gen: 0, timer: 0, first: true, delay: 320 };
 function finishBuild(topY, radius, info, siteMats) {
   worldScaleUVs(buildingGroup);
   mergeStatic(buildingGroup);
@@ -6239,9 +8130,47 @@ function finishBuild(topY, radius, info, siteMats) {
   var site = buildSite(info, siteMats);
   worldScaleUVs(site);
   siteGroup.add(site);
+  MODEL_INFO.obstacles = [];
+  var gen = ++COURT_BUILD.gen;
+  clearTimeout(COURT_BUILD.timer);
+  function furnish(sync) {
+    if (gen !== COURT_BUILD.gen) return;
+    var cg = null, tasks = [];
+    if (SITE.furnish) {
+      cg = new THREE.Group();
+      cg.name = 'court';
+      site.add(cg);
+      tasks = buildCourt(info, site.userData.court, info.mats, siteMats, info.lamps, cg);
+    }
+    function done() {
+      if (cg) {
+        worldScaleUVs(cg);
+        // the court's small furniture: one mesh per material
+        (cg.userData.mergeRoots || []).forEach(function (r) { mergeStatic(r); });
+        MODEL_INFO.obstacles = cg.userData.obstacles || [];
+      }
+      info.lamps.build(info.mats, site);
+      markShadowsDirty();
+      if (window.onCourtBuilt) window.onCourtBuilt();
+    }
+    (function next() {
+      // a newer edit has replaced this site: drop the rest
+      if (gen !== COURT_BUILD.gen) return;
+      var t = tasks.shift();
+      if (!t) { done(); return; }
+      t();
+      markShadowsDirty();
+      if (sync) next(); else COURT_BUILD.timer = setTimeout(next, 16);
+    })();
+  }
+  // the city's windows are lit already; the court's lamps follow when it lands
+  applyNightLights();
+  if (COURT_BUILD.first || !SITE.furnish) { COURT_BUILD.first = false; furnish(true); }
+  else COURT_BUILD.timer = setTimeout(function () { furnish(false); }, COURT_BUILD.delay);
   siteGroup.visible = SITE.visible;
   MODEL_INFO.court = site.userData.court;
-  fitShadowTo(new THREE.Vector3(0, topY * 0.4, 0), radius);
+  // reach a little past the building so the nearest trees and vats cast too
+  fitShadowTo(new THREE.Vector3(0, topY * 0.35, 0), radius * 1.55);
   setFogScale(frameRadius);
   purgeTextureCache();
   markShadowsDirty();
@@ -6506,7 +8435,7 @@ document.getElementById('imgBtn').addEventListener('click', function () {
 // ---- design save / load (localStorage) ----
 var CONTROL_IDS = ['buildingType', 'pagodaStyle', 'storeys', 'sides', 'doukou', 'classType', 'period',
   'bays', 'purlins', 'roofType', 'tuishan', 'tileScale', 'shengqi', 'cejiao', 'railing', 'caihua', 'caihuaType', 'beasts', 'preset',
-  'daylight', 'weather', 'envMode', 'hq', 'shadows', 'groundOn',
+  'clock', 'clouds', 'weather', 'envMode', 'courtOn', 'hq', 'shadows', 'groundOn',
   'cTiaoX', 'cTiaoY', 'cAoX', 'cAoY', 'cGaoY',
   'roofColor', 'trimColor', 'woodColor', 'beamColor', 'caihuaColor', 'dgColor', 'wallColor',
   'latticeColor', 'baseColor', 'railColor'];
@@ -6517,6 +8446,9 @@ function snapshotDesign() {
   return d;
 }
 function applyDesign(d) {
+  // designs saved before the 24-hour clock kept 'daylight', 0..100 over 05:00-19:00
+  if (d.clock === undefined && d.daylight !== undefined)
+    d.clock = String(Math.round((5 + (+d.daylight) / 100 * 14) * 12) * 5);
   CONTROL_IDS.forEach(function (id) {
     var el = document.getElementById(id);
     if (el && d[id] !== undefined) el.value = d[id];
@@ -6554,7 +8486,8 @@ document.getElementById('loadBtn').addEventListener('click', function () {
 });
 
 applyPreset();
-applyDaylight(val('daylight') / 100, document.getElementById('weather').value);
+applyDaylight(val('clock') / 1440, document.getElementById('weather').value);
+setCloudCover(val('clouds') / 100);
 rebuild();
 startLoop();
 </script>
@@ -7079,54 +9012,116 @@ startLoop();
   })();
 
   /* ------------------------------------------------------------- daylight */
-  // These three drive the scene directly. They deliberately do NOT go through
+  // These drive the scene directly. They deliberately do NOT go through
   // rebuild(): relighting must not regenerate 50k triangles per slider pixel.
   (function () {
-    var day = $('daylight'), sh = $('shadows'), gd = $('groundOn');
+    var day = $('clock'), sh = $('shadows'), gd = $('groundOn');
     var wx = $('weather'), env = $('envMode'), hq = $('hq');
+    var cl = $('clouds'), tl = $('timelapse'), nb = $('nightBtn');
     if (!day) return;
 
-    // 05:00 to 19:00 across the slider, named by the traditional double-hours
-    // real 时辰 boundaries: 卯 5-7, 辰 7-9, 巳 9-11, 午 11-13, 未 13-15, 申 15-17, 酉 17-19
+    // the twelve double-hours, 子时 straddling midnight
     var SHICHEN = [
-      [7,  '卯时 dawn'],      [9,  '辰时 morning'],  [11, '巳时 forenoon'],
-      [13, '午时 noon'],      [15, '未时 afternoon'], [17, '申时 late day'],
-      [99, '酉时 dusk']
+      [1, '子时 midnight'], [3, '丑时 small hours'], [5, '寅时 before dawn'], [7, '卯时 dawn'],
+      [9, '辰时 morning'], [11, '巳时 forenoon'], [13, '午时 noon'], [15, '未时 afternoon'],
+      [17, '申时 late day'], [19, '酉时 dusk'], [21, '戌时 evening'], [23, '亥时 night'], [25, '子时 midnight']
     ];
-    function label(t) {
-      var h = 5 + t * 14;
-      var name = SHICHEN[SHICHEN.length - 1][1];
-      for (var i = 0; i < SHICHEN.length; i++)
-        if (h < SHICHEN[i][0]) { name = SHICHEN[i][1]; break; }
-      var hh = Math.floor(h), mm = Math.round((h - hh) * 60);
-      if (mm === 60) { hh++; mm = 0; }
+    function label(min) {
+      var h = min / 60, name = '';
+      for (var i = 0; i < SHICHEN.length; i++) if (h < SHICHEN[i][0]) { name = SHICHEN[i][1]; break; }
+      var hh = Math.floor(min / 60) % 24, mm = Math.round(min % 60);
+      if (mm === 60) { hh = (hh + 1) % 24; mm = 0; }
       return (hh < 10 ? '0' : '') + hh + ':' + (mm < 10 ? '0' : '') + mm + ' ' + name;
     }
 
-    // relighting is cheap but rebuilding the environment map is not, so each
-    // piece is only touched when its own control actually changed
-    var last = { t: null, w: null };
+    // `minutes` is the clock the scene is lit for. The slider snaps to five
+    // minutes; animation runs between its stops, so it is kept apart.
+    var minutes = +day.value;
+    var last = { m: null, w: null, c: null };
+    function light(m) {
+      minutes = ((m % 1440) + 1440) % 1440;
+      last.m = minutes; last.w = wx.value;
+      applyDaylight(minutes / 1440, wx.value);
+      $('dayOut').textContent = label(minutes);
+      if (nb) nb.setAttribute('aria-pressed', NIGHT.k > 0.5 ? 'true' : 'false');
+    }
+
     syncers.push(function () {
-      var t = (+day.value) / 100, w = wx.value;
-      if (t !== last.t || w !== last.w) { last.t = t; last.w = w; applyDaylight(t, w); }
+      var m = +day.value, w = wx.value;
+      if (!anim && !lapse && (m !== Math.round(last.m) || w !== last.w)) light(m);
+      else if (w !== last.w) light(minutes);
+      var c = (+cl.value) / 100;
+      if (c !== last.c) { last.c = c; setCloudCover(c); }
+      $('cloudOut').textContent = Math.round(c * 100) + '%';
       var shOn = (+sh.value) > 0.5;
       if (sun.castShadow !== shOn) { sun.castShadow = shOn; markShadowsDirty(); }
       var gOn = (+gd.value) > 0.5;
-      if (SITE.visible !== gOn) { SITE.visible = gOn; siteGroup.visible = gOn; requestRender(); }
+      if (SITE.visible !== gOn) { SITE.visible = gOn; siteGroup.visible = gOn; applyNightLights(); requestRender(); }
       var hqOn = (+hq.value) > 0.5;
       if (HQ.enabled !== hqOn) { HQ.enabled = hqOn; requestRender(); }
-      $('dayOut').textContent = label(t);
+      $('dayOut').textContent = label(minutes);
       $('shOut').textContent = shOn ? 'on' : 'off';
       $('gdOut').textContent = gOn ? 'on' : 'off';
       $('hqOut').textContent = hqOn ? (HQ.ok ? 'on' : 'n/a') : 'off';
+      var lOn = (+tl.value) > 0.5;
+      $('tlOut').textContent = lOn ? 'on' : 'off';
+      if (lOn && !lapse) startLapse();
+      if (!lOn && lapse) lapse = null;
     });
 
-    [day, sh, gd, wx, hq].forEach(function (el) {
-      el.addEventListener('input', sync);
+    // dragging the clock takes over from whatever was running it
+    day.addEventListener('input', function () { anim = null; light(+day.value); });
+    [sh, gd, wx, hq, cl, tl].forEach(function (el) { el.addEventListener('input', sync); });
+
+    // ---- 流转 time-lapse: an hour every second and a half
+    var lapse = null;
+    function startLapse() {
+      lapse = { t: performance.now() };
+      (function step() {
+        if (!lapse) return;
+        var now = performance.now(), dt = Math.min(0.1, (now - lapse.t) / 1000);
+        lapse.t = now;
+        if (!anim) {
+          light(minutes + dt * 40);
+          day.value = Math.round(minutes / 5) * 5 % 1440;
+        }
+        requestAnimationFrame(step);
+      })();
+    }
+
+    // ---- 昼夜: run the clock forward to evening or to the next afternoon,
+    // through dusk or dawn, rather than cutting
+    var anim = null;
+    function runTo(target, ms) {
+      var from = minutes, delta = ((target - from) % 1440 + 1440) % 1440;
+      if (delta < 1) return;
+      anim = { t0: performance.now(), ms: ms, from: from, delta: delta };
+      nb.classList.add('busy');
+      (function step() {
+        if (!anim) { nb.classList.remove('busy'); return; }
+        var k = Math.min(1, (performance.now() - anim.t0) / anim.ms);
+        var e = k < 0.5 ? 2 * k * k : 1 - Math.pow(-2 * k + 2, 2) / 2;
+        light(anim.from + anim.delta * e);
+        day.value = Math.round(minutes / 5) * 5 % 1440;
+        if (k < 1) requestAnimationFrame(step);
+        else { anim = null; nb.classList.remove('busy'); light(target); day.value = target; }
+      })();
+    }
+    if (nb) nb.addEventListener('click', function () {
+      if (NIGHT.k > 0.5) runTo(14 * 60, 3600);
+      else runTo(21 * 60 + 30, 3000);
     });
-    // the setting changes what the site builds, so it goes through rebuild()
+
+    // the setting and the furnishings change what the site builds, so they
+    // go through rebuild()
+    var cr = $('courtOn');
     env.addEventListener('input', function () { SITE.mode = env.value; rebuild(); });
-    REBUILD_PRE.push(function () { SITE.mode = env.value; });
+    cr.addEventListener('input', function () { SITE.furnish = (+cr.value) > 0.5; rebuild(); });
+    REBUILD_PRE.push(function () { SITE.mode = env.value; SITE.furnish = (+cr.value) > 0.5; });
+    syncers.push(function () { $('crOut').textContent = (+cr.value) > 0.5 ? 'on' : 'off'; });
+    // 读取 load writes the slider directly; light from it on the next sync
+    REBUILD_PRE.push(function () { if (!anim && !lapse) minutes = +day.value; });
+    light(minutes);
   })();
 
   /* --------------------------------------------------------- view toolbar */
