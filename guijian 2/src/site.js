@@ -54,8 +54,6 @@ function buildSite(info, mats) {
   g.add(earth);
 
   var showWalls = SITE.mode === 'court';
-  // inside the palace city the ground beyond the wall is paved as well
-  if (showWalls) earth.material = mats.cityGround;
   // paving
   var paveGeo = new THREE.PlaneGeometry(cw, cd, 72, 72);
   // grime drifts against the foot of the walls and the platform

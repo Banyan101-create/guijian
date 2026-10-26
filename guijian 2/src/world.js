@@ -31,8 +31,13 @@ scene.add(worldGroup);
 // ---------------------------------------------------------------------------
 //  an indexed mesh accumulator, positions and metre UVs; normals at the end
 // ---------------------------------------------------------------------------
-function MeshAcc() { this.p = []; this.uv = []; this.idx = []; this.n = 0; }
-MeshAcc.prototype.v = function (x, y, z, u, w) { this.p.push(x, y, z); this.uv.push(u, w); return this.n++; };
+// Each vertex also carries the accumulator's current colour (`col`), so one
+// mesh can hold a roof, its darker soffit and its ridge in one draw call.
+function MeshAcc() { this.p = []; this.uv = []; this.c = []; this.idx = []; this.n = 0; this.col = [1, 1, 1]; }
+MeshAcc.prototype.v = function (x, y, z, u, w) {
+  this.p.push(x, y, z); this.uv.push(u, w); this.c.push(this.col[0], this.col[1], this.col[2]);
+  return this.n++;
+};
 MeshAcc.prototype.face = function (vs, out) {
   // a convex polygon of [x,y,z,u,v], fanned; wound to face `out` if given
   var ids = [], self = this;
@@ -82,6 +87,7 @@ MeshAcc.prototype.append = function (src, m4) {
   for (var i = 0; i < src.n; i++) {
     v.set(src.p[i * 3], src.p[i * 3 + 1], src.p[i * 3 + 2]).applyMatrix4(m4);
     this.p.push(v.x, v.y, v.z); this.uv.push(src.uv[i * 2], src.uv[i * 2 + 1]);
+    this.c.push(src.c[i * 3], src.c[i * 3 + 1], src.c[i * 3 + 2]);
   }
   for (var k = 0; k < src.idx.length; k++) this.idx.push(src.idx[k] + base);
   this.n += src.n;
@@ -90,6 +96,7 @@ MeshAcc.prototype.geometry = function () {
   var g = new THREE.BufferGeometry();
   g.setAttribute('position', new THREE.Float32BufferAttribute(this.p, 3));
   g.setAttribute('uv', new THREE.Float32BufferAttribute(this.uv, 2));
+  g.setAttribute('color', new THREE.Float32BufferAttribute(this.c, 3));
   g.setIndex(this.idx);
   g.computeVertexNormals();
   g.computeBoundingSphere();
@@ -171,35 +178,6 @@ function palaceBay(glow) {
   x.fillRect(lx, ly - 4, lw, 6); x.fillRect(lx, ly + lh - 2, lw, 6);
   return (_bayTex[key] = cachedTex(c, true));
 }
-// a house front: grey brick, a 支摘窗 window of step lattice over paper, a door
-function houseBay(glow) {
-  var key = 'h' + (glow ? 'g' : '');
-  if (_bayTex[key]) return _bayTex[key];
-  var S = 256, c = document.createElement('canvas');
-  c.width = c.height = S;
-  var x = c.getContext('2d');
-  if (glow) { x.fillStyle = '#000'; x.fillRect(0, 0, S, S); }
-  else {
-    x.fillStyle = '#8b8a85'; x.fillRect(0, 0, S, S);
-    x.strokeStyle = 'rgba(60,60,58,0.45)'; x.lineWidth = 1;
-    for (var r = 0; r < S; r += 8) {
-      x.beginPath(); x.moveTo(0, r); x.lineTo(S, r); x.stroke();
-      for (var b = (r / 8) % 2 ? 0 : 12; b < S; b += 24) { x.beginPath(); x.moveTo(b, r); x.lineTo(b, r + 8); x.stroke(); }
-    }
-    // timber frame: posts, lintel
-    x.fillStyle = '#5c2a1d'; x.fillRect(0, 0, 14, S); x.fillRect(S - 14, 0, 14, S); x.fillRect(0, 0, S, 22);
-    x.fillStyle = '#3a6a52'; x.fillRect(14, 8, S - 28, 10);
-  }
-  // window
-  var wx = 40, wy = 48, ww = S - 80, wh = 110;
-  x.fillStyle = glow ? '#ffb46a' : '#d9c9a5'; x.fillRect(wx, wy, ww, wh);
-  x.strokeStyle = glow ? '#000' : '#5a2a1d'; x.lineWidth = 3;
-  for (var gx = wx; gx <= wx + ww; gx += ww / 6) { x.beginPath(); x.moveTo(gx, wy); x.lineTo(gx, wy + wh); x.stroke(); }
-  for (var gy = wy; gy <= wy + wh; gy += wh / 5) { x.beginPath(); x.moveTo(wx, gy); x.lineTo(wx + ww, gy); x.stroke(); }
-  if (!glow) { x.fillStyle = '#5c2a1d'; x.fillRect(wx - 6, wy + wh, ww + 12, 10); }
-  return (_bayTex[key] = cachedTex(c, true));
-}
-
 // ---------------------------------------------------------------------------
 //  materials: made per world (they follow the scheme's roof and wall colour)
 // ---------------------------------------------------------------------------
@@ -220,14 +198,12 @@ function worldMaterials(cRoof, cWall, lite) {
   var lamps = [];
   function lit(m, base) { m.emissive = new THREE.Color(1.0, 0.62, 0.30); m.emissiveIntensity = 0; lamps.push({ m: m, base: base }); return m; }
   var mats = {
-    roof: tiles(cRoof, 0.40), roofGreen: tiles('#4d7d5a', 0.36), roofGrey: tiles('#73746f', 0.27),
-    ridge: std(darker(cRoof, 0.85), { roughness: 0.5 }), ridgeGrey: std('#5d5e5b'),
+    roof: tiles(cRoof, 0.40), roofGreen: tiles('#4f8a5c', 0.36), roofGrey: tiles('#5c5e60', 0.27),
+    ridge: std(darker(cRoof, 0.85), { roughness: 0.5 }), ridgeGrey: std('#5d5e5b'), ridgeGreen: std('#3f6a4a', { roughness: 0.5 }),
     soffit: std('#4a2f24'), soffitGrey: std('#3b3631'),
     fascia: std('#7a2418'), fasciaGrey: std('#4a3b30'),
     gable: std(darker(cWall, 0.95)),
     facade: lit(new THREE.MeshStandardMaterial({ map: palaceBay(false), emissiveMap: palaceBay(true), roughness: 0.8 }), 0.85),
-    houseFacade: lit(new THREE.MeshStandardMaterial({ map: houseBay(false), emissiveMap: houseBay(true), roughness: 0.9 }), 0.75),
-    houseFacadeDark: new THREE.MeshStandardMaterial({ map: houseBay(false), roughness: 0.9 }),
     wall: dress(std(cWall), 'plaster', 1, { normal: 0.7 }),
     brick: dress(std('#8e8d88'), 'wallBrick', 1, { normal: 0.8 }),
     stone: dress(std('#c3beb1'), 'ashlar', 1, { normal: 0.8 }),
@@ -242,10 +218,18 @@ function worldMaterials(cRoof, cWall, lite) {
     bark: dress(std('#6e5e50'), 'bark', 1, { normal: 1.0 }),
     leaf: dress(std('#3f5236', { vertexColors: true }), 'foliage', 1, { normal: 1.0 }),
     arch: std('#151110', { roughness: 1 }),
+    vcol: std('#ffffff', { vertexColors: true, roughness: 0.9 }),
+    ground: dress(std('#8a8274', { vertexColors: true }), 'earth', 1, { size: 5, normal: 0.5 }),
     beam: std('#2d5068', { roughness: 0.7 }),
     gold: std('#c9a548', { metalness: 0.9, roughness: 0.35 })
   };
   mats.water.color = C('#203133');
+  // everything laid flat on the ground is drawn a little toward the eye, in
+  // order, so the layers never fight however far off they are
+  [['ground', -1], ['grass', -1], ['field', -1], ['earth', -2], ['lane', -2], ['paving', -2], ['water', -3]].forEach(function (p) {
+    var m = mats[p[0]];
+    m.polygonOffset = true; m.polygonOffsetFactor = p[1]; m.polygonOffsetUnits = p[1] * 2;
+  });
   mats.lamps = lamps;
   return mats;
 }
@@ -400,125 +384,63 @@ function buildingTpl(spec) {
   return (_tplCache[key] = { parts: out, spec: spec });
 }
 
-// a 四合院: four houses round a court, a wall, the gate in the south-east corner
-var _syhCache = {};
-function siheyuanTpl(v) {
-  if (_syhCache[v]) return _syhCache[v];
-  var W = [22, 26, 30][v], Dd = [24, 30, 36][v];
-  var main = buildingParts({ L: 11 + v * 2, D: 6.4, Hb: 0.5, He: 3.0, ov: 0.9, rise: 0.30, roof: 'yingshan', bay: 3.4, house: true, ns: 3, nt: 2, ridgeW: 0.32, ridgeH: 0.42, steps: false, margin: 0.4, noUnder: true });
-  var side = buildingParts({ L: 8.4 + v, D: 5.2, Hb: 0.35, He: 2.7, ov: 0.8, rise: 0.30, roof: 'yingshan', bay: 3.2, house: true, ns: 3, nt: 2, ridgeW: 0.3, ridgeH: 0.4, steps: false, margin: 0.3, noUnder: true });
-  var out = {};
-  function put(src, x, z, rot) {
-    var m4 = new THREE.Matrix4().makeRotationY(rot); m4.setPosition(x, 0, z);
-    Object.keys(src).forEach(function (k) { if (!src[k].n) return; (out[k] = out[k] || new MeshAcc()).append(src[k], m4); });
-  }
-  put(main, 0, -Dd / 2 + 4.2, 0);                              // 正房 facing south
-  put(side, -W / 2 + 3.4, 0.5, Math.PI / 2);                    // 厢房 facing in
-  put(side, W / 2 - 3.4, 0.5, -Math.PI / 2);
-  put(main, 0, Dd / 2 - 3.6, Math.PI);                          // 倒座房 facing north
-  // the outer wall, grey brick with a tiled coping, gate gap at the south-east
-  var wall = out.wall2 = new MeshAcc(), cap = out.cap = new MeshAcc();
-  function seg(x0, z0, x1, z1) {
-    var cx = (x0 + x1) / 2, cz = (z0 + z1) / 2, lx = Math.abs(x1 - x0) || 0.5, lz = Math.abs(z1 - z0) || 0.5;
-    wall.box(cx, 1.6, cz, lx, 3.2, lz, { bottom: true });
-    cap.box(cx, 3.35, cz, lx + 0.3, 0.3, lz + 0.3, { bottom: true });
-  }
-  seg(-W / 2, -Dd / 2, W / 2, -Dd / 2);
-  seg(-W / 2, -Dd / 2, -W / 2, Dd / 2);
-  seg(W / 2, -Dd / 2, W / 2, Dd / 2 - 3.5);
-  // the 宅门 in the south-east corner, a little roofed gatehouse
-  var gate = buildingParts({ L: 3.6, D: 3.0, Hb: 0.4, He: 2.6, ov: 0.6, rise: 0.32, roof: 'yingshan', bay: 3.6, house: true, ns: 2, nt: 2, ridgeW: 0.25, ridgeH: 0.35, steps: false, margin: 0.2, noUnder: true });
-  put(gate, W / 2 - 1.8, Dd / 2 - 1.5, 0);
-  // the court: brick paving with a small planted square
-  var court = out.court = new MeshAcc();
-  court.face([[-W / 2 + 6.5, 0.04, -Dd / 2 + 7.8, 0, 0], [W / 2 - 6.5, 0.04, -Dd / 2 + 7.8, W, 0],
-              [W / 2 - 6.5, 0.04, Dd / 2 - 7.2, W, Dd], [-W / 2 + 6.5, 0.04, Dd / 2 - 7.2, 0, Dd]], [0, 1, 0]);
-  var geos = {};
-  Object.keys(out).forEach(function (k) { if (out[k].n) geos[k] = out[k].geometry(); });
-  return (_syhCache[v] = { parts: geos, W: W, D: Dd });
-}
-
-// the same courtyard house for the far city: two roof planes a house, no
-// soffits, the fronts still windowed so the city glows at night
-var _syhFar = {};
-function siheyuanFarTpl(v) {
-  if (_syhFar[v]) return _syhFar[v];
-  var W = [22, 26, 30][v], Dd = [24, 30, 36][v];
-  var o = { Hb: 0.3, He: 2.9, ov: 0.8, rise: 0.30, roof: 'yingshan', bay: 3.4, house: true, ns: 1, nt: 1, ridgeW: 0.3, ridgeH: 0.4, steps: false, margin: 0.2, noUnder: true };
-  var main = buildingParts(Object.assign({ L: 11 + v * 2, D: 6.4 }, o));
-  var side = buildingParts(Object.assign({ L: 8.4 + v, D: 5.2 }, o));
-  var out = {};
-  function put(src, x, z, rot) {
-    var m4 = new THREE.Matrix4().makeRotationY(rot); m4.setPosition(x, 0, z);
-    Object.keys(src).forEach(function (k) { if (!src[k].n || k === 'base' || k === 'fascia') return; (out[k] = out[k] || new MeshAcc()).append(src[k], m4); });
-  }
-  put(main, 0, -Dd / 2 + 4.2, 0);
-  put(side, -W / 2 + 3.4, 0.5, Math.PI / 2);
-  put(side, W / 2 - 3.4, 0.5, -Math.PI / 2);
-  put(main, 0, Dd / 2 - 3.6, Math.PI);
-  var wall = out.wall2 = new MeshAcc();
-  wall.box(0, 1.5, -Dd / 2, W, 3.0, 0.6, { bottom: true });
-  wall.box(-W / 2, 1.5, 0, 0.6, 3.0, Dd, { bottom: true });
-  wall.box(W / 2, 1.5, 0, 0.6, 3.0, Dd, { bottom: true });
-  wall.box(-2, 1.5, Dd / 2, W - 4, 3.0, 0.6, { bottom: true });
-  var geos = {};
-  Object.keys(out).forEach(function (k) { if (out[k].n) geos[k] = out[k].geometry(); });
-  return (_syhFar[v] = { parts: geos, W: W, D: Dd });
-}
-
-// light trees for the distance: a trunk and a handful of displaced clumps
-var _lodTrees = null;
-function lodTrees() {
-  if (_lodTrees) return _lodTrees;
-  _lodTrees = [];
-  for (var v = 0; v < 4; v++) {
-    var rnd = TEXGEN.rng(900 + v * 17), bark = new GeoAcc(), leaf = new GeoAcc();
-    var H = 7 + rnd() * 5, lean = new THREE.Vector3((rnd() - 0.5) * 0.3, 1, (rnd() - 0.5) * 0.3);
-    var trunk = [new THREE.Vector3(0, -0.2, 0), new THREE.Vector3(lean.x * H * 0.3, H * 0.45, lean.z * H * 0.3)];
-    addLimb(bark, trunk, 0.32, 0.2, new THREE.Color(1, 1, 1));
-    var top = trunk[1], nc = 3 + Math.floor(rnd() * 3), pine = v === 3;
-    for (var c = 0; c < nc; c++) {
-      var a = rnd() * 6.28, d = 0.6 + rnd() * 1.6;
-      var p = top.clone().add(new THREE.Vector3(Math.cos(a) * d, (pine ? 0.4 : 1.0) * (rnd() * H * 0.45), Math.sin(a) * d));
-      var r = (1.7 + rnd() * 1.1) * (pine ? 1.15 : 1);
-      addClump(leaf, p, r, pine ? 1.3 : 1.0, pine ? 0.5 : 0.95, pine ? 1.3 : 1.0, 7000 + v * 31 + c, 0.85 + rnd() * 0.25);
-    }
-    _lodTrees.push({ bark: bark.geometry(), leaf: leaf.geometry() });
-  }
-  return _lodTrees;
-}
-
 // ---------------------------------------------------------------------------
-//  instancing: collect placements per template, then one InstancedMesh per
-//  template part
+//  placing: collect placements per template, then bake them all, one mesh
+//  per material
 // ---------------------------------------------------------------------------
 function Placer(M) { this.M = M; this.lists = {}; this.tpls = {}; }
 Placer.prototype.put = function (name, tpl, x, z, rot, s, y) {
   this.tpls[name] = tpl;
   (this.lists[name] = this.lists[name] || []).push([x, y || 0, z, rot || 0, (s || 1) * this.M]);
 };
-Placer.prototype.build = function (group, slotMats, tint) {
-  var m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), ps = new THREE.Vector3(), sc = new THREE.Vector3(), Y = new THREE.Vector3(0, 1, 0);
-  var col = new THREE.Color(), self = this, count = 0;
+// Everything placed is baked into one static mesh per material: a few hundred
+// halls of a dozen kinds cost a dozen draw calls, not a dozen per kind.
+Placer.prototype.build = function (group, slotMats) {
+  var self = this, byMat = [], count = 0;
   Object.keys(this.lists).forEach(function (name) {
     var list = self.lists[name], tpl = self.tpls[name];
     Object.keys(tpl.parts).forEach(function (slot) {
       var mat = slotMats(name, slot);
       if (!mat) return;
-      var im = new THREE.InstancedMesh(tpl.parts[slot], mat, list.length);
-      list.forEach(function (it, i) {
-        q.setFromAxisAngle(Y, it[3]);
-        m4.compose(ps.set(it[0], it[1], it[2]), q, sc.set(it[4], it[4], it[4]));
-        im.setMatrixAt(i, m4);
-        if (tint && tint[name]) { tint[name](i, col); im.setColorAt(i, col); }
-      });
-      im.instanceMatrix.needsUpdate = true;
-      if (im.instanceColor) im.instanceColor.needsUpdate = true;
-      im.frustumCulled = false;
-      im.castShadow = false; im.receiveShadow = true;
-      group.add(im);
-      count += list.length;
+      var g = tpl.parts[slot], e = null;
+      for (var i = 0; i < byMat.length; i++) if (byMat[i].mat === mat) { e = byMat[i]; break; }
+      if (!e) byMat.push(e = { mat: mat, parts: [], nv: 0, ni: 0 });
+      e.parts.push([g, list]);
+      e.nv += g.attributes.position.count * list.length;
+      e.ni += (g.index ? g.index.count : g.attributes.position.count) * list.length;
     });
+    count += list.length;
+  });
+  byMat.forEach(function (e) {
+    var P = new Float32Array(e.nv * 3), N = new Float32Array(e.nv * 3), U = new Float32Array(e.nv * 2);
+    var I = e.nv > 65535 ? new Uint32Array(e.ni) : new Uint16Array(e.ni);
+    var v = 0, k = 0;
+    e.parts.forEach(function (pl) {
+      var g = pl[0], pos = g.attributes.position.array, nor = g.attributes.normal.array, uv = g.attributes.uv ? g.attributes.uv.array : null;
+      var idx = g.index ? g.index.array : null, vc = g.attributes.position.count;
+      pl[1].forEach(function (it) {
+        var c = Math.cos(it[3]), sn = Math.sin(it[3]), sc = it[4], base = v;
+        for (var i = 0; i < vc; i++) {
+          var x = pos[i * 3], y = pos[i * 3 + 1], z = pos[i * 3 + 2];
+          P[v * 3] = (c * x + sn * z) * sc + it[0]; P[v * 3 + 1] = y * sc + it[1]; P[v * 3 + 2] = (c * z - sn * x) * sc + it[2];
+          var nx = nor[i * 3], nz = nor[i * 3 + 2];
+          N[v * 3] = c * nx + sn * nz; N[v * 3 + 1] = nor[i * 3 + 1]; N[v * 3 + 2] = c * nz - sn * nx;
+          if (uv) { U[v * 2] = uv[i * 2]; U[v * 2 + 1] = uv[i * 2 + 1]; }
+          v++;
+        }
+        if (idx) for (var j = 0; j < idx.length; j++) I[k++] = idx[j] + base;
+        else for (var j2 = 0; j2 < vc; j2++) I[k++] = base + j2;
+      });
+    });
+    var geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.BufferAttribute(P, 3));
+    geo.setAttribute('normal', new THREE.BufferAttribute(N, 3));
+    geo.setAttribute('uv', new THREE.BufferAttribute(U, 2));
+    geo.setIndex(new THREE.BufferAttribute(I, 1));
+    geo.computeBoundingSphere();
+    var mesh = new THREE.Mesh(geo, e.mat);
+    mesh.castShadow = false; mesh.receiveShadow = false;
+    group.add(mesh);
   });
   return count;
 };
@@ -532,84 +454,115 @@ function worldKey(info, court) {
           M.toFixed(4), info.colors.roof, info.colors.wall, IS_TOUCH ? 1 : 0].join('|');
 }
 
+// the palace-style templates, metres, shared by every layout
+var _palTpl = null;
+function palaceTemplates() {
+  if (_palTpl) return _palTpl;
+  return (_palTpl = {
+    main5x: buildingTpl({ L: 27, D: 14, Hb: 1.5, He: 5.2, ov: 2.2, rise: 0.40, roof: 'xieshan', bay: 5.2, wen: true }),
+    main5w: buildingTpl({ L: 27, D: 14, Hb: 1.5, He: 5.2, ov: 2.2, rise: 0.42, roof: 'wudian', bay: 5.2, wen: true }),
+    main7x: buildingTpl({ L: 36, D: 16, Hb: 2.0, He: 6.0, ov: 2.4, rise: 0.40, roof: 'xieshan', bay: 5.0, wen: true }),
+    side3: buildingTpl({ L: 15, D: 8, Hb: 0.9, He: 4.2, ov: 1.6, rise: 0.38, roof: 'xieshan', bay: 5.0 }),
+    side5: buildingTpl({ L: 22, D: 8.5, Hb: 0.9, He: 4.2, ov: 1.6, rise: 0.36, roof: 'yingshan', bay: 4.4 }),
+    gate3: buildingTpl({ L: 10, D: 6.5, Hb: 0.8, He: 3.8, ov: 1.4, rise: 0.40, roof: 'wudian', bay: 3.4 }),
+    pav: buildingTpl({ L: 7, D: 7, Hb: 0.9, He: 3.4, ov: 1.6, rise: 0.55, roof: 'pyramid', bay: 3.5 }),
+    bigGate: buildingTpl({ L: 54, D: 22, Hb: 0.5, He: 7.5, ov: 2.8, rise: 0.40, roof: 'wudian', bay: 6.0, wen: true, steps: false }),
+    gate5: buildingTpl({ L: 30, D: 14, Hb: 0.5, He: 5.6, ov: 2.2, rise: 0.40, roof: 'xieshan', bay: 6.0, wen: true, steps: false }),
+    tower: buildingTpl({ L: 13, D: 13, Hb: 0.4, He: 5.0, ov: 1.8, rise: 0.48, roof: 'xieshan', bay: 4.3, steps: false }),
+    towerX: buildingTpl({ L: 13, D: 9, Hb: 0.4, He: 6.2, ov: 1.6, rise: 0.50, roof: 'xieshan', bay: 4.3, steps: false, margin: 0 }),
+    jpav: buildingTpl({ L: 12, D: 12, Hb: 1.6, He: 5.0, ov: 2.0, rise: 0.60, roof: 'pyramid', bay: 4.0 }),
+    // the roof of an arrow tower or a corner tower: it sits on a brick body
+    atower: buildingTpl({ L: 36, D: 14, Hb: 0, He: 1.4, ov: 2.0, rise: 0.42, roof: 'xieshan', bay: 6.0, steps: false, margin: 0 }),
+    // 天安门: nine bays under a hip-and-gable roof, on its 城台
+    tam: buildingTpl({ L: 57, D: 25, Hb: 0.6, He: 8.0, ov: 2.9, rise: 0.42, roof: 'xieshan', bay: 6.3, wen: true, steps: false }),
+    // a long range of rooms: 朝房, 千步廊, storehouses
+    long: buildingTpl({ L: 44, D: 7.5, Hb: 0.6, He: 3.8, ov: 1.4, rise: 0.34, roof: 'yingshan', bay: 4.0 })
+  });
+}
+
+var WORLD_FOGCAP = 1e9;
 function buildWorld(info, court) {
   var g = new THREE.Group();
   var M = info.M, lite = IS_TOUCH;
+  KIT_UM.value = M;
+  buildKit();
   var W = worldMaterials(info.colors.roof, info.colors.wall, lite);
   var P = new Placer(M);
   var acc = { wall: new MeshAcc(), cap: new MeshAcc(), lane: new MeshAcc(), paving: new MeshAcc(), water: new MeshAcc(),
               stone: new MeshAcc(), brick: new MeshAcc(), capGrey: new MeshAcc(), grass: new MeshAcc(), arch: new MeshAcc(),
-              earth: new MeshAcc(), beam: new MeshAcc() };
+              earth: new MeshAcc(), beam: new MeshAcc(), ground: new MeshAcc(), vcol: new MeshAcc() };
   var fieldAcc = new GeoAcc();
-  var trees = [];                     // [x, z, scale, variant]
+  var F = new Fabric(M);
   var rnd = TEXGEN.rng(20261025);
-  var ctx = { info: info, court: court, M: M, lite: lite, P: P, acc: acc, trees: trees, rnd: rnd, W: W, fieldAcc: fieldAcc, extra: [], glows: [] };
+  var ctx = { info: info, court: court, M: M, lite: lite, P: P, acc: acc, trees: [], rnd: rnd, W: W, fieldAcc: fieldAcc,
+              extra: [], glows: [], F: F, holes: [], T: palaceTemplates() };
 
-  if (SITE.mode !== 'court') buildCountry(ctx);
-  else if (info.type === 'pagoda') buildTempleTown(ctx);
-  else buildPalaceCity(ctx);
+  if (SITE.mode !== 'court') buildCountryside(ctx);
+  else if (info.type === 'pagoda') buildTempleTownCity(ctx);
+  else buildCapital(ctx);
 
-  // trees
-  var T = lodTrees(), byV = [[], [], [], []];
-  trees.forEach(function (t) { byV[t[3] % 4].push(t); });
-  var m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), ps = new THREE.Vector3(), sc = new THREE.Vector3(), Y = new THREE.Vector3(0, 1, 0);
-  var tcol = new THREE.Color();
-  byV.forEach(function (list, v) {
-    if (!list.length) return;
-    var bark = new THREE.InstancedMesh(T[v].bark, W.bark, list.length);
-    var leaf = new THREE.InstancedMesh(T[v].leaf, W.leaf, list.length);
-    list.forEach(function (t, i) {
-      q.setFromAxisAngle(Y, (t[0] * 13.1 + t[1] * 7.7) % 6.28);
-      m4.compose(ps.set(t[0], t[4] || 0, t[1]), q, sc.set(t[2] * M, t[2] * M, t[2] * M));
-      bark.setMatrixAt(i, m4); leaf.setMatrixAt(i, m4);
-      var k = 0.8 + 0.4 * ((Math.sin(t[0] * 0.37 + t[1] * 0.91) + 1) / 2);
-      leaf.setColorAt(i, tcol.setRGB(k * (0.92 + 0.1 * Math.sin(t[1])), k, k * 0.9));
+  if (ctx.worldR) farFields(ctx, ctx.worldR, ctx.worldR * 2.2);
+
+  // trees collected the older way go into the fabric too
+  var OLD = [0, 2, 4, 5];
+  ctx.trees.forEach(function (t) { F.tree(OLD[t[3] % 4], t[0], t[1], t[2], null, t[4]); });
+
+  // the city's own ground: packed earth inside the wall, with a hole where
+  // the court's paving is
+  if (ctx.groundRect) {
+    var G = ctx.groundRect, wt = 1.6 * M;
+    var h = { x0: -court.hx - wt, x1: court.hx + wt, z0: court.zb - wt, z1: court.zf + wt };
+    [[G.x0, G.z0, G.x1, h.z0], [G.x0, h.z1, G.x1, G.z1], [G.x0, h.z0, h.x0, h.z1], [h.x1, h.z0, G.x1, h.z1]].forEach(function (q) {
+      var nx = Math.max(1, Math.round((q[2] - q[0]) / (40 * M))), nz = Math.max(1, Math.round((q[3] - q[1]) / (40 * M)));
+      acc.ground.col = [1, 1, 1];
+      acc.ground.grid(nx, nz, function (s, t) {
+        var x = q[0] + (q[2] - q[0]) * s, z = q[1] + (q[3] - q[1]) * t;
+        var k = 0.86 + 0.28 * (0.5 + 0.5 * Math.sin(x * 0.013 / M + Math.cos(z * 0.011 / M) * 2.1)) * (0.7 + 0.3 * Math.sin(z * 0.031 / M));
+        acc.ground.col = [k, k * 0.985, k * 0.96];
+        return [x, 0, z, x, z];
+      }, [0, 1, 0]);
     });
-    [bark, leaf].forEach(function (im) {
-      im.instanceMatrix.needsUpdate = true;
-      if (im.instanceColor) im.instanceColor.needsUpdate = true;
-      im.frustumCulled = false; im.castShadow = false; im.receiveShadow = true;
-      g.add(im);
-    });
-  });
+  }
 
-  // buildings
+  // the fabric: houses, walls, shops, trees, in tiles with two levels of detail
+  var KM = kitMaterials(W.lamps);
+  g.add(F.build(ctx.fabricInner, lite ? 200 : 230, KM));
+  g.userData.fabric = F;
+
+  // the palace-style buildings, their roof colour named after the '|'
   var slot = {
     roof: 'roof', under: 'soffit', fascia: 'fascia', ridge: 'ridge', gable: 'gable', facade: 'facade',
     wall: 'wall', base: 'stone', wall2: 'brick', cap: 'capGrey', court: 'paving'
   };
   P.build(g, function (name, s) {
-    var house = /^syh|^house|^shop/.test(name);
-    // a 牌楼 is posts and a roof, no walls
-    if (name === 'paifang' && (s === 'facade' || s === 'wall' || s === 'base')) return null;
-    var green = /green/.test(name);
-    if (house) {
-      var dark = /d$/.test(name);
-      return { roof: W.roofGrey, under: W.soffitGrey, fascia: W.fasciaGrey, ridge: W.ridgeGrey, gable: W.brick,
-               facade: name === 'shop' ? W.facade : dark ? W.houseFacadeDark : W.houseFacade, wall: W.brick, base: W.stoneGrey,
-               wall2: W.brick, cap: W.capGrey, court: W.paving }[s];
-    }
-    var m = W[slot[s]];
-    if (s === 'roof' && green) m = W.roofGreen;
-    return m;
+    var parts = name.split('|'), tone = parts[1] || 'y';
+    if (parts[0] === 'paifang' && (s === 'facade' || s === 'wall' || s === 'base')) return null;
+    if (s === 'roof') return tone === 'g' ? W.roofGreen : tone === 'k' ? W.roofGrey : W.roof;
+    if (s === 'ridge') return tone === 'g' ? W.ridgeGreen : tone === 'k' ? W.ridgeGrey : W.ridge;
+    if (s === 'fascia' && tone === 'k') return W.fasciaGrey;
+    return W[slot[s]];
   });
 
-  // merged statics
+  // merged statics; their UVs were laid in scene units, the textures are in metres
   var accMat = { wall: W.wall, cap: W.cap, lane: W.lane, paving: W.paving, water: W.water, stone: W.stone,
-                 brick: W.brick, capGrey: W.capGrey, grass: W.grass, arch: W.arch, earth: W.earth, beam: W.beam };
+                 brick: W.brick, capGrey: W.capGrey, grass: W.grass, arch: W.arch, earth: W.earth, beam: W.beam,
+                 ground: W.ground, vcol: W.vcol };
   Object.keys(acc).forEach(function (k) {
     if (!acc[k].n) return;
-    var mesh = new THREE.Mesh(acc[k].geometry(), accMat[k]);
-    mesh.receiveShadow = true; mesh.castShadow = false;
+    var geo = acc[k].geometry(), uv = geo.attributes.uv;
+    for (var i = 0; i < uv.array.length; i++) uv.array[i] /= M;
+    var mesh = new THREE.Mesh(geo, accMat[k]);
+    mesh.receiveShadow = false; mesh.castShadow = false;
     g.add(mesh);
   });
   if (fieldAcc.p.length) {
     var fm = new THREE.Mesh(fieldAcc.geometry(), W.field);
-    fm.receiveShadow = true;
+    fm.receiveShadow = false;
     g.add(fm);
   }
   ctx.extra.forEach(function (o) { g.add(o); });
-  // lanterns at the gates: glows only, the lamps themselves too small to see
+  // lanterns at gates and shrines: glows only, the lamps too small to see
+  var m4 = new THREE.Matrix4();
   if (ctx.glows.length) {
     var gm = glowMaterial(HALO_VS, HALO_FS, 1.0, null, 0.3);
     var gi = new THREE.InstancedMesh(new THREE.PlaneGeometry(1, 1), gm, ctx.glows.length);
@@ -621,6 +574,8 @@ function buildWorld(info, court) {
     g.userData.glowMesh = gi;
   }
   g.userData.lampMats = W.lamps;
+  // the haze is whole at the last of the far fields, so the world has no edge
+  WORLD_FOGCAP = (ctx.worldR || 2000 * M) * 2.1;
   return g;
 }
 
@@ -650,6 +605,7 @@ function lineBox(acc, x0, z0, x1, z1, y, h, w) {
   var len = Math.hypot(x1 - x0, z1 - z0);
   if (len < 1e-6) return;
   var b = new MeshAcc();
+  b.col = acc.col;
   b.box(0, y + h / 2, 0, len, h, w, { bottom: true });
   var m4 = new THREE.Matrix4().makeRotationY(-Math.atan2(z1 - z0, x1 - x0));
   m4.setPosition((x0 + x1) / 2, 0, (z0 + z1) / 2);
@@ -662,6 +618,7 @@ function segBox(acc, p0, p1, w, h) {
   var L = d.length();
   if (L < 1e-6) return;
   var b = new MeshAcc();
+  b.col = acc.col;
   b.box(0, 0, 0, L, h, w);
   var m4 = new THREE.Matrix4().compose(new THREE.Vector3((p0[0] + p1[0]) / 2, (p0[1] + p1[1]) / 2, (p0[2] + p1[2]) / 2),
     new THREE.Quaternion().setFromUnitVectors(_sbX, d.normalize()), new THREE.Vector3(1, 1, 1));
@@ -753,21 +710,7 @@ function buildPalaceCity(ctx) {
   var M = ctx.M, court = ctx.court, P = ctx.P, A = ctx.acc, rnd = ctx.rnd, lite = ctx.lite;
   var wt = 1.6 * M;
   var Hx = court.hx + wt, Zf = court.zf + wt, Zb = court.zb - wt;
-  // templates (metres)
-  var T = {
-    main5x: buildingTpl({ L: 27, D: 14, Hb: 1.5, He: 5.2, ov: 2.2, rise: 0.40, roof: 'xieshan', bay: 5.2, wen: true }),
-    main5w: buildingTpl({ L: 27, D: 14, Hb: 1.5, He: 5.2, ov: 2.2, rise: 0.42, roof: 'wudian', bay: 5.2, wen: true }),
-    main7x: buildingTpl({ L: 36, D: 16, Hb: 2.0, He: 6.0, ov: 2.4, rise: 0.40, roof: 'xieshan', bay: 5.0, wen: true }),
-    side3: buildingTpl({ L: 15, D: 8, Hb: 0.9, He: 4.2, ov: 1.6, rise: 0.38, roof: 'xieshan', bay: 5.0 }),
-    side5: buildingTpl({ L: 22, D: 8.5, Hb: 0.9, He: 4.2, ov: 1.6, rise: 0.36, roof: 'yingshan', bay: 4.4 }),
-    gate3: buildingTpl({ L: 10, D: 6.5, Hb: 0.8, He: 3.8, ov: 1.4, rise: 0.40, roof: 'wudian', bay: 3.4 }),
-    pav: buildingTpl({ L: 7, D: 7, Hb: 0.9, He: 3.4, ov: 1.6, rise: 0.55, roof: 'pyramid', bay: 3.5 }),
-    bigGate: buildingTpl({ L: 54, D: 22, Hb: 0.5, He: 7.5, ov: 2.8, rise: 0.40, roof: 'wudian', bay: 6.0, wen: true, steps: false }),
-    gate5: buildingTpl({ L: 30, D: 14, Hb: 0.5, He: 5.6, ov: 2.2, rise: 0.40, roof: 'xieshan', bay: 6.0, wen: true, steps: false }),
-    tower: buildingTpl({ L: 13, D: 13, Hb: 0.4, He: 5.0, ov: 1.8, rise: 0.48, roof: 'xieshan', bay: 4.3, steps: false }),
-    towerX: buildingTpl({ L: 13, D: 9, Hb: 0.4, He: 6.2, ov: 1.6, rise: 0.50, roof: 'xieshan', bay: 4.3, steps: false, margin: 0 }),
-    jpav: buildingTpl({ L: 12, D: 12, Hb: 1.6, He: 5.0, ov: 2.0, rise: 0.60, roof: 'pyramid', bay: 4.0 })
-  };
+  var T = ctx.T;
   var lane = 14 * M, gap = 20 * M;
   var cw = 66 * M, cd = 74 * M;
   var nE = lite ? 2 : 3;
@@ -779,7 +722,22 @@ function buildPalaceCity(ctx) {
   var PZf = Zf + F;
   var occupied = [];
 
-  // ---- the compounds, east and west, and north of the court
+  // ---- the compounds, east and west, and north of the court. No two the
+  // same size, none the same inside: a hall court, a 前殿后寝 pair, rows of
+  // living quarters, a garden, a shrine in its grove, a prince's court under
+  // green tiles. Ranges of rooms (围房) line the walls, as in the palace.
+  var RS = 0.55, RL = 44 * RS * M, RD = 7.5 * RS * M;     // one range: 24 m by 4 m
+  function rangeRun(tone, x0r, z0r, x1r, z1r, rot) {
+    // ranges end to end from (x0r,z0r) to (x1r,z1r), facing `rot`
+    var alongX = Math.abs(x1r - x0r) > Math.abs(z1r - z0r), len = alongX ? Math.abs(x1r - x0r) : Math.abs(z1r - z0r);
+    var n = Math.floor(len / (RL + 0.6 * M));
+    if (n < 1) return;
+    var s0 = (len - n * (RL + 0.6 * M)) / 2 + (RL + 0.6 * M) / 2;
+    for (var i = 0; i < n; i++) {
+      var f = (s0 + i * (RL + 0.6 * M)) / len;
+      P.put('long' + tone, T.long, x0r + (x1r - x0r) * f, z0r + (z1r - z0r) * f, rot, RS);
+    }
+  }
   function compound(cx, cz, w, d, k) {
     var hw = w / 2, hd = d / 2, gw = 4.2 * M;
     var h = 5.0 * M, t = 1.1 * M;
@@ -788,13 +746,18 @@ function buildPalaceCity(ctx) {
     wallRun(ctx, cx + hw, cz - hd, cx + hw, cz + hd, h, t);
     wallRun(ctx, cx - hw, cz + hd, cx - gw, cz + hd, h, t);
     wallRun(ctx, cx + gw, cz + hd, cx + hw, cz + hd, h, t);
-    P.put('gate3', T.gate3, cx, cz + hd - 0.4 * M, 0);
+    var kind = ['hall', 'hall', 'pair', 'rows', 'garden', 'shrine', 'green', 'hall', 'pair', 'green', 'rows', 'pair'][Math.floor(rnd() * 12)];
+    if (kind === 'garden' && w * d > 6000 * M * M) kind = 'pair';
+    var tone = kind === 'green' ? '|g' : '';
+    P.put('gate3' + tone, T.gate3, cx, cz + hd - 0.4 * M, 0, 0.9 + rnd() * 0.15);
     ctx.glows.push([cx - 3.4 * M, 3.4 * M, cz + hd + 3.0 * M, 2.4 * M], [cx + 3.4 * M, 3.4 * M, cz + hd + 3.0 * M, 2.4 * M]);
     strip(ctx, 'paving', cx - hw + t, cz - hd + t, cx + hw - t, cz + hd - t, 0.025 * M);
-    var garden = k % 7 === 3;
-    if (garden) {
-      // a garden court: a pond, a pavilion beside it, trees all round
-      var pr = Math.min(w, d) * 0.22;
+    var inX = hw - t / 2 - RD / 2 - 0.4 * M, backZ = cz - hd + t / 2 + RD / 2 + 0.4 * M;
+    var sc = 0.86 + rnd() * 0.18;
+    if (kind === 'garden') {
+      // a garden court: a pond, a pavilion beside it, rockwork, trees; a
+      // range of rooms along the back to look out over it
+      var pr = Math.min(w, d) * 0.2;
       var ring = [];
       for (var i = 0; i < 14; i++) {
         var a = i / 14 * Math.PI * 2, rr = pr * (0.82 + 0.3 * Math.sin(a * 3 + k));
@@ -803,50 +766,134 @@ function buildPalaceCity(ctx) {
       A.water.face([[cx, 0.05 * M, cz, 0, 0]].concat(ring).concat([ring[0]]), [0, 1, 0]);
       for (var e = 0; e < ring.length; e++) {
         var p0 = ring[e], p1 = ring[(e + 1) % ring.length];
-        A.stone.box((p0[0] + p1[0]) / 2, 0.15 * M, (p0[2] + p1[2]) / 2, Math.abs(p1[0] - p0[0]) + 0.6 * M, 0.3 * M, Math.abs(p1[2] - p0[2]) + 0.6 * M, { bottom: true });
+        lineBox(A.stone, p0[0], p0[2], p1[0], p1[2], 0, 0.3 * M, 0.6 * M);
       }
-      P.put(k % 2 ? 'pav' : 'pavgreen', T.pav, cx + pr * 1.7, cz - pr * 0.6, 0);
-      for (var tt = 0; tt < 7; tt++) {
-        var ta = rnd() * 6.28, td = pr * (1.8 + rnd() * 0.6);
+      P.put(k % 2 ? 'pav' : 'pav|g', T.pav, cx + pr * 1.6, cz - pr * 0.5, 0);
+      for (var s2 = 0; s2 < 7; s2++) A.stone.box(cx - pr * 1.5 + (rnd() - 0.5) * pr, (0.5 + rnd()) * M, cz + pr * 1.1 + (rnd() - 0.5) * pr * 0.5, (1.4 + rnd() * 2) * M, (1 + rnd() * 2.4) * M, (1.2 + rnd() * 1.6) * M, { bottom: true });
+      for (var tt = 0; tt < 12; tt++) {
+        var ta = rnd() * 6.28, td = pr * (1.7 + rnd() * 0.5);
         ctx.trees.push([cx + Math.cos(ta) * td * 1.1, cz + Math.sin(ta) * td * 0.9, 0.8 + rnd() * 0.4, Math.floor(rnd() * 4)]);
       }
-      P.put('side3', T.side3, cx, cz - hd + 7 * M, 0);
+      rangeRun('', cx - hw + 5 * M, backZ, cx + hw - 5 * M, backZ, 0);
       return;
     }
-    var mainName = k % 5 === 0 ? 'main7x' : k % 2 ? 'main5x' : 'main5w';
-    if (mainName === 'main7x' && w < 60 * M) mainName = 'main5x';
-    P.put(mainName, T[mainName], cx, cz - d * 0.17, 0);
-    P.put('side3', T.side3, cx - w * 0.31, cz + d * 0.14, Math.PI / 2);
-    P.put('side3', T.side3, cx + w * 0.31, cz + d * 0.14, -Math.PI / 2);
+    if (kind === 'rows') {
+      // living quarters: small courts one behind the other, each with its
+      // range of rooms and a wall with a gap before it
+      var nR = Math.max(2, Math.floor((d - 14 * M) / (21 * M))), step = (d - 10 * M) / nR;
+      var rs = Math.min(1.15, (w - 8 * M) / (22 * M));
+      for (var rw = 0; rw < nR; rw++) {
+        var zr = cz - hd + 5 * M + rw * step;
+        P.put('side5' + (rw % 3 === 2 ? '|k' : ''), T.side5, cx, zr + 5.5 * M, 0, rs);
+        if (rw < nR - 1) {
+          var zw = zr + step - 1.5 * M;
+          wallRun(ctx, cx - hw, zw, cx - 1.8 * M, zw, 3.6 * M, 0.7 * M);
+          wallRun(ctx, cx + 1.8 * M, zw, cx + hw, zw, 3.6 * M, 0.7 * M);
+        }
+        if (rnd() < 0.6) ctx.trees.push([cx + (rnd() < 0.5 ? 1 : -1) * w * 0.3, zr + step * 0.72, 0.8 + rnd() * 0.3, Math.floor(rnd() * 4)]);
+      }
+      return;
+    }
+    // ranges down both sides, and across the back unless a rear hall is there
+    var twoCourts = d > 96 * M && kind !== 'shrine';
+    var sideZ0 = cz - hd + t + 1.0 * M, sideZ1 = cz + hd - t - 6.5 * M;
+    rangeRun(kind === 'green' ? '|k' : '', cx - inX, sideZ0, cx - inX, sideZ1, Math.PI / 2);
+    rangeRun(kind === 'green' ? '|k' : '', cx + inX, sideZ0, cx + inX, sideZ1, -Math.PI / 2);
+    var ix = inX - RD / 2 - 1.2 * M;                         // the court's inner half-width
+    if (kind === 'shrine') {
+      P.put('main5w', T.main5w, cx, cz - d * 0.12, 0, Math.min(0.7, ix * 2 / (30 * M)));
+      P.put('pav', T.pav, cx - ix * 0.55, cz + d * 0.24, 0, 0.9);
+      P.put('pav', T.pav, cx + ix * 0.55, cz + d * 0.24, 0, 0.9);
+      A.stone.box(cx, 0.6 * M, cz + d * 0.14, 2.2 * M, 1.2 * M, 2.2 * M, { bottom: true });
+      for (var g2 = 0; g2 < 12; g2++) ctx.trees.push([cx + (rnd() - 0.5) * ix * 1.7, cz - hd + (5 + rnd() * 8) * M + (g2 % 2 ? d * 0.55 : 0), 0.9 + rnd() * 0.3, 2]);
+      rangeRun('', cx - ix, backZ, cx + ix, backZ, 0);
+      return;
+    }
+    // the main hall, sized to its court
+    var mainName = ix * 2 > 44 * M && rnd() < 0.35 ? 'main7x' : rnd() < 0.5 ? 'main5x' : 'main5w';
+    var mL = mainName === 'main7x' ? 41 : 32;
+    var ms = Math.min(sc, ix * 2 / (mL * M));
+    var front = twoCourts ? cz - hd + d * 0.46 : cz - hd;  // north edge of the front court
+    var fd = (cz + hd) - front;
+    var mz = front + fd * 0.33;
+    P.put(mainName + tone, T[mainName], cx, mz, 0, ms);
+    var s3 = Math.min(sc, (ix - 4 * M) / (9.5 * M));
+    var sx3 = ix - 5.2 * M * s3;
+    P.put('side3' + tone, T.side3, cx - sx3, front + fd * 0.64, Math.PI / 2, s3);
+    P.put('side3' + tone, T.side3, cx + sx3, front + fd * 0.64, -Math.PI / 2, s3);
+    if (twoCourts) {
+      // the rear court behind a cross wall: 后殿, its own side rooms
+      wallRun(ctx, cx - hw, front, cx - 3.2 * M, front, 4.4 * M, 0.9 * M);
+      wallRun(ctx, cx + 3.2 * M, front, cx + hw, front, 4.4 * M, 0.9 * M);
+      P.put('gate3' + tone, T.gate3, cx, front, 0, 0.7);
+      var rz = cz - hd + (front - (cz - hd)) * 0.42;
+      var rn = rnd() < 0.5 ? 'main5w' : 'side5';
+      P.put(rn + tone, T[rn], cx, rz, 0, Math.min(0.78, ix * 2 / (32 * M)));
+      if (front - (cz - hd) > 40 * M) {
+        P.put('side3|k', T.side3, cx - sx3, rz + 15 * M, Math.PI / 2, s3 * 0.85);
+        P.put('side3|k', T.side3, cx + sx3, rz + 15 * M, -Math.PI / 2, s3 * 0.85);
+      }
+      rangeRun('|k', cx - ix, backZ, cx + ix, backZ, 0);
+      ctx.trees.push([cx - ix * 0.6, rz + 13 * M, 0.85 + rnd() * 0.3, 0], [cx + ix * 0.6, rz + 13 * M, 0.85 + rnd() * 0.3, 3]);
+    } else if (kind === 'pair') {
+      // 前殿后寝: a second hall behind the first, joined by a covered way
+      var bz = cz - hd + t + 6 * M;
+      P.put('side5' + tone, T.side5, cx, bz, 0, Math.min(1.05, ix * 2 / (25 * M)));
+      var gz0 = bz + 5 * M, gz1 = mz - 9 * ms * M;
+      if (gz1 - gz0 > 2 * M) A.wall.box(cx, 2.2 * M, (gz0 + gz1) / 2, 3.5 * M, 4.4 * M, gz1 - gz0, { bottom: true });
+    } else rangeRun(kind === 'green' ? '|k' : '', cx - ix, backZ, cx + ix, backZ, 0);
     // a path from the gate to the main hall's steps
-    strip(ctx, 'lane', cx - 2.2 * M, cz - d * 0.17 + 10 * M, cx + 2.2 * M, cz + hd - t, 0.04 * M);
-    ctx.trees.push([cx - w * 0.14, cz + d * 0.26, 0.9 + rnd() * 0.3, 0]);
-    ctx.trees.push([cx + w * 0.14, cz + d * 0.26, 0.9 + rnd() * 0.3, 1]);
-    if (k % 3 === 0) {
-      ctx.trees.push([cx - w * 0.36, cz - d * 0.36, 1.0, 2], [cx + w * 0.36, cz - d * 0.36, 1.0, 3]);
+    strip(ctx, 'lane', cx - 2.2 * M, mz + 10 * ms * M, cx + 2.2 * M, cz + hd - t, 0.04 * M);
+    if (kind !== 'hall') {
+      ctx.trees.push([cx - ix * 0.45, front + fd * 0.82, 0.9 + rnd() * 0.3, 0]);
+      ctx.trees.push([cx + ix * 0.45, front + fd * 0.82, 0.9 + rnd() * 0.3, rnd() < 0.5 ? 0 : 2]);
     }
+    // bronze vats and stone lanterns before the main hall
+    [-1, 1].forEach(function (s4) {
+      A.stone.box(cx + s4 * 9 * M * ms, 0.45 * M, mz + 12 * ms * M, 1.6 * M, 0.9 * M, 1.6 * M, { bottom: true });
+      A.stone.box(cx + s4 * 4.5 * M, 0.9 * M, mz + 15 * ms * M, 0.5 * M, 1.8 * M, 0.5 * M, { bottom: true });
+    });
   }
-  var k = 0;
-  // east and west columns, from the north edge of the palace to the gate row
-  for (var col = 0; col < nE; col++) {
-    var cx = x0 + col * (cw + lane) + cw / 2;
-    for (var z = PZb + 16 * M + cd / 2; z + cd / 2 < PZf - 18 * M; z += cd + lane) {
-      [-1, 1].forEach(function (sd) { compound(sd * cx, z, cw, cd, k++); });
-    }
+  // the columns either side of the court: their widths vary, and down each
+  // the compounds are cut to different depths; one side never mirrors the other
+  function split(a, b, n, gapW) {
+    var ws = [], sum = 0;
+    for (var i = 0; i < n; i++) { var q = 0.7 + rnd() * 0.65; ws.push(q); sum += q; }
+    var free = (b - a) - gapW * (n - 1), out = [], p = a;
+    ws.forEach(function (q) { var len = free * q / sum; out.push([p, p + len]); p += len + gapW; });
+    return out;
   }
+  var k = 0, laneX = [];
+  [-1, 1].forEach(function (sd) {
+    var cols = split(x0, PX - 16 * M, nE, lane);
+    cols.forEach(function (c, ci) {
+      if (ci > 0) laneX.push(sd * (c[0] - lane / 2));
+      var z = PZb + 16 * M, zEnd = PZf - 18 * M;
+      while (zEnd - z > 40 * M) {
+        var dd = (50 + rnd() * 62) * M;
+        if (zEnd - z - dd - lane < 46 * M) dd = zEnd - z;
+        compound(sd * (c[0] + c[1]) / 2, z + dd / 2, c[1] - c[0], dd, k++);
+        z += dd + lane;
+      }
+    });
+    laneX.push(sd * (Hx + gap / 2));
+  });
   // north of the court, either side of the axis
-  for (var r = 0; r < nN; r++) {
-    var zN = Zb - gap - cd / 2 - r * (cd + lane);
-    var halfW = Hx - lane / 2;
-    [-1, 1].forEach(function (sd) { compound(sd * (lane / 2 + halfW / 2), zN, halfW, cd, k++); });
-  }
+  [-1, 1].forEach(function (sd) {
+    var halfW = Hx - lane / 2, z = Zb - gap, zEnd = PZb + 16 * M;
+    while (z - zEnd > 40 * M) {
+      var dd = (52 + rnd() * 50) * M;
+      if (z - dd - lane - zEnd < 46 * M) dd = z - zEnd;
+      compound(sd * (lane / 2 + halfW / 2), z - dd / 2, halfW, dd, k++);
+      z -= dd + lane;
+    }
+  });
 
-  // ---- lanes: the long ways north-south, and between the rows
-  for (var c2 = 0; c2 <= nE; c2++) {
-    var lx = c2 === 0 ? Hx + gap / 2 : x0 + c2 * (cw + lane) - lane / 2;
-    var lw = c2 === 0 ? gap * 0.6 : lane * 0.7;
-    [-1, 1].forEach(function (sd) { strip(ctx, 'lane', sd * lx - lw / 2, PZb + 10 * M, sd * lx + lw / 2, PZf - 10 * M); });
-  }
+  // ---- lanes: the long ways north-south between the columns
+  laneX.forEach(function (lx, i) {
+    var lw = Math.abs(Math.abs(lx) - (Hx + gap / 2)) < 1e-3 ? gap * 0.6 : lane * 0.7;
+    strip(ctx, 'lane', lx - lw / 2, PZb + 10 * M, lx + lw / 2, PZf - 10 * M);
+  });
   strip(ctx, 'lane', -lane * 0.35, PZb + 10 * M, lane * 0.35, Zb - 2 * M);            // the axis, north
 
   // ---- forecourt: walls continuing the court's, the 金水河, the great gate
@@ -970,7 +1017,7 @@ function buildPalaceCity(ctx) {
   P.put('jpav', T.jpav, 0, JZ, 0, 1, JH - 0.5 * M);
   [[-1, 0.5], [1, 0.5]].forEach(function (p) {
     var px = p[0] * JR * 0.5, h = JH * (0.5 - 0.5 * Math.cos(Math.PI * Math.pow(0.5, 0.8)));
-    P.put('pavgreen', T.pav, px, JZ, 0, 1.2, h - 0.5 * M);
+    P.put('pav|g', T.pav, px, JZ, 0, 1.2, h - 0.5 * M);
   });
   for (var jt = 0; jt < (lite ? 50 : 110); jt++) {
     var ja = rnd() * 6.28, jd = Math.sqrt(rnd()) * JR * 0.92;
@@ -981,13 +1028,11 @@ function buildPalaceCity(ctx) {
 
   // ---- 北海 the lake to the west, its island and the White Dagoba
   var lake = lakeWithDagoba(ctx, -ex0 - mw - 40 * M - 230 * M, (PZb + PZf) / 2 - 120 * M, 190 * M, 320 * M);
-
-  // ---- 胡同 the city round it all
-  hutongRing(ctx, -ex0 - mw - 28 * M, ez0 - mw - 28 * M, ex0 + mw + 28 * M, sz0 + mw + 28 * M,
-             lite ? 300 * M : 820 * M, function (x, z) {
-               if (Math.hypot(x / 1.0, (z - JZ) / 0.8) < JR + 30 * M) return true;
-               return lake && lake.inside(x, z, 14 * M);
-             });
+  ctx.holes.push({ fn: function (x, z) { return lake.inside(x, z, 10 * M); } });
+  return {
+    moat: { x0: -ex0 - mw, x1: ex0 + mw, z0: ez0 - mw, z1: sz0 + mw },
+    JZ: JZ, JR: JR, JH: JH, lake: lake, PZf: PZf, PZb: PZb, PX: PX
+  };
 }
 
 // a lake with a stone shore, an island hill and a white 喇嘛塔 on its top, a
@@ -1069,246 +1114,12 @@ function lakeWithDagoba(ctx, cx, cz, rx, rz) {
   // a long bridge from the island to the south shore
   archBridge(ctx, ix, iz + ir * 0.9 + 30 * M, true, 64 * M, 7 * M, 2.2 * M, 0.5 * M);
   return {
+    cx: cx, cz: cz, rx: rx * 1.13, rz: rz * 1.13, x0: cx - rx * 1.13, x1: cx + rx * 1.13, z0: cz - rz * 1.13, z1: cz + rz * 1.13,
     inside: function (x, z, pad) {
       var dx = (x - cx) / (rx * 1.12 + (pad || 0)), dz = (z - cz) / (rz * 1.12 + (pad || 0));
       return dx * dx + dz * dz < 1;
     }
   };
-}
-
-// rows of 四合院 on a grid round a rectangle, out to `reach` beyond it;
-// skip(x, z) leaves a hole (a hill, a lake)
-function hutongRing(ctx, X0, Z0, X1, Z1, reach, skip) {
-  var M = ctx.M, P = ctx.P, rnd = ctx.rnd;
-  var sw = 30 * M, sd = 38 * M, hut = 7 * M, ave = 24 * M;
-  var nx0 = Math.floor((X0 - reach) / (sw + hut)), nx1 = Math.ceil((X1 + reach) / (sw + hut));
-  var nz0 = Math.floor((Z0 - reach) / (sd + hut)), nz1 = Math.ceil((Z1 + reach) / (sd + hut));
-  for (var ix = nx0; ix <= nx1; ix++) {
-    if (ix % 7 === 0) {
-      // an avenue, tree-lined
-      var axx = ix * (sw + hut);
-      for (var tz = (Z0 - reach); tz < Z1 + reach; tz += 22 * M) {
-        if (tz > Z0 - 6 * M && tz < Z1 + 6 * M && axx > X0 - 6 * M && axx < X1 + 6 * M) continue;
-        if (skip && skip(axx, tz)) continue;
-        var tdx = Math.max(X0 - axx, 0, axx - X1), tdz = Math.max(Z0 - tz, 0, tz - Z1);
-        if (Math.hypot(tdx, tdz) > reach * 0.6) continue;
-        if (rnd() < 0.8) ctx.trees.push([axx - 6 * M, tz, 0.9 + rnd() * 0.3, Math.floor(rnd() * 3)], [axx + 6 * M, tz + 8 * M, 0.9 + rnd() * 0.3, Math.floor(rnd() * 3)]);
-      }
-      for (var sz0 = Z0 - reach; sz0 < Z1 + reach; sz0 += 30 * M) {
-        var smid = sz0 + 15 * M;
-        if (skip && skip(axx, smid)) continue;
-        if (smid > Z0 && smid < Z1 && axx > X0 && axx < X1) continue;
-        strip(ctx, 'lane', axx - ave / 2, sz0, axx + ave / 2, sz0 + 30 * M, 0.015 * M);
-      }
-      continue;
-    }
-    for (var iz = nz0; iz <= nz1; iz++) {
-      var x = ix * (sw + hut), z = iz * (sd + hut);
-      // inside the ring only
-      if (x > X0 - sw / 2 && x < X1 + sw / 2 && z > Z0 - sd / 2 && z < Z1 + sd / 2) continue;
-      var dx = Math.max(X0 - x, 0, x - X1), dz = Math.max(Z0 - z, 0, z - Z1);
-      var dist = Math.hypot(dx, dz);
-      if (dist > reach) continue;
-      if (skip && skip(x, z)) continue;
-      // thinning toward the edge, so the city frays into the haze
-      if (dist > reach * 0.7 && rnd() < (dist - reach * 0.7) / (reach * 0.3) * 0.7) continue;
-      var v = Math.floor(rnd() * 3);
-      var far = dist > reach * 0.42;
-      var tpl = far ? siheyuanFarTpl(v) : siheyuanTpl(v);
-      var rot = rnd() < 0.15 ? Math.PI : 0;
-      // most houses are lit at night, some are not
-      P.put((far ? 'syhF' : 'syh') + v + (rnd() < 0.3 ? 'd' : ''), tpl, x + (rnd() - 0.5) * 2 * M, z, rot, 1);
-      if (rnd() < (far ? 0.25 : 0.42)) ctx.trees.push([x + (rnd() - 0.5) * 6 * M, z + (rnd() - 0.5) * 6 * M, 0.75 + rnd() * 0.35, Math.floor(rnd() * 4)]);
-    }
-  }
-}
-
-// ---------------------------------------------------------------------------
-//  寺城 THE TEMPLE TOWN (a pagoda, in its court)
-// ---------------------------------------------------------------------------
-function buildTempleTown(ctx) {
-  var M = ctx.M, court = ctx.court, P = ctx.P, A = ctx.acc, rnd = ctx.rnd, lite = ctx.lite;
-  var wt = 1.6 * M;
-  var Hx = court.hx + wt, Zf = court.zf + wt, Zb = court.zb - wt;
-  var T = {
-    shop: buildingTpl({ L: 12, D: 7, Hb: 0.4, He: 3.4, ov: 1.2, rise: 0.32, roof: 'yingshan', bay: 3.0, ns: 3, nt: 3, steps: false, margin: 0.3 }),
-    paifang: buildingTpl({ L: 16, D: 2.2, Hb: 0, He: 6.5, ov: 1.2, rise: 0.5, roof: 'wudian', bay: 5.3, steps: false, margin: 0, wen: true }),
-    cityGate: buildingTpl({ L: 40, D: 18, Hb: 0.5, He: 7.0, ov: 2.4, rise: 0.42, roof: 'xieshan', bay: 5.0, wen: true, steps: false }),
-    bridgePav: buildingTpl({ L: 6, D: 6, Hb: 0.6, He: 3.0, ov: 1.4, rise: 0.55, roof: 'pyramid', bay: 3.0 })
-  };
-  // a ring street round the temple wall
-  var ring = 16 * M;
-  strip(ctx, 'lane', -Hx - ring, Zb - ring, Hx + ring, Zb, 0.02 * M);
-  strip(ctx, 'lane', -Hx - ring, Zf, Hx + ring, Zf + ring, 0.02 * M);
-  strip(ctx, 'lane', -Hx - ring, Zb, -Hx, Zf, 0.02 * M);
-  strip(ctx, 'lane', Hx, Zb, Hx + ring, Zf, 0.02 * M);
-  // the market street, south from the temple gate to the city gate
-  var streetW = 20 * M, gateZ = Zf + (lite ? 260 : 420) * M;
-  strip(ctx, 'lane', -streetW / 2, Zf + ring, streetW / 2, gateZ, 0.02 * M);
-  for (var z = Zf + ring + 10 * M; z < gateZ - 30 * M; z += 13.5 * M) {
-    [-1, 1].forEach(function (sd) {
-      P.put('shop', T.shop, sd * (streetW / 2 + 5 * M), z, sd > 0 ? -Math.PI / 2 : Math.PI / 2);
-      if (rnd() < 0.3) ctx.trees.push([sd * (streetW / 2 + 1.2 * M), z + 6 * M, 0.7, 2]);
-    });
-  }
-  // a 牌楼 across the street near the temple, another near the gate
-  [Zf + ring + 4 * M, gateZ - 40 * M].forEach(function (pz) {
-    P.put('paifang', T.paifang, 0, pz, 0);
-    [-1, 0.33, -0.33, 1].forEach(function (f) {
-      A.stone.box(f * 7.6 * M, 0.6 * M, pz, 1.4 * M, 1.2 * M, 2.4 * M, { bottom: true });     // 夹杆石
-      A.wall.box(f * 7.6 * M, 3.6 * M, pz, 0.75 * M, 7.2 * M, 0.75 * M, { bottom: true });   // 柱
-    });
-    A.beam.box(0, 6.2 * M, pz, 16.4 * M, 0.7 * M, 0.6 * M, { bottom: true });                 // 额枋
-    A.beam.box(0, 4.6 * M, pz, 16.4 * M, 0.45 * M, 0.5 * M, { bottom: true });
-  });
-  // the city wall, grey brick, crenellated, and its gate tower
-  var CW = 1200 * M, OH = 11 * M, OW = 12 * M;
-  wallRun(ctx, -CW, gateZ, -26 * M, gateZ, OH, OW, 'brick', 'capGrey');
-  wallRun(ctx, 26 * M, gateZ, CW, gateZ, OH, OW, 'brick', 'capGrey');
-  for (var mx = -CW; mx < CW; mx += 3.4 * M) {
-    if (Math.abs(mx) < 28 * M) continue;
-    A.brick.box(mx, OH + 1.0 * M, gateZ + OW / 2 - 0.3 * M, 1.7 * M, 1.6 * M, 0.6 * M, { bottom: true });
-  }
-  A.brick.box(0, 7 * M, gateZ, 56 * M, 14 * M, 26 * M, { bottom: true });
-  A.arch.box(0, 3.4 * M, gateZ, 6 * M, 6.8 * M, 26.2 * M, { bottom: true });
-  A.stone.box(0, 14.2 * M, gateZ, 57 * M, 0.4 * M, 27 * M, { bottom: true });
-  P.put('cityGate', T.cityGate, 0, gateZ, Math.PI, 1, 14.4 * M);
-  // a canal to the east, stone banks, bridges where the streets cross
-  var cx = Hx + ring + 70 * M, cwid = 18 * M;
-  strip(ctx, 'water', cx - cwid / 2, Zb - 500 * M, cx + cwid / 2, gateZ - OW, 0.04 * M);
-  [-1, 1].forEach(function (sd) { A.stone.box(cx + sd * (cwid / 2 + 0.6 * M), 0.1 * M, (Zb - 500 * M + gateZ - OW) / 2, 1.2 * M, 1.2 * M, gateZ - OW - Zb + 500 * M, { bottom: true }); });
-  for (var bz = Zb - 420 * M; bz < gateZ - 40 * M; bz += 120 * M) {
-    archBridge(ctx, cx, bz, false, cwid + 10 * M, 6 * M, 2.6 * M, 0.5 * M);
-    for (var w = 0; w < 4; w++) ctx.trees.push([cx + (w < 2 ? -1 : 1) * (cwid / 2 + 3 * M), bz + (w % 2 ? 9 : -9) * M, 0.95, 1]);
-  }
-  P.put('bridgePav', T.bridgePav, cx + cwid / 2 + 10 * M, Zb - 60 * M, 0);
-  // the town: hutong all round, kept off the street, the canal and the gate
-  hutongRing(ctx, -Hx - ring, Zb - ring, Hx + ring, Zf + ring, lite ? 300 * M : 760 * M, function (x, z) {
-    if (Math.abs(x) < streetW / 2 + 12 * M && z > Zf) return true;            // the market street
-    if (Math.abs(x - cx) < cwid / 2 + 16 * M) return true;                     // the canal
-    if (z > gateZ - OW - 20 * M) return true;                                  // beyond the wall
-    return false;
-  });
-}
-
-// ---------------------------------------------------------------------------
-//  野 OPEN COUNTRY: fields, villages, tree belts, a river
-// ---------------------------------------------------------------------------
-function buildCountry(ctx) {
-  var M = ctx.M, P = ctx.P, A = ctx.acc, rnd = ctx.rnd, lite = ctx.lite, info = ctx.info;
-  var clear = Math.max(info.width, info.depth || info.width) * 1.7 + 40 * M;
-  var R = (lite ? 600 : 1100) * M;
-  // the year's crops side by side: wheat ripening, young millet, sorghum,
-  // fresh-ploughed earth, a field gone to rape flower, a vegetable plot
-  // (linear multipliers on the field texture: wheat, young millet, sorghum,
-  // ploughed earth, rape in flower, vegetables, fallow)
-  var crops = [[0.66, 0.48, 0.17], [0.22, 0.38, 0.11], [0.14, 0.26, 0.08], [0.33, 0.22, 0.13],
-               [0.74, 0.62, 0.10], [0.24, 0.36, 0.15], [0.45, 0.38, 0.23]];
-  var col = new THREE.Color();
-  var fw = 56 * M, fd = 84 * M, path = 6 * M;
-  var river = function (z) { return 300 * M + 70 * M * Math.sin(z / (200 * M)) + 30 * M * Math.sin(z / (73 * M)); };
-  var villages = [[-330, -220], [200, -420], [-470, 260], [460, 160], [-140, 470], [80, 560], [-620, -40], [640, -300]];
-  var nv = lite ? 4 : villages.length;
-  function nearVillage(x, z) {
-    for (var v = 0; v < nv; v++) if (Math.hypot(x - villages[v][0] * M, z - villages[v][1] * M) < 95 * M) return true;
-    return false;
-  }
-  for (var ix = -Math.ceil(R / fw); ix <= Math.ceil(R / fw); ix++) {
-    for (var iz = -Math.ceil(R / fd); iz <= Math.ceil(R / fd); iz++) {
-      var x = ix * fw, z = iz * fd;
-      var rr = Math.hypot(x, z);
-      if (rr > R) continue;
-      if (Math.abs(x) < clear && Math.abs(z) < clear) continue;
-      if (Math.abs(x - river(z)) < 34 * M) continue;
-      if (nearVillage(x, z)) continue;
-      // a field, sometimes split in two strips of different crops
-      var split = rnd() < 0.35;
-      for (var h = 0; h < (split ? 2 : 1); h++) {
-        var c = crops[Math.floor(rnd() * crops.length)];
-        var k = 0.85 + 0.25 * rnd();
-        col.setRGB(c[0] * k, c[1] * k, c[2] * k);
-        var w = fw - path, d = split ? (fd - path) / 2 - 1 * M : fd - path;
-        var zc = split ? z - (fd - path) / 4 + h * (fd - path) / 2 : z;
-        var g = new THREE.PlaneGeometry(w, d, 1, 1);
-        g.rotateX(-Math.PI / 2);
-        if (rnd() < 0.5) g.rotateY(Math.PI / 2);
-        g.translate(x, 0.03 * M, zc);
-        var uv = g.attributes.uv;
-        for (var q = 0; q < uv.count; q++) uv.setXY(q, uv.getX(q) * w / M, uv.getY(q) * d / M);
-        ctx.fieldAcc.add(g, new THREE.Matrix4(), col);
-        g.dispose();
-      }
-      // a windbreak of poplars along every third field road
-      if (iz % 3 === 0 && (ix & 1) === 0 && rr < R * 0.75) {
-        for (var t = 0; t < 5; t++) ctx.trees.push([x - fw / 2 + t * fw / 5, z - fd / 2, 0.85 + rnd() * 0.25, 1 + (t % 2)]);
-      }
-      if (rnd() < 0.08) ctx.trees.push([x + (rnd() - 0.5) * fw * 0.6, z + fd / 2 - 2 * M, 1.1 + rnd() * 0.3, 0]);
-    }
-  }
-  // a meadow round the site itself, kept clear of the court's own paving
-  var ct = ctx.court, gx0 = -ct.hx - 2 * M, gx1 = ct.hx + 2 * M, gz0 = ct.zb - 2 * M, gz1 = ct.zf + 2 * M;
-  strip(ctx, 'grass', -clear, -clear, clear, gz0, 0.025 * M);
-  strip(ctx, 'grass', -clear, gz1, clear, clear, 0.025 * M);
-  strip(ctx, 'grass', -clear, gz0, gx0, gz1, 0.025 * M);
-  strip(ctx, 'grass', gx1, gz0, clear, gz1, 0.025 * M);
-  strip(ctx, 'earth', -4 * M, gz1, 4 * M, clear, 0.035 * M);
-  for (var mt = 0; mt < 14; mt++) {
-    var ma = rnd() * 6.28, md = clear * (0.55 + 0.4 * rnd());
-    var mx = Math.cos(ma) * md, mz = Math.sin(ma) * md;
-    if (Math.abs(mx) < 6 * M && mz > 0) continue;
-    ctx.trees.push([mx, mz, 1.0 + rnd() * 0.4, Math.floor(rnd() * 4)]);
-  }
-  // field roads: earth tracks along the grid
-  for (var rz = -Math.ceil(R / fd); rz <= Math.ceil(R / fd); rz += 3) {
-    var zz = rz * fd - fd / 2;
-    [[-R, -clear], [clear, R]].forEach(function (span) { strip(ctx, 'earth', span[0], zz - 2 * M, span[1], zz + 2 * M, 0.035 * M); });
-  }
-  strip(ctx, 'earth', -4 * M, clear, 4 * M, R, 0.04 * M);
-  strip(ctx, 'earth', -R, -4 * M, -clear, 4 * M, 0.04 * M);
-  // the river: water, a reed-and-willow bank, a stone arch bridge
-  var N = 90, z0r = -R, z1r = R;
-  for (var i = 0; i < N; i++) {
-    var za = z0r + (z1r - z0r) * i / N, zb = z0r + (z1r - z0r) * (i + 1) / N;
-    var xa = river(za), xb = river(zb), rw = 26 * M;
-    A.water.face([[xa - rw / 2, 0.04 * M, za, xa, za], [xa + rw / 2, 0.04 * M, za, xa + rw, za], [xb + rw / 2, 0.04 * M, zb, xb + rw, zb], [xb - rw / 2, 0.04 * M, zb, xb, zb]], [0, 1, 0]);
-    // grass banks either side
-    [-1, 1].forEach(function (sd) {
-      A.grass.face([[xa + sd * rw / 2, 0.05 * M, za, xa, za], [xa + sd * (rw / 2 + 9 * M), 0.05 * M, za, xa + 9, za],
-                    [xb + sd * (rw / 2 + 9 * M), 0.05 * M, zb, xb + 9, zb], [xb + sd * rw / 2, 0.05 * M, zb, xb, zb]], [0, 1, 0]);
-    });
-    if (i % 2 === 0) ctx.trees.push([xa - rw / 2 - 5 * M, za, 1.0 + rnd() * 0.3, 1 + (i % 3)], [xa + rw / 2 + 5 * M, za + 12 * M, 1.0 + rnd() * 0.3, 2]);
-  }
-  var bzr = 60 * M, bxr = river(bzr);
-  archBridge(ctx, bxr, bzr, false, 44 * M, 5.5 * M, 3.6 * M, 0.5 * M);
-  strip(ctx, 'earth', bxr - 120 * M, bzr - 2.5 * M, bxr - 22 * M, bzr + 2.5 * M, 0.045 * M);
-  strip(ctx, 'earth', bxr + 22 * M, bzr - 2.5 * M, bxr + 160 * M, bzr + 2.5 * M, 0.045 * M);
-  // villages: courtyard houses round a threshing floor, a village temple,
-  // a pond, old trees
-  var T = {
-    vtemple: buildingTpl({ L: 13, D: 8, Hb: 0.8, He: 3.6, ov: 1.4, rise: 0.40, roof: 'xieshan', bay: 4.3 }),
-    vgate: buildingTpl({ L: 6, D: 4, Hb: 0.5, He: 3.0, ov: 1.0, rise: 0.40, roof: 'yingshan', bay: 3.0, ns: 3, nt: 2, house: true })
-  };
-  for (var v = 0; v < nv; v++) {
-    var vx = villages[v][0] * M, vz = villages[v][1] * M;
-    if (Math.abs(vx - river(vz)) < 70 * M) vx -= 140 * M;
-    strip(ctx, 'earth', vx - 24 * M, vz - 16 * M, vx + 24 * M, vz + 16 * M, 0.035 * M);       // 场 threshing floor
-    P.put('vtemple', T.vtemple, vx, vz - 30 * M, 0);
-    var n = 10 + Math.floor(rnd() * 9);
-    for (var hh = 0; hh < n; hh++) {
-      var a = rnd() * 6.28, dd = 36 * M + rnd() * 50 * M;
-      var hv = Math.floor(rnd() * 3);
-      var hx = vx + Math.cos(a) * dd, hz = vz + Math.sin(a) * dd * 0.8;
-      P.put('syh' + hv + (rnd() < 0.35 ? 'd' : ''), siheyuanTpl(hv), hx, hz, rnd() < 0.2 ? Math.PI : 0, 0.85);
-      if (rnd() < 0.8) ctx.trees.push([hx + 13 * M, hz - 9 * M, 1.0 + rnd() * 0.3, Math.floor(rnd() * 4)]);
-    }
-    // the pond
-    var px = vx + 30 * M, pz = vz + 34 * M, ring = [];
-    for (var e = 0; e < 16; e++) { var pa = e / 16 * 6.28, pr = 12 * M * (1 + 0.2 * Math.sin(pa * 3 + v)); ring.push([px + Math.cos(pa) * pr * 1.4, 0.045 * M, pz + Math.sin(pa) * pr, 0, 0]); }
-    A.water.face([[px, 0.045 * M, pz, 0, 0]].concat(ring).concat([ring[0]]), [0, 1, 0]);
-    for (var ot = 0; ot < 5; ot++) ctx.trees.push([px + (rnd() - 0.5) * 50 * M, pz + (rnd() - 0.5) * 40 * M, 1.1 + rnd() * 0.3, Math.floor(rnd() * 4)]);
-    // the road into the village
-    strip(ctx, 'earth', vx - 3 * M, vz + 16 * M, vx + 3 * M, vz + 110 * M, 0.04 * M);
-  }
 }
 
 // ---------------------------------------------------------------------------
@@ -1317,15 +1128,26 @@ function buildCountry(ctx) {
 function disposeWorld() {
   if (!WORLD.group) return;
   worldGroup.remove(WORLD.group);
+  if (WORLD.group.userData.fabric) WORLD.group.userData.fabric.dispose();
   var mats = [];
   WORLD.group.traverse(function (o) {
     if (!o.isMesh) return;
-    // template geometries are cached and shared; only the merged meshes go
-    if (!o.isInstancedMesh) o.geometry.dispose();
+    // template geometries are cached and shared; only the merged meshes and
+    // the instance buffers go
+    if (o.isInstancedMesh) { if (o.dispose) o.dispose(); }
+    else o.geometry.dispose();
     if (mats.indexOf(o.material) < 0) mats.push(o.material);
   });
   mats.forEach(function (m) { m.dispose(); });
+  pruneAoHidden();
   WORLD.group = null;
+}
+// the city's tiles near the eye are drawn in detail; called every frame,
+// cheap (a few hundred box tests). True when anything changed.
+function updateWorldLOD(cam) {
+  if (!WORLD.group || !worldGroup.visible) return false;
+  var F = WORLD.group.userData.fabric;
+  return F ? F.updateLOD(cam) : false;
 }
 function registerWorldLamps() {
   if (!WORLD.group) return;
@@ -1349,6 +1171,7 @@ function updateWorld(info, court, sync) {
     worldGroup.add(WORLD.group);
     registerWorldLamps();
     applyNightLights();
+    fitFog();
     requestRender();
   }
   if (sync || !WORLD.group) go(); else WORLD.timer = setTimeout(go, 360);

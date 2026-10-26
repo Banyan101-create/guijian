@@ -123,14 +123,16 @@ src/
   palette.js    the five 正色 and the eight presets
   site.js       courtyard, 御路, palace wall and gate, the palace city beyond (never exported)
   court.js      what stands in the court: 配殿, 钟鼓楼, 廊庑, trees, 吉祥缸, 香炉, 石灯
-  world.js      what lies beyond the wall: palace city, temple town or open country
+  world.js      what lies beyond the wall: the palace city, shared pieces (walls, gate towers, bridges), the build
+  fabric.js     the city's kit of small buildings and trees, and the tiles that draw it in two levels of detail
+  city.js       the layouts: imperial city, walled capital, temple town, open country, fields to the horizon
   app.js        rebuild(), materials, OBJ export with per-part welding
   ui.js         control surface
 ```
 
 Load order matters: `textures → scene → sky → geom → render → lamps →
 constants → roof → pagoda → hall → hallbuild → palette → site → court → world →
-app → ui`. Three.js r128, its OrbitControls
+fabric → city → app → ui`. Three.js r128, its OrbitControls
 and its `Sky` come from the CDN.
 
 Bay widths are **unequal** (77 斗口 at the 明间, −11 per bay outward), so
@@ -160,7 +162,7 @@ on a default hall; it now has nine.
 
 **A place, not a stage.** The hall stands in a 城砖-paved court with a raised
 御路 to its steps, inside a 6.5 m palace wall with a glazed coping and a 9 × 9
-studded gate; beyond it, instanced halls of the palace city recede into the
+studded gate; beyond it, the palace city and the capital recede into the
 haze, and a ring of hills sits on the horizon in aerial-perspective colour. The
 wall takes the scheme's wall colour, so a 江南 hall gets 粉墙. 环境 → 旷野 drops
 the court for open ground. None of it is exported.
@@ -211,21 +213,51 @@ needle sprays round a dark core, instanced, casting real shadows. Bronze
 石灯 stone lanterns line the way. 陈设 turns it all off. The court is built a
 moment after the last edit, so dragging a slider stays as quick as before.
 
-**The world beyond the wall.** A hall stands in a palace city: walled
-compounds on a grid of lanes, each with its main hall, side halls, gatehouse,
-trees, and here and there a garden with a pond and a pavilion; a forecourt to
-the south with the 金水河 bowed across it under five marble bridges, and a great
-gate on a 城台; a crenellated outer wall with 角楼 corner towers; the moat; 景山 to
-the north with its pavilions; 北海 to the west, the White Dagoba on its island;
-and hutong neighbourhoods of 四合院 fraying into the haze. A pagoda stands in a
-temple town instead -- hutong all round, a market street with 牌楼 running south
-to the city gate, a canal with stone bridges. In 旷野 the court stands among
-villages, a patchwork of fields, poplar windbreaks and a river. Every building
-out there is a real small building -- a curved, upturned roof with eaves,
-soffit, ridges and gables over a columned, latticed front -- made once per kind
-and instanced, about two hundred draw calls for all of it; its windows light
-at night. It is cached, and only rebuilt when the court changes size or the
-scheme's roof or wall colour changes.
+**The world beyond the wall.** A hall stands at the heart of a capital laid
+out the way Ming–Qing Beijing was. Inside the palace wall, compounds of every
+size -- no two columns or rows alike -- each with its own arrangement: a hall
+court, a 前殿后寝 pair joined by a covered way, two courts behind a cross wall,
+rows of living quarters, a garden with a pond and rockwork, a shrine in a grove,
+a prince's court under green tiles, with ranges of rooms (围房) along the walls.
+South of the court the 金水河 bows under five marble bridges to 午门. Round the
+palace, the moat, and round that the imperial city (皇城): red walls under
+yellow tiles, 天安门 on its 城台 with the outer 金水河, the 华表 and the 千步廊 down
+to 大清门; 端门 and the 朝房; the ancestral temple 太庙 in its grove of cypress;
+the altar of earth and grain 社稷坛, its top laid in the five earths and its low
+wall glazed in the colour of each quarter; 景山 in its own walls; the lakes of
+the 西苑 with the White Dagoba; and the offices, storehouses and shrines that
+served the court. Beyond the imperial wall, the city: hutong of 四合院 that
+differ lot by lot -- one, two or three courts, 倒座, 垂花门, 影壁, 厢房, 耳房, a
+storeyed 后罩楼, wells, grape trellises, a crowded 大杂院 with sheds built into
+its court, an official's red gate -- shop streets with signboards and
+two-storey fronts, princes' mansions (王府) with gardens, temples, the drum and
+bell towers, a market, lakes; then the grey city wall with 马面 bastions,
+barbicans, arrow towers and corner towers, the moat, suburbs along the roads,
+villages, fields and windbreaks, and fields again to the horizon, where the
+haze closes over them so the world has no edge.
+
+**Colour follows rank.** The jump from the palace's yellow and red to the
+city's grey is deliberate, because it was real. Yellow glazed tiles were for
+the emperor alone: his palaces, and the temples of his ancestors. Green tiles
+were allowed to princes' mansions and to temples; officials' houses could have
+painted gates but grey tile; a commoner's house was grey brick and grey tile,
+and its timber dark. The step between the two is made gradual the way the
+city made it: imperial yellow inside the palace, the imperial city's red
+walls and grey-tiled offices around it, green-tiled mansions and temples
+scattered through the town, and grey everywhere else.
+
+**Drawn so it stays smooth.** The city is tens of thousands of small
+buildings, drawn from one kit in tiles with two levels of detail: tiles near
+the eye are drawn in full (tiled roofs, brick, painted and latticed fronts,
+round trees), and all the near tiles share one mesh per part, so a dense
+quarter costs a few dozen draw calls; tiles further off are each baked into
+one plain coloured mesh. The palace-city halls are baked into one mesh per
+material. While the view is moving, the resolution drops a little if frames
+are slow, and comes back for the still. The ambient occlusion pass skips the
+distant city. It is all cached, and only rebuilt when the court changes size
+or the scheme's roof or wall colour changes. A pagoda stands in a walled temple
+town instead; in 旷野 the court stands among villages, fields, poplar
+windbreaks and a river.
 
 **Day and night.** The clock runs the whole 24 hours. After sunset the same
 directional light becomes the full moon (the equinox full moon rises as the

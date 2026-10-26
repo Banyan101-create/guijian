@@ -181,8 +181,10 @@ var _fogRT = null, _fogCam = null, _fogScene = null, _fogSky = null;
 function sampleHorizon() {
   try {
     if (!_fogRT) {
-      _fogRT = new THREE.WebGLRenderTarget(16, 16);
+      // four 16 x 16 views side by side, read back once: one stall, not four
+      _fogRT = new THREE.WebGLRenderTarget(64, 16);
       _fogRT.texture.encoding = THREE.sRGBEncoding;
+      _fogRT.scissorTest = true;
       _fogCam = new THREE.PerspectiveCamera(20, 1, 0.1, 100);
       _fogScene = new THREE.Scene();
       _fogSky = skyWithGain(new THREE.Sky());
@@ -190,17 +192,19 @@ function sampleHorizon() {
       _fogScene.add(_fogSky);
     }
     copySkyUniforms(_fogSky);
-    var buf = new Uint8Array(16 * 16 * 4), acc = [0, 0, 0], n = 0;
+    var buf = new Uint8Array(64 * 16 * 4), acc = [0, 0, 0], n = 0;
     var prev = renderer.getRenderTarget();
     for (var k = 0; k < 4; k++) {
       var a = k * Math.PI / 2 + 0.4;
       _fogCam.position.set(0, 0, 0);
       _fogCam.lookAt(Math.sin(a), 0.035, Math.cos(a));
+      _fogRT.viewport.set(k * 16, 0, 16, 16);
+      _fogRT.scissor.set(k * 16, 0, 16, 16);
       renderer.setRenderTarget(_fogRT);
       renderer.render(_fogScene, _fogCam);
-      renderer.readRenderTargetPixels(_fogRT, 0, 0, 16, 16, buf);
-      for (var i = 0; i < buf.length; i += 4) { acc[0] += buf[i]; acc[1] += buf[i + 1]; acc[2] += buf[i + 2]; n++; }
     }
+    renderer.readRenderTargetPixels(_fogRT, 0, 0, 64, 16, buf);
+    for (var i = 0; i < buf.length; i += 4) { acc[0] += buf[i]; acc[1] += buf[i + 1]; acc[2] += buf[i + 2]; n++; }
     renderer.setRenderTarget(prev);
     scene.fog.color.setRGB(acc[0] / n / 255, acc[1] / n / 255, acc[2] / n / 255);
     // after dark the Preetham sky is black; the haze takes the night sky's
@@ -360,7 +364,9 @@ function applyDaylight(t, weather) {
     rebuildEnvironment(); sampleHorizon(); tintHills();
     if (typeof updateSkyLayers === 'function') updateSkyLayers();
   }
-  if (!applyDaylight._last || now - applyDaylight._last > 90) {
+  // while the clock is being run (time-lapse, the night button) the
+  // environment is re-lit a little less often: it is the costly part
+  if (!applyDaylight._last || now - applyDaylight._last > (LIGHT.busy ? 240 : 90)) {
     applyDaylight._last = now;
     slow();
   }

@@ -177,6 +177,10 @@ function hqRender() {
   var skyVis = sky.visible, fog = scene.fog;
   sky.visible = false; scene.fog = null;
   var hidden = AO_HIDDEN.map(function (o) { var v = o.visible; o.visible = false; return v; });
+  // the city beyond is too far off for its occlusion to show, and drawing it
+  // twice is most of the cost of this pass
+  var wgv = typeof worldGroup !== 'undefined' && worldGroup.visible;
+  if (wgv) worldGroup.visible = false;
   scene.overrideMaterial = q.normalMat;
   var oldClear = renderer.getClearColor(new THREE.Color()), oldAlpha = renderer.getClearAlpha();
   renderer.setClearColor(0x7f7fff, 1);
@@ -186,6 +190,7 @@ function hqRender() {
   scene.overrideMaterial = null;
   sky.visible = skyVis; scene.fog = fog;
   AO_HIDDEN.forEach(function (o, i) { o.visible = hidden[i]; });
+  if (wgv) worldGroup.visible = true;
   renderer.setClearColor(oldClear, oldAlpha);
 
   // 3. occlusion. Radius is in view-space units: about a metre and a half at
@@ -249,10 +254,28 @@ function fitNearPlane() {
 //  haze follows the viewing distance as well as the building: pulled back to
 //  take in the whole city, the city should still be there, not lost in fog
 // ---------------------------------------------------------------------------
-var FOG_BASE = 20;
+var FOG_BASE = 20, _fogDir = new THREE.Vector3();
 function fitFog() {
   var d = WALK.active ? 0 : camera.position.distanceTo(controls.target);
   var want = Math.max(FOG_BASE, d * 0.5);
+  // ...but never so thin that the edge of the world shows: the haze is whole
+  // where the line of sight, straight ahead or at the sides of the view,
+  // leaves the last field
+  if (typeof WORLD_FOGCAP !== 'undefined' && WORLD_FOGCAP < 1e8 && worldGroup.visible) {
+    var w = WEATHER[LIGHT.weather] || WEATHER.clear, R = WORLD_FOGCAP;
+    var px = camera.position.x, pz = camera.position.z, cd = Math.hypot(px, pz);
+    camera.getWorldDirection(_fogDir);
+    var hl = Math.hypot(_fogDir.x, _fogDir.z), t = cd + R;
+    if (hl > 0.2 && cd < R) {
+      var a0 = Math.atan2(_fogDir.z, _fogDir.x);
+      [-0.5, 0, 0.5].forEach(function (da) {
+        var dx = Math.cos(a0 + da), dz = Math.sin(a0 + da), b = px * dx + pz * dz;
+        t = Math.min(t, -b + Math.sqrt(Math.max(0, b * b - cd * cd + R * R)));
+      });
+    }
+    var far = Math.hypot(t, camera.position.y);
+    want = Math.min(want, Math.max(FOG_BASE, far / w.fog[1]));
+  }
   if (Math.abs(want - FOG_SCALE) / FOG_SCALE > 0.06) { FOG_SCALE = want; applySky(); }
 }
 
@@ -355,6 +378,7 @@ renderer.domElement.addEventListener('pointermove', function (e) {
   WALK.yaw = WALK.drag.yaw + (e.clientX - WALK.drag.x) * 0.004;
   WALK.pitch = Math.max(-1.2, Math.min(1.3, WALK.drag.pitch + (e.clientY - WALK.drag.y) * 0.004));
   walkApply();
+  fitFog();
   requestRender(); RENDER_STATE.lastMotion = performance.now();
 });
 ['pointerup', 'pointercancel'].forEach(function (ev) {
@@ -434,12 +458,46 @@ window.addEventListener('resize', function () {
   renderer.setSize(window.innerWidth, window.innerHeight);
   requestRender();
 });
+// a moved window or a zoomed page can change the device pixel ratio
+window.matchMedia && (function watch() {
+  try {
+    var mq = window.matchMedia('(resolution: ' + (window.devicePixelRatio || 1) + 'dppx)');
+    var on = function () {
+      DYN.full = DYN.move = Math.min(window.devicePixelRatio || 1, 2);
+      DYN.min = Math.max(0.6, DYN.full * 0.6);
+      setRatio(DYN.full); requestRender();
+      if (mq.removeEventListener) mq.removeEventListener('change', on);
+      watch();
+    };
+    if (mq.addEventListener) mq.addEventListener('change', on);
+  } catch (e) {}
+})();
 
-var _lastT = performance.now();
+// ---------------------------------------------------------------------------
+//  resolution while moving: if frames come slower than ~40 a second the
+//  moving view is drawn at a lower pixel ratio (never below 60 %); the still
+//  that follows is always drawn at full resolution
+// ---------------------------------------------------------------------------
+var DYN = { full: renderer.getPixelRatio(), move: renderer.getPixelRatio(), cur: renderer.getPixelRatio(), ema: 16.7, last: 0 };
+DYN.min = Math.max(0.6, DYN.full * 0.6);
+function setRatio(r) {
+  if (Math.abs(r - DYN.cur) < 0.02) return;
+  DYN.cur = r;
+  renderer.setPixelRatio(r);
+}
+function adaptRatio(now, ms) {
+  DYN.ema = DYN.ema * 0.8 + Math.min(ms, 100) * 0.2;
+  if (now - DYN.last < 700) return;
+  if (DYN.ema > 25 && DYN.move > DYN.min) { DYN.move = Math.max(DYN.min, DYN.move * 0.82); DYN.last = now; }
+  else if (DYN.ema < 15 && DYN.move < DYN.full) { DYN.move = Math.min(DYN.full, DYN.move * 1.12); DYN.last = now; }
+  setRatio(DYN.move);
+}
+
+var _lastT = performance.now(), _wasMoving = false;
 function startLoop() {
   (function loop() {
     requestAnimationFrame(loop);
-    var now = performance.now(), dt = Math.min(0.1, (now - _lastT) / 1000);
+    var now = performance.now(), ms = now - _lastT, dt = Math.min(0.1, ms / 1000);
     _lastT = now;
     var moved = updateCameraFlight();
     if (!WALK.active) moved = controls.update() || moved;
@@ -450,11 +508,19 @@ function startLoop() {
     if (moved) { RENDER_STATE.lastMotion = now; RENDER_STATE.dirty = true; RENDER_STATE.hqDone = false; }
     if (RENDER_STATE.dirty) {
       RENDER_STATE.dirty = false;
+      // two moving frames in a row: their spacing is the frame time
+      if (moved && _wasMoving) adaptRatio(now, ms);
+      else if (moved) setRatio(DYN.move);
+      _wasMoving = moved;
+      updateWorldLOD(camera);
       renderFrame(false);
       return;
     }
+    _wasMoving = false;
     if (!RENDER_STATE.hqDone && now - RENDER_STATE.lastMotion > 160) {
       RENDER_STATE.hqDone = true;
+      setRatio(DYN.full);
+      updateWorldLOD(camera);
       renderFrame(true);
     }
   })();

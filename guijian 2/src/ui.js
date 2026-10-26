@@ -546,6 +546,7 @@
     function light(m) {
       minutes = ((m % 1440) + 1440) % 1440;
       last.m = minutes; last.w = wx.value;
+      LIGHT.busy = !!(anim || lapse);
       applyDaylight(minutes / 1440, wx.value);
       $('dayOut').textContent = label(minutes);
       if (nb) nb.setAttribute('aria-pressed', NIGHT.k > 0.5 ? 'true' : 'false');

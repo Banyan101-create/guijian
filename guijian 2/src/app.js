@@ -198,7 +198,6 @@ function buildModel() {
     brick: dress(std('#8f8e8a'), 'wallBrick', Me),
     cap: dress(std(cRoof), 'stone', Me, { size: 1.4, roughMul: 0.6 }),
     door: dress(std(cWood), 'lacquer', Me),
-    cityGround: dress(std('#7e7b75', { vertexColors: true }), 'brick', 1, { size: 1.92 * Me, normal: 0.3 }),
     gold: goldMat
   };
   BOUNCE_ALBEDO.copy(C('#8d8a83')).multiplyScalar(0.8);
@@ -367,6 +366,7 @@ function finishBuild(topY, radius, info, siteMats) {
   // reach a little past the building so the nearest trees and vats cast too
   fitShadowTo(new THREE.Vector3(0, topY * 0.35, 0), radius * 1.55);
   setFogScale(frameRadius);
+  fitFog();
   purgeTextureCache();
   markShadowsDirty();
 }
